@@ -3,18 +3,18 @@ output:
   html_document: default
   pdf_document: default
 ---
-# raise_fs
+# raise_fs repository
 # IRM for RAISE-FS project
 
 ## Introduction
 
 There are three major activities:
 
-2.1 General renewal of script(s) to account for R package changes and deprecation (e.g. terra and rgdal) 
+* 2.1 General renewal of script(s) to account for R package changes and deprecation (e.g. terra and rgdal) 
 
-2.2 Easier choice of criteria (more dynamic and flexible) easier combination of criteria to understand scalability for different commodities and innovations
+* 2.2 Easier choice of criteria (more dynamic and flexible) easier combination of criteria to understand scalability for different commodities and innovations
 
-2.3 Simplicity in the script (use R shiny app) or restructuring of the script
+* 2.3 Simplicity in the script (use R shiny app) or restructuring of the script
 
 ## 2.1 General renewal of script(s)
 
@@ -32,17 +32,20 @@ Previous IRM scripts used sf and raster objects.
 
 ### 2.1.1 Base script
 
-D:/repos/irm/code/rmd/IRM guide.Rmd
+*D:/repos/irm/code/rmd/irm_modular20210203.Rmd*
 
-D:/repos/irm/code/rmd/irm_modular20210203.Rmd 
+This version from 3rd February 2021 includes modular organisation with a separate functions.R file.
+This script includes a rule base diagram.
 
-This version from 3rd February 2021 includes modular organisation with separate functions.R file.
-Includes rule base diagram.
-
-D:/repos/irm/code/rmd/irm_modular.Rmd 
+*D:/repos/irm/code/rmd/irm_modular.Rmd*
 
 This version from 9th May 2021 includes better coding of multiple innovations, and an extra section on production.
 
+
+*D:/repos/irm/code/rmd/IRM guide.Rmd*
+
+This script is a hard coded guide to the directories and parameter files that comprise the R repository (in this case the irm repository).
+This guide should be used as a template for the raise_fs repository.
 
 
 
@@ -51,44 +54,72 @@ This version from 9th May 2021 includes better coding of multiple innovations, a
 
 #### 2.1.2.1 Multiple innovations
 
-D:/repos/rcm/shiny_hide_sidebar/dig_dtd_hma.Rmd this allowed for three innovations but was hardcoded
+*D:/repos/rcm/shiny_hide_sidebar/dig_dtd_hma.Rmd*
 
+This script allowed for three innovations but the criteria parameters were hard coded in the yaml header, and code chunks were suffixed with the innovation number.
 
+Ideally the number of innovations should be assigned by the user, along with the name of the innovation, at the same time a more compact script would allow the chunk to be re-run for each innovation.
 
 
 #### 2.1.2.2 Yield Estimates
 
-D:/repos/rcm/shiny_hide_sidebar/yield_test.Rmd
+*D:/repos/rcm/shiny_hide_sidebar/yield_test.Rmd*
 
 This looks at fuzzy partitions and compares with the hypothetical yield over a range of precipitation values.
 
-D:/repos/irm/code/rmd/IRM_criteria_correlation.Rmd
-D:/repos/irm/code/rmd/IRM_yield_calculation_arsi_hawassa09.Rmd
+The current classifications for suitability are a legacy of the original code which assessed the optimality of the different criteria. The optimality value is similar to the rating scale in Sys et al. (1993).
+
+|Class|Degree of limitation|Rating scale|
+|---|------|------|
+| | |  100  |
+| |  0  | |
+| S1||95|
+||1||
+|||85|
+|S2|2||
+|||60|
+|S3|3||
+|||40|
+|N1|||
+||4|25|
+|N2|||
+|||0|
+
+The rating scale could be yield, but depending on the criterion could also be a qualitative assessment of reliability or flexibility (Beek, 1978).
+
+
+
+*D:/repos/irm/code/rmd/IRM_criteria_correlation.Rmd*
+
+
+*D:/repos/irm/code/rmd/IRM_yield_calculation_arsi_hawassa09.Rmd*
 
 
 #### 2.1.2.3 Soil texture from sand, silt clay fractions
 
-D:/repos/irm/code/rmd/Soil texture.rmd
+*D:/repos/irm/code/rmd/Soil texture.rmd*
 
 
 #### 2.1.2.4 Spatially variable sowing date
 
-e.g. D:/repos/sourcing_targets/sowing_date_test_4_CRASA_ZMB_soybean.Rmd
+*e.g. D:/repos/sourcing_targets/sowing_date_test_4_CRASA_ZMB_soybean.Rmd*
 
 
 #### 2.1.2.5 Replacement of raster with terra
 
-e.g. D:/repos/sourcing_targets/IRM_4_CRASA_soybean_ZM_GP_spatial_new.rmd
+*e.g. D:/repos/sourcing_targets/IRM_4_CRASA_soybean_ZM_GP_spatial_new.rmd*
 
-This script includes automatic date settings.
-A new parameter for spatially variable season onset.
-Allows for different growth stages for temperature and precipitation.
-Uses Well Known Text (WKT) for defining the projection instead of proj4.
-Uses the terra package for raster and vector management.
-New functions for monthly and dekad growth periods.
-Uses more dplyr methods such as mutate, select and filter
-USDA texture values filled in a separate external csv file
-Includes new crisp classification of results to show just optimal and completely suboptimal classifications
+This script includes:
+
+* Automatic date settings.
+* A new parameter for spatially variable season onset.
+* Allows for different growth stages for temperature and precipitation.
+* Uses Well Known Text (WKT) for defining the projection instead of proj4.
+* Uses the terra package for raster and vector management.
+* New functions for monthly and dekad growth periods.
+* More dplyr methods such as mutate, select and filter
+* USDA texture values filled in a separate external csv file
+* New crisp classification of results to show just optimal and completely suboptimal classifications
 
 
 
@@ -98,7 +129,7 @@ In the current version of IRM it is possible to choose the criteria that are con
 
 However, some components are hard-wired in the script. For instance the climatic suitability expects both temperature and rainfall criteria. Also the map of limitations expects all the criteria to be present (i.e. socio-economic feasibility, soil physical, soil fertility, landscape, land use and climate).
 
-## 2.2.1 Rule Base Diagram
+### 2.2.1 Rule Base Diagram
 
 In 2021 a rule base diagram was introduced to make clear to the user how the rule bases contributed to the overall likelihood for adoption (D:/repos/irm/code/rmd/rule_base_diagram_relational_tables.Rmd). This relied on user defined codes, which link rule base stacks with lower level rule bases. The solution assumes some rule base stacks e.g. soil physical, soil fertility. 
 
