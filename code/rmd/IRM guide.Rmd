@@ -1,0 +1,194 @@
+---
+title: "IRM guide to directories and parameter files"
+author: "A Farrow"
+date: "05/02/2021"
+output:
+  html_document:  
+    code_folding: "show"
+    theme: united
+    number_sections: no
+    toc: yes
+    toc_float: true
+    toc_depth: 6
+---
+
+```{r initialise01, cache = FALSE, echo=FALSE, message=FALSE, warning=FALSE}
+
+# initialisation
+  library(tidyverse)
+  library(knitr)
+ 
+```
+
+# Project_dir/raise_fs
+
+The raise_fs root directory. We use the 'here' package which always refers to this directory. All other paths are relative to this directory.
+
+## Project_dir/raise_fs/code
+
+The raise_fs code directory - also includes shiny and packages.
+
+
+### Project_dir/raise_fs/code/r
+
+The raise_fs R code directory.
+
+File             | Description
+-----------------|----------------------------------
+irm_functions.R  |  a R script with functions specific to IRM but not in the IRM package
+
+
+###		Project_dir/raise_fs/code/rmd
+
+The raise_fs Rmd code directory.
+
+File             | Description
+-----------------|----------------------------------
+irm_modular.Rmd  |  the current name for the script to run IRM
+irm_modular.html|  the current output html file
+
+ 
+### 	Project_dir/raise_fs/code/rmd/figures/...
+
+The raise_fs Rmd figures directory set in the initialise02 chunk. Will also automatically create leaflet and other widgets in sub-directories.
+
+File             | Description
+-----------------|----------------------------------
+*.png  |  image files for each created during IRM
+
+
+#### Project_dir/raise_fs/code/rmd/js
+
+The raise_fs javascript and css code directory.
+
+File             | Description
+-----------------|----------------------------------
+hideOutput.js  |  Extra javascript used for hiding chunk outputs
+style.css|  a stylesheet used when knitting the html file
+
+ 	
+##	Project_dir/raise_fs/spatial_data
+
+The raise_fs spatial data directory.
+
+### Project_dir/raise_fs/spatial_data/input
+
+The directory of spatial data used as an **input** in IRM.
+
+File             | Description
+-----------------|----------------------------------
+ag_land_arsi.tif | Agricultural land geotif (any CRS)
+ basesat_arsi.tif  | Base saturation geotif (any CRS)
+ cec_arsi.tif | CEC geotif (any CRS)
+ cor_frag_arsi.tif | Coarse fragments geotif (any CRS)
+ **crs_arsi_hawassa09.txt** | Text file of arsi_hawassa09 CRS in proj4 format
+ depth_arsi.tif | Soil Depth geotif (any CRS)
+ drain_arsi.tif | drainage (#) geotif (any CRS)
+ ec_arsi.tif | electrical conductivity (dS/m) geotif (any CRS)
+ ex_bases_arsi.tif | Exchangeable bases geotif (any CRS)
+ **mask_arsi_hawassa09.tif** | Mask geotif (uses the arsi_hawassa09 CRS)
+ pHh2o_arsi.tif | Soil pH-H2O (between 0 and 14) geotif (any CRS)
+ prec_m_arsi.tif | monthly precipitation sum (mm) geotif (any CRS)
+ slope_arsi.tif | slope (degrees) geotif (any CRS)
+ soc_arsi.tif | soil organic carbon (g/kg) geotif (any CRS)
+ srtm_arsi.tif | elevation (masl) geotif (any CRS)
+ **subdiv_arsi_hawassa09.geojson** | subdivision multipart polygons of modelling area geojson (WGS84 CRS)
+ tavg_m_arsi.tif | monthly mean tempreature (degC) geotif (any CRS)
+ **triangulation_arsi_hawassa09.geojson** | triangulation points geojson (WGS84 CRS)
+ txt_arsi.tif | soil texture (USDA #) geotif (any CRS)
+*** 
+Files in **bold** are obligatory
+ 
+ 
+###		Project_dir/raise_fs/spatial_data/output
+
+The directory of spatial data produced as an **output** from IRM.
+
+File             | Description
+-----------------|----------------------------------
+apt_arsi_hawassa09.geojson | point file of all inputs and results (WGS84 CRS)
+ba_nuance_subdiv_area_arsi_hawassa09.geojson |  polygon file of biophysical aptitude nuanced results in hectares per subdivision (WGS84 CRS)
+ba_nuance_subdiv_pc_arsi_hawassa09.geojson |  polygon file of biophysical aptitude nuanced results in percentage of the area per subdivision (WGS84 CRS)
+ba_subdiv_area_arsi_hawassa09.geojson | polygon file of biophysical aptitude results in hectares per subdivision (WGS84 CRS)
+ba_subdiv_pc_arsi_hawassa09.geojson | polygon file of biophysical aptitude results in percentage of the area per subdivision (WGS84 CRS)
+ 
+ 
+##	Project_dir/raise_fs/tab_data	
+
+The raise_fs tabular data directory.
+
+### Project_dir/raise_fs/tab_data/input
+
+The directory of tabular data used as an **input** in IRM.
+
+File             | Description
+-----------------|----------------------------------
+growth_stages_arsi_hawassa09.csv | definition of growth stage lengths, and sowing/planting date [full details...](#growth_stages-link)
+**priorities_arsi_hawassa09.csv** | definition of all criteria, rule base structure, weights, thresholds, data file prefixes, rule propositions and conclusions and contribution to yield estimation [full details...](#priorities-link)
+usda_texture_arsi_hawassa09.csv | table for classifying soil texture in IRM from USDA# to value [full details...](#texture-link)
+*** 
+Files in **bold** are obligatory
+ 
+###		Project_dir/raise_fs/tab_data/output
+
+The directory of tabular data produced as an **output** from IRM.
+
+File             | Description
+-----------------|----------------------------------
+ba_nuance_subdiv_area_arsi_hawassa09.csv | table of biophysical aptitude nuanced results in hectares per subdivision (WGS84 CRS)
+ba_nuance_subdiv_pc_arsi_hawassa09.csv | table of biophysical aptitude nuanced results in percentage of the area per subdivision (WGS84 CRS)
+ba_subdiv_area_arsi_hawassa09.csv | table of biophysical aptitude results in hectares per subdivision (WGS84 CRS)
+ba_subdiv_pc_arsi_hawassa09.csv | table of biophysical aptitude results in percentage of the area per subdivision (WGS84 CRS)
+
+
+# Important files
+
+## priorities_arsi_hawassa09.csv {#priorities-link}
+
+Column name / Variable | Description  | No data
+-----------------|----------------------------------|-----------------
+id | criterion number not used in code | Always renumber
+rulebase_stack | rule base stack id (can be duplicated) | Use 'NA' to denote no data
+rulebase_number | rule base number id (unique) | Use 'NA' to denote no data
+criterion | criterion name used in rule base diagramme | Always has a value
+weight | weight of socioeconomic criterion weights of rule bases in a rule base stack must sum to 1  | Leave blank to denote no data
+threshold | every rule base with raw data needs at least one thresholds to define the propositions |Leave blank to denote no data
+threshold2 | used when there are three propositions|Leave blank to denote no data
+width	 | width of first threshold |Leave blank to denote no data
+width2 | width of second threshold |Leave blank to denote no data
+data_desc | description of data used for the criterion | Use 'NA' to denote no data
+data_file_prefix | prefix which is combined with innovation name to define data file | Use 'NA' to denote no data
+raster_or_brick | if the raster data has a single layer use 'raster' if multiple layers use 'brick' | Use 'NA' to denote no data
+agg_fun | function used when aggregating rasters use 'mean', 'median' or 'mode' as appropriate | Use 'NA' to denote no data
+rsm_fun | function used when resampling rasters use 'bilinear' or 'ngb' as appropriate | Use 'NA' to denote no data
+phen_stage | short name for phenological stage consistent with growth stage csv file | Use 'NA' to denote no data
+prop_level_1 | proposition level 1 (values below first threshold) | Use 'NA' to denote no data
+prop_level_2 | proposition level 2 (values above first threshold)  | Use 'NA' to denote no data
+prop_level_3 | proposition level 3 (values above second threshold) | Use 'NA' to denote no data
+conclusion_1 | conclusion level 1 | Use 'NA' to denote no data
+conclusion_2 | conclusion level 2 | Use 'NA' to denote no data
+conclusion_3 | conclusion level 3 | Use 'NA' to denote no data
+yield |  1 if criterion or rule base stack contributes to yield estimation |Leave blank to denote no data
+
+
+## growth_stages_arsi_hawassa09.csv {#growth_stages-link}
+
+Column name / Variable | Description  | No data
+-----------------|----------------------------------|----------------------------------
+name| short name of phenological stage consistent with 'phen_stage' in priorities csv. First value always sowing date |	Always has a value
+day	| sowing date julian day number between 0 and 365 | First value always sowing date. Leave other rows blank
+length	| length in days of each phenological stage. Always include total length even if not used as a criterion | First value always blank. Other rows always have a value
+criteria | is this phenological stage a criterion for IRM  | First value always 0. Other rows 0 for not a criterion
+
+
+## usda_texture_arsi_hawassa09.csv {#texture-link}
+
+Column name / Variable | Description  | No data
+-----------------|----------------------------------|----------------------------------
+USDA_Texture_Class 	 | Numeric USDA texture class from 1 to 12 | Always has a value
+USDA_Texture_Code	 | USDA texture code e.g.  'ClLo' | Use 'NA' to denote no data
+USDA_Texture_Description	 | USDA texture description e.g.  'sandy clay loam' | Use 'NA' to denote no data
+Suitability	 | Factor rating given in Sys et al (1993) e.g. S2 | Use 'NA' to denote no data
+IRM_Value | Relationship between factor rating and aptitude optimality between 0 (N1) and 1 (S1) | Use 'NA' to denote no data
+
+ 
