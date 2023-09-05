@@ -47,6 +47,23 @@ This version from 9th May 2021 includes better coding of multiple innovations, a
 This script is a hard coded guide to the directories and parameter files that comprise the R repository (in this case the irm repository).
 This guide should be used as a template for the raise_fs repository.
 
+*D:/repos/raise-fs/code/rmd/irm_modular.Rmd*
+
+This will be the base script used in raise_fs repository.
+
+The base script will allow for:
+* 2 innovations (more dynamic choices will follow)
+* estimation of yield and production
+* comparison of suitability and yield of innovations
+* variable sowing dates (variable growth period lengths possibly to follow)
+
+The base script will use where possible the following packages:
+* terra instead of raster
+* SpatRaster instead of Raster
+* SpatVector instead of sf vectors
+* dplyr instead of base functions/methods
+* WKT instead of proj4
+
 
 
 ### 2.1.2 Extensions
