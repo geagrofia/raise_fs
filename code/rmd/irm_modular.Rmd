@@ -1,7 +1,7 @@
 ---
 title: Fuzzy rule based modelling of the biophysical aptitude and the socio-economic feasibility
-author: "Dennis Walvoort and Andy Farrow"
-date: "November 2015 -- January 2021"
+author: ""
+date: "`r Sys.Date()`"
 output:
   html_document:  
     code_folding: "hide"
@@ -19,11 +19,13 @@ params:
   GRS1: 1
   SUBDIV1: RK_NAME
   TRI1: Aptitude
+  SOS1: 1
   INN2: NA
   RES2: 3
   GRS2: 1
   SUBDIV2: TABIA
   TRI2: Aptitude
+  SOS2: 1
 ---
 
 <style>
@@ -53,6 +55,8 @@ div.Agg { background-color:#e6f0ff; border-radius: 5px; padding: 10px; font-size
 
 # GRS sets whether there are growth stages defined for the innovation. A value of 1 shows that there are growth stages defined in a csv file, and that (some) of the climatic criteria should be evaluated for the specific growth stages
 
+# SOS sets whether the season onset is spatially defined. If so, SOS has a value of 1 and the start of the growing period is set using a raster rather than the value in the growth stage csv file. Otherwise SOS is 0.
+
 # Agg defines the aggregation factor. This can be set above in the header with an integer value, or can be passed from the interface. The larger the aggregation factor the quicker the computation. The minimum value is 1.
 
 # RES defines whether 3-class suitability, 9-class suitability or both classes are computed. Computing both classes will increase the time to run the script!
@@ -75,13 +79,13 @@ div.Agg { background-color:#e6f0ff; border-radius: 5px; padding: 10px; font-size
 ```{r initialise01, cache = FALSE, echo=FALSE, message=FALSE, warning=FALSE}
 
 # initialisation
-  library(raster)
-  library(maptools)
+ # library(raster)
+ # library(maptools)
   library(tidyverse)
   library(fuZR)
   library(knitr)
   library(irm)
-  library(rgdal)
+  #library(rgdal)
   library(tinytex)
   library(ggplot2)
   library(conflicted)
@@ -90,7 +94,7 @@ div.Agg { background-color:#e6f0ff; border-radius: 5px; padding: 10px; font-size
   library(leaflet)
   library(tibble)
   library(sf)
-  library(stars)
+  #library(stars)
   library(widgetframe)
   library(patchwork)
   library(here)
@@ -98,7 +102,9 @@ div.Agg { background-color:#e6f0ff; border-radius: 5px; padding: 10px; font-size
   library(lava)
   library(svgPanZoom)
   library(scales)
- 
+  library(terra)
+  library(tidyterra)
+  library(lubridate)
 ```
 
 ```{r initialise02, echo=FALSE, message=FALSE, warning=FALSE}
@@ -171,6 +177,7 @@ priorities %>%
 
 kable(digits = 3) %>% kable_styling("striped", full_width = T) %>%
   row_spec(0, angle = -45) %>%  scroll_box(height = "500px")
+
 ```
 </div>
 
@@ -181,6 +188,29 @@ Boxes in green show basic rule bases which have data and a fuzzy partition defin
 <div class="fold o"> 
 ```{r rule_base_graphs, results='asis'}
 
+
+edges <-  select(priorities, criterion, stack) %>% dplyr::filter( !is.na(stack)) # %>% 
+#as.matrix(ncol = 2)
+
+vertices <-  select(priorities, criterion) 
+
+library(igraph)
+#graph_rb <- graph_from_edgelist(edges)
+graph_rb <- graph_from_data_frame(edges, directed=TRUE, vertices=vertices)
+#dotfile_graph_rb <- write_graph(graph_rb, paste0("../../tab_data/output/graph_rb", "dot"))
+#if (!interactive()) {
+#  unlink(file)
+#}
+plot(graph_rb)
+print(graph_rb, e=TRUE, v=TRUE)
+adj_list <- as_adj_list(graph_rb, mode = c("in"))
+
+```
+</div>
+
+
+<div class="fold o"> 
+```{r rule_base_graphs2, results='asis'}
 # In this chunk we will use the DiagrammeR package to produce a graph diagram of the rule bases, using the information provided by the priorities csv file loaded in the previous chunk.
 
 # the DiagrammeR package expects a valid graph specification in the DOT language. The graph is a kind of network with nodes and edges. For our purposes the nodes are the criteria and the rule bases. The edges are directed lines that show how each contributes and can also the weight of each criteria (or the results of previously run rule bases)
@@ -208,7 +238,9 @@ rbnumberlist3 <- unique(rbnumberlist2)
 rbnumberlist4 <- rbnumberlist3[rbnumberlist3 %ni% rbstacklist3]
 rbnumberlist5 <- paste(rbnumberlist4, collapse=";")
 
-edges1 <- paste(rbnumberlist2,rbstacklist2, sep="->")
+rbnumberlist2 <- rbnumberlist2[! rbnumberlist2 %in% c('adop_0')]
+
+edges1 <- paste(rbnumberlist2,rbstacklist2, sep="->")  
 edges2 <- paste(edges1, collapse=" ")
 
 rbnumberlabellist1 <- rbnumberdf1[,"id_label"]  
@@ -240,10 +272,12 @@ grViz(rulebasegraph)
 
 
 #knitr::knit_exit() # this stops knitting useful for debugging
+
 ```
 </div>
 
 ```{r rule_base_stack_binary, results='asis'}
+
 
 # adoption rule base exists?
 if (("adop_0" %in% rbstacklist3) & ("ba_1" %in% rbstacklist3) & ("se_1" %in% rbstacklist3)){
@@ -265,6 +299,11 @@ if ("ba_2a" %in% rbnumberlist3) {
 if (params$GRS1 == 1){
     grs_crit <- TRUE
 } else {grs_crit <- FALSE}
+
+# season onset spatial?
+if (params$SOS == 1){
+    sos_crit <- TRUE
+} else {sos_crit <- FALSE}
 
 # climate rule base exists?
 if ("ba_2b" %in% rbstacklist3) {
@@ -361,8 +400,9 @@ Here we load the table of the growth stages.")
     kable(digits = 3, caption = "Growth Stage Lengths") %>% kable_styling("striped", full_width = T) %>% print
   
 # create a new table just for where growth stage has requirements
-growth_stages_req <- dplyr::filter(growth_stages, criteria == 1)  
-  
+growth_stages_req <- dplyr::filter(growth_stages, (prec_criteria == 1 | temp_criteria == 1))
+growth_stages_req_prec <- dplyr::filter(growth_stages, prec_criteria == 1)  
+growth_stages_req_temp <- dplyr::filter(growth_stages, temp_criteria == 1)   
   
   
   # get the number of variables in growth_stages (excluding sowing/planting date and total length)
@@ -400,6 +440,52 @@ growth_stages_req <- dplyr::filter(growth_stages, criteria == 1)
 
 Here we load all the spatial data. The data are used in different chunks below but it is easier to modify filenames if all the spatial data are imported in the same chunk.
 
+## Vector Data
+
+The vector data include the sub-divisions of the area that is being modelled, and triangulation points if available.
+
+The vector data are not projected and in geojson format. Here they are loaded and projected to the working crs
+
+
+<div class="fold o">   
+```{r spatialdataload_vector_01, cache = FALSE, out.width="100%", include = TRUE, echo=FALSE}
+
+
+vect_subdiv <- load_crs_vector_data( paste0("subdiv_", params$INN1), crs_irm)
+vect_subdiv$id <- as.integer(rownames(vect_subdiv))
+vect_subdiv$id <- formatC(vect_subdiv$id, width = 2, format = "d", flag = "0") # add an id field
+
+vect_subdiv_extent <- extent(vect_subdiv)
+
+nudge_xval <-
+  ((st_bbox(vect_subdiv)[3] - st_bbox(vect_subdiv)[1]) /  (nrow(vect_subdiv) * 2.5))
+cat("nudge_xval =", nudge_xval)
+nudge_yval <-
+  ((st_bbox(vect_subdiv)[4] - st_bbox(vect_subdiv)[2]) /  (nrow(vect_subdiv) * 2.5))
+cat("nudge_yval =", nudge_yval)
+
+vect_subdiv_pt <- st_centroid(vect_subdiv)
+expr <- paste0("vect_subdiv_pt$", params$SUBDIV1)
+vect_subdiv_pt$subdiv_label <- paste(vect_subdiv_pt$id, "=", eval(parse(text=(expr))))
+vect_subdiv_pt$subdiv_label <- factor(vect_subdiv_pt$subdiv_label)
+
+
+vect_triangulation <- load_crs_vector_data( paste0("triangulation_", params$INN1), crs_irm)
+
+crs(vect_subdiv)
+
+g <- ggplot()+
+      geom_sf(data=vect_subdiv)+
+      geom_sf_text(data=vect_subdiv, aes_string(label = paste(params$SUBDIV1))) +
+      geom_sf(data=vect_triangulation, color = "Red")+
+      geom_sf_text(data=vect_triangulation, aes_string(label = paste(params$TRI1)), color = "Red", size = 2)+
+      coord_sf(datum=st_crs(crs_irm))
+g
+
+```
+</div>
+
+
 ## Raster Data
 
 The raster spatial data are loaded first.
@@ -408,18 +494,91 @@ Only the mask need be in the working crs.
 <div class="fold o">   
 ```{r spatialdataload_raster_01, results='asis', warning=FALSE}
 
-# set the working crs using a text file with proj4 arguments
 
-crs_filename <-
-  as.character(paste("spatial_data/input/crs_", params$INN1, ".txt", sep = ""))
-crs_irm <-  read_lines(here(crs_filename))
 
-# load the raster data for mask function defined in irm_functions.R
-# this raster must have the same crs as the working crs
 
-r_mask <-
-  load_raster_data(paste0("mask_", params$INN1), r_mask, raster)
 
+# set the working crs using WKT arguments
+
+wkt_lam <-  paste0(
+    "PROJCRS[\"unknown\",
+    BASEGEOGCRS[\"unknown\",
+        DATUM[\"World Geodetic System 1984\",
+            ELLIPSOID[\"WGS 84\",6378137,298.257223563,
+                LENGTHUNIT[\"metre\",1]],
+            ID[\"EPSG\",6326]],
+        PRIMEM[\"Greenwich\",0,
+            ANGLEUNIT[\"degree\",0.0174532925199433],
+            ID[\"EPSG\",8901]]],
+    CONVERSION[\"unknown\",
+        METHOD[\"Lambert Azimuthal Equal Area\",
+            ID[\"EPSG\",9820]],
+        PARAMETER[\"Latitude of natural origin\",",
+vect_subdiv_extent@ymin,
+    ",ANGLEUNIT[\"degree\",0.0174532925199433],
+            ID[\"EPSG\",8801]],
+        PARAMETER[\"Longitude of natural origin\",",
+vect_subdiv_extent@xmin,
+    ",ANGLEUNIT[\"degree\",0.0174532925199433],
+            ID[\"EPSG\",8802]],
+        PARAMETER[\"False easting\",1000000,
+            LENGTHUNIT[\"metre\",1],
+            ID[\"EPSG\",8806]],
+        PARAMETER[\"False northing\",1000000,
+            LENGTHUNIT[\"metre\",1],
+            ID[\"EPSG\",8807]]],
+    CS[Cartesian,2],
+        AXIS[\"(E)\",east,
+            ORDER[1],
+            LENGTHUNIT[\"metre\",1,
+                ID[\"EPSG\",9001]]],
+        AXIS[\"(N)\",north,
+            ORDER[2],
+            LENGTHUNIT[\"metre\",1,
+                ID[\"EPSG\",9001]]]]"
+  )
+
+
+crs_lam <- st_crs(wkt_lam)
+proj4_lam <- showP4(wkt_lam)
+
+# project the country boundary to LAM
+
+vect_subdiv_proj <-  st_transform(vect_subdiv, crs_lam)
+vect_subdiv_proj <- terra::vect(vect_subdiv_proj)
+
+vect_subdiv_proj_extent <- extent(vect_subdiv_proj)
+vect_subdiv_proj_extent <- terra::ext(vect_subdiv_proj)
+
+# project the cropland to LAM
+
+vect_subdiv_cropland_proj <- terra::project(vect_subdiv_cropland, wkt_lam)
+
+# make a basic raster with dimensions of 900 * 700 with 2km resolution 
+# and projected crs 
+
+rast_subdiv_mask_proj_extent <- rast(crs = wkt_lam, extent = vect_subdiv_proj_extent, resolution = 2000)
+
+# make the mask based on the country boundary
+
+rast_subdiv_mask_proj <- terra::rasterize(
+      vect_subdiv_proj,
+      rast_subdiv_mask_proj_extent,
+      field = 1,
+      background = NA
+    ) 
+
+# make the mask based on the cropland
+
+rast_subdiv_cropland_mask_proj <- terra::rasterize(
+      vect_subdiv_cropland_proj,
+      rast_subdiv_mask_proj_extent,
+      field = 1,
+      background = NA
+    )
+
+
+# crs(rast_ISO_cropland_mask_proj) <- proj4_lam
 
 # subset the priorities dataframe to keep only the records that have distinct raster data files
 
@@ -435,61 +594,19 @@ for (i in seq(from = 1,
               to = nrow(raster_data_df),
               by = 1)) {
   assign(
-    paste0("r_", raster_data_df[i, 11]),
+    paste0("rast_", raster_data_df[i, 11]),
     load_raster_data(
       as.character(raster_data_df[i, 11]),
-      paste0("r_", raster_data_df[i, 11]),
+      paste0("rast_", raster_data_df[i, 11]),
       match.fun(as.character(raster_data_df[i, 12]))
     )
   )
-  cat(paste0("\nr_", raster_data_df[i, 11], " :"))
+  cat(paste0("\nrast_", raster_data_df[i, 11], " :"))
   print(crs(get(paste0(
-    "r_", raster_data_df[i, 11]
+    "rast_", raster_data_df[i, 11]
   ))))
 }
 
-
-```
-</div>
-
-## Vector Data
-
-The vector data include the sub-divisions of the area that is being modelled, and triangulation points if available.
-
-The vector data are not projected and in geojson format. Here they are loaded and projected to the working crs
-
-
-<div class="fold o">   
-```{r spatialdataload_vector_01, cache = FALSE, out.width="100%", include = TRUE, echo=FALSE}
-
-v_subdiv <- load_crs_vector_data( paste0("subdiv_", params$INN1), crs_irm)
-v_subdiv$id <- as.integer(rownames(v_subdiv))
-v_subdiv$id <- formatC(v_subdiv$id, width = 2, format = "d", flag = "0") # add an id field
-
-nudge_xval <-
-  ((st_bbox(v_subdiv)[3] - st_bbox(v_subdiv)[1]) /  (nrow(v_subdiv) * 2.5))
-cat("nudge_xval =", nudge_xval)
-nudge_yval <-
-  ((st_bbox(v_subdiv)[4] - st_bbox(v_subdiv)[2]) /  (nrow(v_subdiv) * 2.5))
-cat("nudge_yval =", nudge_yval)
-
-v_subdiv_pt <- st_centroid(v_subdiv)
-expr <- paste0("v_subdiv_pt$", params$SUBDIV1)
-v_subdiv_pt$subdiv_label <- paste(v_subdiv_pt$id, "=", eval(parse(text=(expr))))
-v_subdiv_pt$subdiv_label <- factor(v_subdiv_pt$subdiv_label)
-
-
-v_triangulation <- load_crs_vector_data( paste0("triangulation_", params$INN1), crs_irm)
-
-crs(v_subdiv)
-
-g <- ggplot()+
-      geom_sf(data=v_subdiv)+
-      geom_sf_text(data=v_subdiv, aes_string(label = paste(params$SUBDIV1))) +
-      geom_sf(data=v_triangulation, color = "Red")+
-      geom_sf_text(data=v_triangulation, aes_string(label = paste(params$TRI1)), color = "Red", size = 2)+
-      coord_sf(datum=st_crs(crs_irm))
-g
 
 ```
 </div>
@@ -506,12 +623,15 @@ The properties of this map are given below:
 <div class="fold o">  
 ```{r mask01, cache = TRUE, cache.whatever=params$Agg, out.width="100%", warning=FALSE}
 
-r_mask  %>% plot(title = paste("Original mask\nResolution = ", res(r_mask)))
 
-ra_mask <- aggregate(r_mask, fact = params$Agg, expand = TRUE)
 
-ra_mask
-ra_mask %>% plot(title = paste("Aggregated mask\nResolution = ", res(ra_mask)))
+
+if (params$Agg == 1){rast_mask_proj <- rast_subdiv_cropland_mask_proj} else {
+  rast_mask_proj <- aggregate(rast_subdiv_cropland_mask_proj, fact = params$Agg, expand = TRUE)}
+
+
+rast_mask_proj
+rast_mask_proj %>% terra::plot(main = paste("Aggregated mask\nResolution = ", res(rast_mask_proj)))
 
 ```
 </div>
@@ -520,7 +640,7 @@ A factor is calculated to determine the area of each raster cell in hectares.
 
 ```{r mask02, cache = FALSE, warning=FALSE }
 
-Stat_factor_ha <- ((xres(ra_mask)^2) / 10000) # factor used for statistical calculations divides the area of a raster cell (in m2) by 10000 to give the area of the cell in hectares 
+Stat_factor_ha <- ((xres(rast_mask_proj)^2) / 10000) # factor used for statistical calculations divides the area of a raster cell (in m2) by 10000 to give the area of the cell in hectares 
 
 cat(paste(Stat_factor_ha, "hectares in each cell"))
 
@@ -534,29 +654,44 @@ This mask designates the locations where predictions should be made, and an empt
 
 # only run the models for the areas in the mask
 
-cond_data <- coordinates(rasterToPoints(ra_mask)) %>% as_tibble()
+cond_data <- geom(terra::as.points(rast_mask_proj)) %>% as_tibble()
 
 x <-  pull(cond_data, x)
 y <-  pull(cond_data, y)
 xy <- cbind(x, y)
 
 str(cond_data)
-``` 
-</div>
-
-
-
-```{r}
 
 if (params$INT == 1)
   shiny::setProgress(0.17, message = "Resampling data 1st Innovation")  # set progress to 17%
-```
+``` 
+</div>
 
-
-## Reproject, Aggregate and Resample
+## Rough crop, Reproject, Aggregate and Resample
 
 <div class="fold o">   
 ```{r agg_resample_01, cache = TRUE, out.width="100%", results='asis', warning=FALSE}
+
+
+# do a rough crop of the thematic data for the country extent in the CRS of the thematic data
+
+
+
+for (i in seq(from = 1,
+              to = nrow(raster_data_df),
+              by = 1)) {
+  
+  temp_crs <- crs(get(paste0("rast_", raster_data_df[i, 11])))
+  assign("vect_ISO_temp_crs", terra::project(vect_ISO, temp_crs))
+  assign("vect_ISO_temp_crs_extent", terra::ext(vect_ISO_temp_crs))
+    
+  assign(
+    paste0("rast_", raster_data_df[i, 11], "_roughcrop"),
+    crop(get(paste0("rast_", raster_data_df[i, 11])),
+      vect_ISO_temp_crs_extent)
+  )  
+}
+
 
 for (i in seq(from = 1,
               to = nrow(raster_data_df),
@@ -567,36 +702,40 @@ for (i in seq(from = 1,
 # compare the crs of the raster with the working crs
 # when different project the raster  
   
-  if ( paste(crs(get(paste0("r_", raster_data_df[i, 11])))) %ni% paste(crs_irm)) {  
+  if ( paste(crs(get(paste0("rast_", raster_data_df[i, 11])))) %ni% paste(proj4_lam)) {  
   
+  print("different crs")  
   assign(
-    paste0("r_", raster_data_df[i, 11], "_prj"),
+    paste0("rast_", raster_data_df[i, 11], "_prj"),
     raster_project(
-      get(paste0("r_", raster_data_df[i, 11])),
-      crs_irm,
+      get(paste0("rast_", raster_data_df[i, 11], "_roughcrop")),
+      #proj4_lam,
       as.character(raster_data_df[i, 14])
     )
   )  
+  
   } else {
 
+   print("same crs") 
 # when not different just create a new raster with the same prj suffix  
     assign(
-    paste0("r_", raster_data_df[i, 11], "_prj"),
-    get(paste0("r_", raster_data_df[i, 11]))
+    paste0("rast_", raster_data_df[i, 11], "_prj"),
+    get(paste0("rast_", raster_data_df[i, 11], "_roughcrop"))
       )
   }
 
 # calculate aggregate factor for each criterion for both dimensions of the raster (these are the same for a square cell shape)
   
   cat(paste(raster_data_df[i, 10]))
+
   calc_agg_factor <-
-    (res(ra_mask) / res(get(paste0(
-      "r_", raster_data_df[i, 11], "_prj"
+    (res(rast_mask_proj) / res(get(paste0(
+      "rast_", raster_data_df[i, 11], "_prj"
     ))))
   cat(paste("calculated aggregate factor = ", calc_agg_factor))
   cat("\n")
   
-  if (calc_agg_factor[1] < 1) {
+ if (calc_agg_factor[1] < 1) {
     calc_agg_factor[1] <- 1
     
     # this means that the mask has a higher resolution than the precipitation raster so aggregation is not necessary and the precipitation raster will stay the same resolution
@@ -612,31 +751,32 @@ for (i in seq(from = 1,
   }
   
   # for each record in the raster_data_df data frame use the data file prefix to recreate the raster name, and the aggregation and resample functions
-  
+  cat(paste("aggregate and resample"))
   assign(
-    paste0("r_", raster_data_df[i, 11], "_rsmp"),
+    paste0("rast_", raster_data_df[i, 11], "_rsmp"),
     agg_resample(
-      get(paste0("r_", raster_data_df[i, 11], "_prj")),
+      get(paste0("rast_", raster_data_df[i, 11], "_prj")),
       calc_agg_factor,
-      get(paste(raster_data_df[i, 13])),
+      as.character(raster_data_df[i, 13]),
       as.character(raster_data_df[i, 14])
     )
   )
   
   plot_raster <-
-    plot(
-      get(paste0("r_", raster_data_df[i, 11], "_rsmp")),
-      title = paste0(
+    terra::plot(
+      get(paste0("rast_", raster_data_df[i, 11], "_rsmp")),
+      main = paste0(
         as.character(raster_data_df[i, 10]),
-        "\nagg ",
+        " agg ",
         as.character(raster_data_df[i, 13]),
-        "\nrsmp ",
+        " rsmp ",
         as.character(raster_data_df[i, 14])
       ),
-      n = 10
-    )
-  print(plot_raster)
-  plot(ra_mask, title = "") # this is needed (even if it is not actually plotted) to enable the plot of the raster
+      breaks = 10
+   )
+  #print(plot_raster)
+  plot_raster
+#  terra::plot(rast_mask_proj, title = "") # this is needed (even if it is not actually plotted) to enable the plot of the raster
   
 }
 
@@ -682,8 +822,13 @@ print(paste(n_cba3, "Climatic criteria: "))
 
 for (i in 1:n_cba3) {
   print(paste(criteria_ba3[i, 4]))
-  clim_mask <- get(paste0("r_", criteria_ba3[i, 11], "_rsmp"))
-  names(clim_mask) <- c(month.name)
+  clim_mask <- get(paste0("rast_", criteria_ba3[i, 11], "_rsmp"))
+  if (paste(criteria_ba3[i, 23]) == "m") {
+  clim_mask_m <- clim_mask
+  names(clim_mask_m) <- c(month.name)
+  } else {
+  clim_mask_d <- clim_mask
+  names(clim_mask_d) <- c(1:36)}
 }
 
 # then determine and print the names of the rule bases in the climatic theme
@@ -721,39 +866,208 @@ cat("If there are climatic criteria that are for specific growth stages and whic
 
 ## division by zero rainfall is infinitive, thus edited by Atkilt
 
-values(clim_mask)[values(clim_mask) >= 0] = 0
-values(clim_mask)[values(clim_mask) < 0] = NA
+values(clim_mask_m)[values(clim_mask_m) >= 0] = 0
+values(clim_mask_m)[values(clim_mask_m) < 0] = NA
 
+values(clim_mask_d)[values(clim_mask_d) >= 0] = 0
+values(clim_mask_d)[values(clim_mask_d) < 0] = NA
 
 # see if one of the criteria is for the total growing period, if so then generate distribution
 
-# this uses a function from the irm package called .growth_period which takes two arguments: day_begin, and day_end in day numbers
-# these can be obtained from the growth_stages_req table
+# this uses two functions from the irm package called .growth_period_long (for monthly data) and .growth_period_long_dekad (for dekadal data) 
+
+# both functions take three arguments: day_begin, and day_end in day numbers (obtained from the growth_stages_req table) and num_years which is calculated based on whether the growing season is spread across more than one calendar year
 
 
 # for each of the growth stages for which there are requirements create a new raster brick
 
+# monthly distribution
+
 for (i in 1:(nrow(growth_stages_req))) {
   period_name <- as.character(growth_stages_req[i, 1])
-  v <-
+  v_m <-
     .growth_period_long(phen_stages_beg[period_name], phen_stages_end[period_name], num_years)
-  assign(paste0("r_period_", growth_stages_req[i, 1]),
-         clim_mask %>%
-           calc(function(x) {
-             ifelse(is.na(x), NA_real_, v)
+  assign(paste0("rast_period_m_", growth_stages_req[i, 1]),
+         clim_mask_m %>%
+           app(function(x) {
+             ifelse(is.na(x), NA_real_, v_m)
            }))
   
   plot_raster <-
-    plot(get(paste0("r_period_", growth_stages_req[i, 1])),
-         title = paste0("r_period_",
-                        as.character(growth_stages_req[i, 1])),
-         n = 10)
+    plot(get(paste0("rast_period_m_", growth_stages_req[i, 1])),
+         main = paste0("rast_period_m_",
+                        as.character(growth_stages_req[i, 1])))
+  print(plot_raster)
+}
+
+# dekadal distribution
+
+for (i in 1:(nrow(growth_stages_req))) {
+  period_name <- as.character(growth_stages_req[i, 1])
+  v_d <-
+    .growth_period_long_dekad(phen_stages_beg[period_name], phen_stages_end[period_name], num_years)
+  assign(paste0("rast_period_d_", growth_stages_req[i, 1]),
+         clim_mask_d %>%
+           app(function(x) {
+             ifelse(is.na(x), NA_real_, v_d)
+           }))
+  
+  plot_raster <-
+    plot(get(paste0("rast_period_d_", growth_stages_req[i, 1])),
+         main = paste0("rast_period_d_",
+                        as.character(growth_stages_req[i, 1])), maxnl = 36)
   print(plot_raster)
 }
 
 ``` 
 </div>
 
+
+<div class="fold o">   
+```{r requirements_phen_stages01_sos_m, cache = TRUE, cache.whatever=params$Agg, fig.width=8, fig.height=7, out.width="100%", warning=FALSE, eval=grs_crit, eval=sos_crit}
+
+# monthly growth stages have been pre-modelled for the spatial onset of season
+
+# for each of the growth stages for which there are requirements create a new raster brick
+
+##-- monthly distribution --
+
+for (i in 1:(nrow(growth_stages_req))) {
+  period_name <- as.character(growth_stages_req[i, 1])
+  cat("period_name = ", period_name, "\n")
+
+
+# load growth period rasters
+
+assign(paste0("rast_period_m_", period_name,"_original"),   
+rast(paste0("D:/repos/sourcing_targets/data/ZMB/soybean/mth_", period_name,"_r.tif"))) 
+  
+# reproject growth period rasters
+
+assign(paste0("rast_period_m_", period_name,"_prj"),  
+  terra::project( get(paste0("rast_period_m_", period_name,"_original")),   rast_mask_proj, "near"))
+
+# aggregate if necessary
+
+#calc_agg_factor_m <-
+#    (res(rast_mask_proj) / res(rast_period_m_total_prj))
+#  cat(paste("calculated aggregate factor m = ", calc_agg_factor_m))
+
+calc_agg_factor_m <- (res(rast_mask_proj) / res(get(paste0("rast_period_m_", period_name,"_prj"))))
+
+cat(paste("calculated aggregate factor m = ", calc_agg_factor_m))
+
+
+if (calc_agg_factor_m[1] < 1) {
+    calc_agg_factor_m[1] <- 1
+    
+    # this means that the mask has a higher resolution than the precipitation raster so aggregation is not necessary and the precipitation raster will stay the same resolution
+    
+    cat(paste("revised calculated aggregate factor m1 = ", calc_agg_factor_m[1]))
+  }
+    cat("\n")
+  
+if (calc_agg_factor_m[2] < 1) {
+    calc_agg_factor_m[2] <- 1
+    cat(paste("revised calculated aggregate factor m2 = ", calc_agg_factor_m[2]))
+  }  
+  
+# resample
+
+  cat(paste("aggregate and resample"))
+ 
+#    rast_period_m_total <- 
+#    agg_resample(
+#      rast_period_m_total_prj,
+#      calc_agg_factor_m, "modal", "near")
+  
+  assign(paste0("rast_period_m_", period_name),  
+    agg_resample(get(paste0("rast_period_m_", period_name,"_prj")),
+    calc_agg_factor_m, "modal", "near"))
+  
+    
+# plot
+
+  plot(get(paste0("rast_period_m_", period_name)),
+      main = paste0(period_name," - spatial monthly"))  
+  
+}
+```  
+</div>    
+ 
+<div class="fold o">   
+```{r requirements_phen_stages01_sos_d, cache = TRUE, cache.whatever=params$Agg, fig.width=8, fig.height=7, out.width="100%", warning=FALSE, eval=grs_crit, eval=sos_crit}
+
+# dekadal growth stages have been pre-modelled for the spatial onset of season
+
+# for each of the growth stages for which there are requirements create a new raster brick
+
+##-- dekadal distribution --
+
+for (i in 1:(nrow(growth_stages_req))) {
+  period_name <- as.character(growth_stages_req[i, 1])
+  cat("period_name = ", period_name, "\n")
+
+
+# load growth period rasters
+
+assign(paste0("rast_period_d_", period_name,"_original"),   
+rast(paste0("D:/repos/sourcing_targets/data/ZMB/soybean/dek_", period_name,"_r.tif"))) 
+  
+# reproject growth period rasters
+
+assign(paste0("rast_period_d_", period_name,"_prj"),  
+  terra::project( get(paste0("rast_period_d_", period_name,"_original")),   rast_mask_proj, "near"))
+
+# aggregate if necessary
+
+#calc_agg_factor_m <-
+#    (res(rast_mask_proj) / res(rast_period_m_total_prj))
+#  cat(paste("calculated aggregate factor m = ", calc_agg_factor_m))
+
+calc_agg_factor_d <- (res(rast_mask_proj) / res(get(paste0("rast_period_d_", period_name,"_prj")))) 
+
+cat(paste("calculated aggregate factor d = ", calc_agg_factor_d))
+
+
+if (calc_agg_factor_d[1] < 1) {
+    calc_agg_factor_d[1] <- 1
+    
+    # this means that the mask has a higher resolution than the precipitation raster so aggregation is not necessary and the precipitation raster will stay the same resolution
+    
+    cat(paste("revised calculated aggregate factor d1 = ", calc_agg_factor_d[1]))
+  }
+    cat("\n")
+  
+if (calc_agg_factor_d[2] < 1) {
+    calc_agg_factor_d[2] <- 1
+    cat(paste("revised calculated aggregate factor d2 = ", calc_agg_factor_d[2]))
+  }  
+  
+# resample
+
+  cat(paste("aggregate and resample"))
+ 
+#    rast_period_m_total <- 
+#    agg_resample(
+#      rast_period_m_total_prj,
+#      calc_agg_factor_m, "modal", "near")
+  
+  assign(paste0("rast_period_d_", period_name),  
+    agg_resample(get(paste0("rast_period_d_", period_name,"_prj")),
+    calc_agg_factor_d, "modal", "near"))
+  
+    
+# plot
+
+  plot(get(paste0("rast_period_d_", period_name)),
+      main = paste0(period_name," - spatial dekadal"), maxnl = 36)  
+}
+
+```     
+    
+ 
+</div>
 
 ```{r requirements_prec01, echo=FALSE, results='asis', eval=prec_crit, eval=grs_crit}
 
@@ -768,40 +1082,42 @@ By combining precipitation in each month and the phenological stages above, we c
 ```{r requirements_prec02, cache = TRUE, cache.whatever=params$Agg, fig.width=8, fig.height=7, out.width="100%", fig.show="hold", warning=FALSE, eval=prec_crit, eval=grs_crit}
 
 criteria_ba3a <-
-    subset(criteria_ba3,
-           grepl("^ba_3a", criteria_ba3$rulebase_stack))
+    dplyr::filter(criteria_ba3, grepl("^ba_3a", rulebase_stack) & temp_resolution == "m") # filter precipitation criteria
   
-  for (i in 1:nrow(growth_stages_req)) {
-        period_name <- as.character(growth_stages_req[i, 1])
+  for (i in 1:nrow(growth_stages_req_prec)) {
+        period_name <- as.character(growth_stages_req_prec[i, 1])
       print(period_name)
       if (sum(criteria_ba3a[i, 'phen_stage'] == period_name, na.rm = TRUE) == 1) {
         print(paste0("period_name = ", as.character(period_name)))
         crit_rownum <-
           which(criteria_ba3a$phen_stage == period_name)
-        assign(paste0("r_", criteria_ba3a[crit_rownum, 11], "_rsmp_", growth_stages_req[i, 1]),
+        assign(paste0("rast_", criteria_ba3a[crit_rownum, 11], "_rsmp_", growth_stages_req_prec[i, 1]),
                sum(get(
-                 paste0("r_", criteria_ba3a[crit_rownum, 11], "_rsmp")
+                 paste0("rast_", criteria_ba3a[crit_rownum, 11], "_rsmp")
                ) * get(
-                 paste0("r_period_", growth_stages_req[i, 1])
+                 paste0("rast_period_", growth_stages_req_prec[i, 1])
                )))
         print(get(
-          paste0("r_", criteria_ba3a[crit_rownum, 11], "_rsmp_", growth_stages_req[i, 1])
+          paste0("rast_", criteria_ba3a[crit_rownum, 11], "_rsmp_", growth_stages_req_prec[i, 1])
         ))
         plot_raster <-
           plot(get(
-            paste0("r_", criteria_ba3a[crit_rownum, 11], "_rsmp_", growth_stages_req[i, 1])
+            paste0("rast_", criteria_ba3a[crit_rownum, 11], "_rsmp_", growth_stages_req_prec[i, 1])
           ),
-          title = paste0("r_period_",
-                         as.character(growth_stages_req[i, 1])),
-          n = 10)
+          main = paste0("rast_period_m_",
+                         as.character(growth_stages_req_prec[i, 1])))
         print(plot_raster)
         
         
         new_col <-
-          get(paste0("r_", criteria_ba3a[crit_rownum, 11], "_rsmp_", growth_stages_req[i , 1])) %>% raster::extract(xy) # extract the raster values using xy points
+          get(paste0("rast_", criteria_ba3a[crit_rownum, 11], "_rsmp_", growth_stages_req_prec[i , 1])) %>% raster::extract(xy) # extract the raster values using xy points
+        
+        new_col <- new_col[[1]]
+        
+        cond_data <- dplyr::select(cond_data, -any_of(c(as.character(paste0(criteria_ba3a[crit_rownum, 3]))))) # remove column if name already exists
         
         cond_data <-
-          add_column(cond_data,!!as.character(paste0(criteria_ba3a[crit_rownum, 3])) := new_col)   # add the raster values to the cond_data tibble, this needs to be dynamic so uses the !! and := operators
+          mutate(cond_data,!!as.character(paste0(criteria_ba3a[crit_rownum, 3])) := new_col, .keep = c("all"))   # add the raster values to the cond_data tibble, this needs to be dynamic so uses the !! and := operators
         
         
       } else {
@@ -809,7 +1125,49 @@ criteria_ba3a <-
       }
     }
 
-
+criteria_ba3a <-
+    dplyr::filter(criteria_ba3, grepl("^ba_3a", rulebase_stack) & temp_resolution == "d") # filter precipitation criteria
+  
+  for (i in 1:nrow(growth_stages_req_prec)) {
+        period_name <- as.character(growth_stages_req_prec[i, 1])
+      print(period_name)
+      if (sum(criteria_ba3a[i, 'phen_stage'] == period_name, na.rm = TRUE) == 1) {
+        print(paste0("period_name = ", as.character(period_name)))
+        crit_rownum <-
+          which(criteria_ba3a$phen_stage == period_name)
+        assign(paste0("rast_", criteria_ba3a[crit_rownum, 11], "_rsmp_", growth_stages_req_prec[i, 1]),
+               sum(get(
+                 paste0("rast_", criteria_ba3a[crit_rownum, 11], "_rsmp")
+               ) * get(
+                 paste0("rast_period_d_", growth_stages_req_prec[i, 1])
+               )))
+        print(get(
+          paste0("rast_", criteria_ba3a[crit_rownum, 11], "_rsmp_", growth_stages_req_prec[i, 1])
+        ))
+        plot_raster <-
+          plot(get(
+            paste0("rast_", criteria_ba3a[crit_rownum, 11], "_rsmp_", growth_stages_req_prec[i, 1])
+          ),
+          main = paste0("rast_period_d_",
+                         as.character(growth_stages_req_prec[i, 1])))
+        print(plot_raster)
+        
+        
+        new_col <-
+          get(paste0("rast_", criteria_ba3a[crit_rownum, 11], "_rsmp_", growth_stages_req_prec[i , 1])) %>% raster::extract(xy) # extract the raster values using xy points
+        
+        new_col <- new_col[[1]]
+        
+        cond_data <- dplyr::select(cond_data, -any_of(c(as.character(paste0(criteria_ba3a[crit_rownum, 3]))))) # remove column if name already exists
+        
+        cond_data <-
+          mutate(cond_data,!!as.character(paste0(criteria_ba3a[crit_rownum, 3])) := new_col, .keep = c("all"))   # add the raster values to the cond_data tibble, this needs to be dynamic so uses the !! and := operators
+        
+        
+      } else {
+        print(sum(criteria_ba3a[, 'phen_stage'] == period_name, na.rm = TRUE))
+      }
+    }
 
 ``` 
 </div>
@@ -959,11 +1317,11 @@ for (i in 1:(nrow(criteria_ba3a))) {
   s_col <- getMembership(get(paste0("fpm_",
                                     criteria_ba3a[i, 3]))$suboptimal)
   cond_data <-
-    add_column(cond_data,!!as.character(paste0(criteria_ba3a[i, 3], "_o")) := o_col)
+    mutate(cond_data,!!as.character(paste0(criteria_ba3a[i, 3], "_o")) := o_col, .keep = c("all"))
   cond_data <-
-    add_column(cond_data,!!as.character(paste0(criteria_ba3a[i, 3], "_s")) := s_col)
+    mutate(cond_data,!!as.character(paste0(criteria_ba3a[i, 3], "_s")) := s_col, .keep = c("all"))
   
-  n = 2
+  n <- 2
   fpm_conc_var <-
     c(as.character(paste0(criteria_ba3a[i, 3], "_o")), as.character(paste0(criteria_ba3a[i, 3], "_s")), "x" , "y")
   fpm_conc_name <-
@@ -988,56 +1346,133 @@ By combining temperature in each month and the phenological stages above, we can
 
 ```
 
-
 <div class="fold o">   
-```{r requirements_temp02, cache = TRUE, cache.whatever=params$Agg, fig.width=8, fig.height=7, out.width="100%", fig.show="hold", warning=FALSE, eval=tmp_crit, eval=grs_crit}
+```{r requirements_temp02, cache = TRUE, cache.whatever=params$Agg, fig.width=8, fig.height=7, out.width="100%", fig.show="hold", warning=FALSE, eval=temp_crit, eval=grs_crit}
 
-criteria_ba3b <-
-  subset(criteria_ba3,
-         grepl("^ba_3b", criteria_ba3$rulebase_stack))
+#criteria_ba3b <-
+#    subset(criteria_ba3,
+#           grepl("^ba_3b", criteria_ba3$rulebase_stack)) # subset temperature criteria
 
-for (i in 1:nrow(growth_stages_req)) {
-  period_name <- as.character(growth_stages_req[i, 1])
-  print(period_name)
-  if (sum(criteria_ba3b[i, 'phen_stage'] == period_name, na.rm = TRUE) == 1) {
-    print(paste0("period_name = ", as.character(period_name)))
-    crit_rownum <-
-      which(criteria_ba3b$phen_stage == period_name)
-    assign(paste0("r_", criteria_ba3b[crit_rownum, 11], "_rsmp_", growth_stages_req[i, 1]),
-           (sum(get(
-             paste0("r_", criteria_ba3b[crit_rownum, 11], "_rsmp")
-           ) * get(
-             paste0("r_period_", growth_stages_req[i, 1])
-           )) / sum(get(
-             paste0("r_period_", growth_stages_req[i, 1])
-           ))))
-    print(get(
-      paste0("r_", criteria_ba3b[crit_rownum, 11], "_rsmp_", growth_stages_req[i, 1])
-    ))
-    plot_raster <-
-      plot(get(
-        paste0("r_", criteria_ba3b[crit_rownum, 11], "_rsmp_", growth_stages_req[i, 1])
-      ),
-      title = paste0("r_period_",
-                     as.character(growth_stages_req[i, 1])),
-      n = 10)
-    print(plot_raster)
-    
-    
-    new_col <-
-      get(paste0("r_", criteria_ba3b[crit_rownum, 11], "_rsmp_", growth_stages_req[i, 1])) %>% raster::extract(xy) # extract the raster values using xy points
-    
-    cond_data <-
-      add_column(cond_data, !!as.character(paste0(criteria_ba3b[crit_rownum, 3])) := new_col)   # add the raster values to the cond_data tibble, this needs to be dynamic so uses the !! and := operators
-    
-    
-  } else {
-    print(sum(criteria_ba3b[, 'phen_stage'] == period_name, na.rm = TRUE))
-  }
+criteria_ba3b_m <-
+    dplyr::filter(criteria_ba3, grepl("^ba_3b", rulebase_stack) & temp_resolution == "m") # filter temperature criteria
+
+# A Farrow 01/06/2023 the following assumes that there is only one temperature criterion per growth stage
+# In fact there may be multiple so a different way of looping through the criteria is needed
+
+
+if (nrow(criteria_ba3b_m) > 0) {
+  for (i in 1:nrow(growth_stages_req_temp)) {
+      period_name <- as.character(growth_stages_req_temp[i, 1])
+      print(paste0("m period_name = ", as.character(period_name)))
+      print(criteria_ba3b_m[i, 'phen_stage'])
+      print(sum(criteria_ba3b_m[i, 'phen_stage'] == period_name))
+      
+      if (sum(criteria_ba3b_m[i, 'phen_stage'] == period_name, na.rm = TRUE) == 1) {
+        print(paste0("m period_name = ", as.character(period_name)))
+        
+        # get criterion row number for the specific growth stage
+        
+        crit_rownum <-
+          which(criteria_ba3b_m$phen_stage == period_name)
+        
+        # add another for loop if more than one value in crit_rownum vector
+        
+        for (j in 1:length(crit_rownum)) {
+        
+        assign(paste0("rast_", criteria_ba3b_m[crit_rownum[j], 11], "_rsmp_", growth_stages_req_temp[i, 1]),
+               (sum(get(
+                 paste0("rast_", criteria_ba3b_m[crit_rownum[j], 11], "_rsmp")
+               ) * get(
+                 paste0("rast_period_m_", growth_stages_req_temp[i, 1])
+               )) / sum(get(
+                 paste0("rast_period_m_", growth_stages_req_temp[i, 1])
+               ))))
+        
+        #sum(r_tmean_calc_agg_mean_rsmp_bil * r_period_v) / sum(r_period_v)
+        
+        #print(get(
+#          paste0("rast_", criteria_ba3b_m[crit_rownum, 11], "_rsmp_", growth_stages_req_temp[i, 1])
+#        ))
+        plot_raster <-
+          plot(get(
+            paste0("rast_", criteria_ba3b_m[crit_rownum[j], 11], "_rsmp_", growth_stages_req_temp[i, 1])
+          ),
+          main = paste0("rast_period_m_",
+                         as.character(growth_stages_req_temp[i, 1])))
+#        print(plot_raster)
+        
+        
+        new_col <-
+          get(paste0("rast_", criteria_ba3b_m[crit_rownum[j], 11], "_rsmp_", growth_stages_req_temp[i , 1])) %>% raster::extract(xy) # extract the raster values using xy points
+        
+        new_col <- new_col[[1]]
+        
+        cond_data <- dplyr::select(cond_data, -any_of(c(as.character(paste0(criteria_ba3b_m[crit_rownum[j], 3]))))) # remove column if name already exists
+        
+        cond_data <-
+          mutate(cond_data,!!as.character(paste0(criteria_ba3b_m[crit_rownum[j], 3])) := new_col, .keep = c("all"))   # add the raster values to the cond_data tibble, this needs to be dynamic so uses the !! and := operators
+        
+        } 
+      } else {
+        print(paste0("else m ", period_name, sum(criteria_ba3b_m[, 'phen_stage'] == period_name, na.rm = TRUE)))
+      }
+    }
 }
 
-``` 
+
+criteria_ba3b_d <-
+    dplyr::filter(criteria_ba3, grepl("^ba_3b", rulebase_stack) & temp_resolution == "d") # filter temperature criteria
+
+if (nrow(criteria_ba3b_d) > 0) {  
+  for (i in 1:nrow(growth_stages_req_temp)) {
+        period_name <- as.character(growth_stages_req_temp[i, 1])
+      print(period_name)
+      if (sum(criteria_ba3b_d[i, 'phen_stage'] == period_name, na.rm = TRUE) == 1) {
+        print(paste0("period_name = ", as.character(period_name)))
+        crit_rownum <-
+          which(criteria_ba3b_d$phen_stage == period_name)
+        assign(paste0("rast_", criteria_ba3b_d[crit_rownum, 11], "_rsmp_", growth_stages_req_temp[i, 1]),
+               (sum(get(
+                 paste0("rast_", criteria_ba3b_m[crit_rownum, 11], "_rsmp")
+               ) * get(
+                 paste0("rast_period_d_", growth_stages_req_temp[i, 1])
+               )) / sum(get(
+                 paste0("rast_period_d_", growth_stages_req_temp[i, 1])
+               ))))
+#        print(get(
+#          paste0("rast_", criteria_ba3b_d[crit_rownum, 11], "_rsmp_", #growth_stages_req_temp[i, 1])
+#        ))
+        plot_raster <-
+          plot(get(
+            paste0("rast_", criteria_ba3b_d[crit_rownum, 11], "_rsmp_", growth_stages_req_temp[i, 1])
+          ),
+          main = paste0("rast_period_d_",
+                         as.character(growth_stages_req_temp[i, 1])))
+#        print(plot_raster)
+        
+        
+        new_col <-
+          get(paste0("rast_", criteria_ba3b_d[crit_rownum, 11], "_rsmp_", growth_stages_req_temp[i , 1])) %>% raster::extract(xy) # extract the raster values using xy points
+        
+        new_col <- new_col[[1]]
+        
+        cond_data <- dplyr::select(cond_data, -any_of(c(as.character(paste0(criteria_ba3b_d[crit_rownum, 3]))))) # remove column if name already exists
+        
+        cond_data <-
+          mutate(cond_data,!!as.character(paste0(criteria_ba3b_d[crit_rownum, 3])) := new_col, .keep = c("all"))   # add the raster values to the cond_data tibble, this needs to be dynamic so uses the !! and := operators
+        
+        
+      } else {
+        print(sum(criteria_ba3b_d[, 'phen_stage'] == period_name, na.rm = TRUE))
+      }
+    }
+}
+
+criteria_ba3b <- rbind(criteria_ba3b_m, criteria_ba3b_d)
+
+```
 </div>
+
 
 ```{r requirements_temp03, echo=FALSE, results='asis', eval=tmp_crit, eval=grs_crit}
 
@@ -1187,9 +1622,9 @@ for (i in 1:(nrow(criteria_ba3b))) {
   s_col <- getMembership(get(paste0("fpm_",
                                     criteria_ba3b[i, 3]))$suboptimal)
   cond_data <-
-    add_column(cond_data,!!as.character(paste0(criteria_ba3b[i, 3], "_o")) := o_col)
+    mutate(cond_data,!!as.character(paste0(criteria_ba3b[i, 3], "_o")) := o_col, .keep = c("all"))
   cond_data <-
-    add_column(cond_data,!!as.character(paste0(criteria_ba3b[i, 3], "_s")) := s_col)
+    mutate(cond_data,!!as.character(paste0(criteria_ba3b[i, 3], "_s")) := s_col, .keep = c("all"))
   
   n = 2
   fpm_conc_var <-
@@ -1265,34 +1700,13 @@ for (i in 1:n_cba2c) {
     
     # reclass using soil_texture table
     
-    r_texture <-
-      get(paste0("r_", criteria_ba2c[i, 11], "_rsmp")) %>% reclassify(as.matrix(
+    rast_texture <-
+      get(paste0("rast_", criteria_ba2c[i, 11], "_rsmp")) %>% classify(as.matrix(
         dplyr::select(soil_texture, USDA_Texture_Class, IRM_Value)
       ))
     
     
-    #     r_texture <-
-    #       get(paste0("r_", criteria_ba2c[i, 11], "_rsmp")) %>% calc(function(x) {
-    #          is_na <- x > 254.5
-    #          is_s1 <- ((x > 0.5) & (x < 1.5)) | # USDA Texture Class 1 "Cl" clay
-    #                   ((x > 1.5) & (x < 2.5)) | # USDA Texture Class 2 "SiCl" silty clay
-    #                   ((x > 2.5) & (x < 3.5)) | # USDA Texture Class 3 "SaCl" sandy  clay
-    #                   ((x > 3.5) & (x < 4.5)) | # USDA Texture Class 4 "ClLo" clay loam
-    #                   ((x > 4.5) & (x < 5.5)) | # USDA Texture Class 5 "SiClLo" silty clay #loam
-    #                   ((x > 5.5) & (x < 6.5)) | # USDA Texture Class 6 "SaClLo" sandy clay #loam
-    #                   ((x > 6.5) & (x < 7.5)) | # USDA Texture Class 7 "Lo" loam
-    #                   ((x > 7.5) & (x < 8.5)) | # USDA Texture Class 8 "SiLo" silty loam
-    #                   ((x > 8.5) & (x < 9.5)) | # USDA Texture Class 9 "SaLo" sandy loam
-    #                   ((x > 9.5) & (x < 10.5)) | # USDA Texture Class 10 "Si" silt
-    #                   ((x > 10.5) & (x < 11.5)) | # USDA Texture Class 11 "LoSa" loamy #sand
-    #                   ((x > 11.5) & (x < 12.5))   # USDA Texture Class 12 "Sa" sand
-    #          x[is_s1] <- 1
-    #          x[!is_s1] <- 0
-    #          x[is_na] <- NA
-    #          x
-    #        })
-    
-    assign(paste0("r_", criteria_ba2c[i, 11], "_rsmp"),  r_texture[[1:5]])
+    assign(paste0("rast_", criteria_ba2c[i, 11], "_rsmp"),  rast_texture[[1:5]])
     
     # standard depths for interpolation
     standard_depths <- c(0.025, 0.10, 0.225, 0.45, 0.80, 1.50)
@@ -1305,12 +1719,12 @@ for (i in 1:n_cba2c) {
     )) < 1.0e-6)
     
     # depth weighted texture class (0-1)
-    assign(paste0("r_", criteria_ba2c[i, 11], "_rsmp"),
-           get(paste0("r_", criteria_ba2c[i, 11], "_rsmp")) %>% calc(function(x) {
+    assign(paste0("rast_", criteria_ba2c[i, 11], "_rsmp"),
+           get(paste0("rast_", criteria_ba2c[i, 11], "_rsmp")) %>% app(function(x) {
              sum((x * thickness) / sum(thickness))
            }))
   } else if (paste(criteria_ba2c[i, 4]) == "Coarse fragments") {
-    assign(paste0("r_", criteria_ba2c[i, 11], "_rsmp"),  get(paste0("r_", criteria_ba2c[i, 11], "_rsmp"))[[1:5]])
+    assign(paste0("rast_", criteria_ba2c[i, 11], "_rsmp"),  get(paste0("rast_", criteria_ba2c[i, 11], "_rsmp"))[[1:5]])
     
     # standard depths for interpolation
     standard_depths <- c(0.025, 0.10, 0.225, 0.45, 0.80, 1.50)
@@ -1323,8 +1737,8 @@ for (i in 1:n_cba2c) {
     )) < 1.0e-6)
     
     # depth weighted map
-    assign(paste0("r_", criteria_ba2c[i, 11], "_rsmp"),
-           get(paste0("r_", criteria_ba2c[i, 11], "_rsmp")) %>% calc(function(x) {
+    assign(paste0("rast_", criteria_ba2c[i, 11], "_rsmp"),
+           get(paste0("rast_", criteria_ba2c[i, 11], "_rsmp")) %>% app(function(x) {
              sum((x * thickness) / sum(thickness))
            }))
   }
@@ -1344,10 +1758,12 @@ cat("The reclassified classes are averaged over the entire soil profile from 0 t
 
 for (i in 1:n_cba2c) {
   new_col <-
-    get(paste0("r_", criteria_ba2c[i, 11], "_rsmp")) %>% raster::extract(xy) # extract the raster values using xy points
+    get(paste0("rast_", criteria_ba2c[i, 11], "_rsmp")) %>% raster::extract(xy) # extract the raster values using xy points
+          
+  new_col <- new_col[[1]]
   
   cond_data <-
-    add_column(cond_data, !!as.character(paste0(criteria_ba2c[i, 3])) := new_col)   # add the raster values to the cond_data tibble, this needs to be dynamic so uses the !! and := operators
+    mutate(cond_data, !!as.character(paste0(criteria_ba2c[i, 3])) := new_col, .keep = c("all"))   # add the raster values to the cond_data tibble, this needs to be dynamic so uses the !! and := operators
   
 }
 
@@ -1501,9 +1917,10 @@ for (i in 1:(nrow(criteria_ba2c))) {
   s_col <- getMembership(get(paste0("fpm_",
                                     criteria_ba2c[i, 3]))$suboptimal)
   cond_data <-
-    add_column(cond_data, !!as.character(paste0(criteria_ba2c[i, 3], "_o")) := o_col)
+    mutate(cond_data, !!as.character(paste0(criteria_ba2c[i, 3], "_o")) := o_col, .keep = c("all"))
+  
   cond_data <-
-    add_column(cond_data, !!as.character(paste0(criteria_ba2c[i, 3], "_s")) := s_col)
+    mutate(cond_data, !!as.character(paste0(criteria_ba2c[i, 3], "_s")) := s_col, .keep = c("all"))
   
   n = 2
   fpm_conc_var <-
@@ -1511,7 +1928,7 @@ for (i in 1:(nrow(criteria_ba2c))) {
   fpm_conc_name <-
     c(as.character(paste0(criteria_ba2c[i, 4], " optimal")), as.character(paste0(criteria_ba2c[i, 4], " suboptimal")))
   fpm_plot_title <-
-    "Soil physical\nproperties\noptimality\nmembership"
+    "Soil physical properties optimality membership"
   
   plot_fpm <- rasterize_plot_fpm(n, fpm_conc_var, fpm_conc_name, cond_data)
   print(plot_fpm)
@@ -1521,6 +1938,7 @@ for (i in 1:(nrow(criteria_ba2c))) {
 
 ``` 
 </div>
+
 
 ```{r requirements_soilf01, echo=FALSE, results='asis', eval=soil_f_crit}
 
@@ -1543,28 +1961,6 @@ cat(paste(n_cba2d, "Soil fertility criteria:\n\n "))
 # then determine and print the names of the rule bases in the soil fertility theme
 
 cat(paste(n_cba2d, "Soil fertility rule bases:\n\n"))
-for (i in 1:n_cba2d) {
-  cat(paste(criteria_ba2d[i, 3],"\n", criteria_ba2d[i, 4],"\n"))
-  
-  assign(paste0("r_", criteria_ba2d[i, 11], "_rsmp"),  get(paste0("r_", criteria_ba2d[i, 11], "_rsmp"))[[1:5]])
-  
-  # standard depths for interpolation
-  standard_depths <- c(0.025, 0.10, 0.225, 0.45, 0.80, 1.50)
-  
-  # thicknesses of individual layers
-  bottom_layer <- c(0.05, 0.15, 0.30, 0.60, 1.0)
-  thickness <- diff(c(0, bottom_layer))
-  stopifnot(max(abs(
-    bottom_layer - 0.5 *  thickness - standard_depths[1:5]
-  )) < 1.0e-6)
-  
-  # depth weighted texture class (0-1)
-  assign(paste0("r_", criteria_ba2d[i, 11], "_rsmp"),
-         get(paste0("r_", criteria_ba2d[i, 11], "_rsmp")) %>% calc(function(x) {
-           sum((x * thickness) / sum(thickness))
-         }))
-}
-
 ```
 
 
@@ -1573,10 +1969,12 @@ for (i in 1:n_cba2d) {
 
 for (i in 1:n_cba2d) {
   new_col <-
-    get(paste0("r_", criteria_ba2d[i, 11], "_rsmp")) %>% raster::extract(xy) # extract the raster values using xy points
+    get(paste0("rast_", criteria_ba2d[i, 11], "_rsmp")) %>% raster::extract(xy) # extract the raster values using xy points
+  
+  new_col <- new_col[[1]]
   
   cond_data <-
-    add_column(cond_data, !!as.character(paste0(criteria_ba2d[i, 3])) := new_col)   # add the raster values to the cond_data tibble, this needs to be dynamic so uses the !! and := operators
+    mutate(cond_data, !!as.character(paste0(criteria_ba2d[i, 3])) := new_col, .keep = c("all"))   # add the raster values to the cond_data tibble, this needs to be dynamic so uses the !! and := operators
   
 }
 
@@ -1730,9 +2128,9 @@ for (i in 1:(nrow(criteria_ba2d))) {
   s_col <- getMembership(get(paste0("fpm_",
                                     criteria_ba2d[i, 3]))$suboptimal)
   cond_data <-
-    add_column(cond_data, !!as.character(paste0(criteria_ba2d[i, 3], "_o")) := o_col)
+    mutate(cond_data, !!as.character(paste0(criteria_ba2d[i, 3], "_o")) := o_col, .keep = c("all"))
   cond_data <-
-    add_column(cond_data, !!as.character(paste0(criteria_ba2d[i, 3], "_s")) := s_col)
+    mutate(cond_data, !!as.character(paste0(criteria_ba2d[i, 3], "_s")) := s_col, .keep = c("all"))
   
   n = 2
   fpm_conc_var <-
@@ -1740,7 +2138,7 @@ for (i in 1:(nrow(criteria_ba2d))) {
   fpm_conc_name <-
     c(as.character(paste0(criteria_ba2d[i, 4], " optimal")), as.character(paste0(criteria_ba2d[i, 4], " suboptimal")))
   fpm_plot_title <-
-    "Soil fertility\noptimality\nmembership"
+    "Soil fertility optimality membership"
   
   plot_fpm <- rasterize_plot_fpm(n, fpm_conc_var, fpm_conc_name, cond_data)
   print(plot_fpm)
@@ -1797,10 +2195,12 @@ for (i in 1:n_cba2e) {
 
 for (i in 1:n_cba2e) {
   new_col <-
-    get(paste0("r_", criteria_ba2e[i, 11], "_rsmp")) %>% raster::extract(xy) # extract the raster values using xy points
+    get(paste0("rast_", criteria_ba2e[i, 11], "_rsmp")) %>% raster::extract(xy) # extract the raster values using xy points
+          
+  new_col <- new_col[[1]]
   
   cond_data <-
-    add_column(cond_data, !!as.character(paste0(criteria_ba2e[i, 3])) := new_col)   # add the raster values to the cond_data tibble, this needs to be dynamic so uses the !! and := operators
+    mutate(cond_data, !!as.character(paste0(criteria_ba2e[i, 3])) := new_col, .keep = c("all"))   # add the raster values to the cond_data tibble, this needs to be dynamic so uses the !! and := operators
   
 }
 
@@ -1956,9 +2356,9 @@ for (i in 1:(nrow(criteria_ba2e))) {
   s_col <- getMembership(get(paste0("fpm_",
                                     criteria_ba2e[i, 3]))$suboptimal)
   cond_data <-
-    add_column(cond_data, !!as.character(paste0(criteria_ba2e[i, 3], "_o")) := o_col)
+    mutate(cond_data, !!as.character(paste0(criteria_ba2e[i, 3], "_o")) := o_col, .keep = c("all"))
   cond_data <-
-    add_column(cond_data, !!as.character(paste0(criteria_ba2e[i, 3], "_s")) := s_col)
+    mutate(cond_data, !!as.character(paste0(criteria_ba2e[i, 3], "_s")) := s_col, .keep = c("all"))
   
   n = 2
   fpm_conc_var <-
@@ -1966,7 +2366,7 @@ for (i in 1:(nrow(criteria_ba2e))) {
   fpm_conc_name <-
     c(as.character(paste0(criteria_ba2e[i, 4], " optimal")), as.character(paste0(criteria_ba2e[i, 4], " suboptimal")))
   fpm_plot_title <-
-    "Landscape\noptimality\nmembership"
+    "Landscape optimality membership"
   
   plot_fpm <- rasterize_plot_fpm(n, fpm_conc_var, fpm_conc_name, cond_data)
   print(plot_fpm)
@@ -1975,6 +2375,7 @@ for (i in 1:(nrow(criteria_ba2e))) {
 
 ``` 
 </div>
+
 
 ```{r requirements_agland01, echo=FALSE, results='asis', eval=land_crit}
 
@@ -2013,10 +2414,12 @@ for (i in 1:n_cba2a) {
 
 for (i in 1:n_cba2a) {
   new_col <-
-    get(paste0("r_", criteria_ba2a[i, 11], "_rsmp")) %>% raster::extract(xy) # extract the raster values using xy points
-  
+    get(paste0("rast_", criteria_ba2a[i, 11], "_rsmp")) %>% raster::extract(xy) # extract the raster values using xy points
+          
+  new_col <- new_col[[1]]
+        
   cond_data <-
-    add_column(cond_data, !!as.character(paste0(criteria_ba2a[i, 3])) := new_col)   # add the raster values to the cond_data tibble, this needs to be dynamic so uses the !! and := operators
+    mutate(cond_data, !!as.character(paste0(criteria_ba2a[i, 3])) := new_col, .keep = c("all"))   # add the raster values to the cond_data tibble, this needs to be dynamic so uses the !! and := operators
   
 }
 
@@ -2172,9 +2575,9 @@ for (i in 1:(nrow(criteria_ba2a))) {
   s_col <- getMembership(get(paste0("fpm_",
                                     criteria_ba2a[i, 3]))$suboptimal)
   cond_data <-
-    add_column(cond_data, !!as.character(paste0(criteria_ba2a[i, 3], "_o")) := o_col)
+    mutate(cond_data, !!as.character(paste0(criteria_ba2a[i, 3], "_o")) := o_col, .keep = c("all"))
   cond_data <-
-    add_column(cond_data, !!as.character(paste0(criteria_ba2a[i, 3], "_s")) := s_col)
+    mutate(cond_data, !!as.character(paste0(criteria_ba2a[i, 3], "_s")) := s_col, .keep = c("all"))
   
   n = 2
   fpm_conc_var <-
@@ -2231,10 +2634,12 @@ for (i in 1:n_cse2b) {
 
 for (i in 1:n_cse2b) {
   new_col <-
-    get(paste0("r_", criteria_se2b[i, 11], "_rsmp")) %>% raster::extract(xy) # extract the raster values using xy points
+    get(paste0("rast_", criteria_se2b[i, 11], "_rsmp")) %>% raster::extract(xy) # extract the raster values using xy points
+        
+  new_col <- new_col[[1]]
   
   cond_data <-
-    add_column(cond_data, !!as.character(paste0(criteria_se2b[i, 3])) := new_col)   # add the raster values to the cond_data tibble, this needs to be dynamic so uses the !! and := operators
+    mutate(cond_data, !!as.character(paste0(criteria_se2b[i, 3])) := new_col, .keep = c("all"))   # add the raster values to the cond_data tibble, this needs to be dynamic so uses the !! and := operators
   
 }
 
@@ -2388,9 +2793,9 @@ for (i in 1:(nrow(criteria_se2b))) {
   p_col <- getMembership(get(paste0("fpm_",
                                     criteria_se2b[i, 3]))$poor)
   cond_data <-
-    add_column(cond_data, !!as.character(paste0(criteria_se2b[i, 3], "_g")) := g_col)
+    mutate(cond_data, !!as.character(paste0(criteria_se2b[i, 3], "_g")) := g_col, .keep = c("all"))
   cond_data <-
-    add_column(cond_data, !!as.character(paste0(criteria_se2b[i, 3], "_p")) := p_col)
+    mutate(cond_data, !!as.character(paste0(criteria_se2b[i, 3], "_p")) := p_col, .keep = c("all"))
   
   n = 2
   fpm_conc_var <-
@@ -2446,10 +2851,12 @@ for (i in 1:n_cse3b) {
 
 for (i in 1:n_cse3b) {
   new_col <-
-    get(paste0("r_", criteria_se3b[i, 11], "_rsmp")) %>% raster::extract(xy) # extract the raster values using xy points
+    get(paste0("rast_", criteria_se3b[i, 11], "_rsmp")) %>% raster::extract(xy) # extract the raster values using xy points
+        
+  new_col <- new_col[[1]] 
   
   cond_data <-
-    add_column(cond_data, !!as.character(paste0(criteria_se3b[i, 3])) := new_col)   # add the raster values to the cond_data tibble, this needs to be dynamic so uses the !! and := operators
+    mutate(cond_data, !!as.character(paste0(criteria_se3b[i, 3])) := new_col, .keep = c("all"))   # add the raster values to the cond_data tibble, this needs to be dynamic so uses the !! and := operators
   
 }
 
@@ -2603,9 +3010,9 @@ for (i in 1:(nrow(criteria_se3b))) {
   p_col <- getMembership(get(paste0("fpm_",
                                     criteria_se3b[i, 3]))$poor)
   cond_data <-
-    add_column(cond_data, !!as.character(paste0(criteria_se3b[i, 3], "_g")) := g_col)
+    mutate(cond_data, !!as.character(paste0(criteria_se3b[i, 3], "_g")) := g_col, .keep = c("all"))
   cond_data <-
-    add_column(cond_data, !!as.character(paste0(criteria_se3b[i, 3], "_p")) := p_col)
+    mutate(cond_data, !!as.character(paste0(criteria_se3b[i, 3], "_p")) := p_col, .keep = c("all"))
   
   n = 2
   fpm_conc_var <-
@@ -2662,10 +3069,12 @@ for (i in 1:n_cse4a) {
 
 for (i in 1:n_cse4a) {
   new_col <-
-    get(paste0("r_", criteria_se4a[i, 11], "_rsmp")) %>% raster::extract(xy) # extract the raster values using xy points
+    get(paste0("rast_", criteria_se4a[i, 11], "_rsmp")) %>% raster::extract(xy) # extract the raster values using xy points
+  
+  new_col <- new_col[[1]]
   
   cond_data <-
-    add_column(cond_data, !!as.character(paste0(criteria_se4a[i, 3])) := new_col)   # add the raster values to the cond_data tibble, this needs to be dynamic so uses the !! and := operators
+    mutate(cond_data, !!as.character(paste0(criteria_se4a[i, 3])) := new_col, .keep = c("all"))   # add the raster values to the cond_data tibble, this needs to be dynamic so uses the !! and := operators
   
 }
 
@@ -2819,9 +3228,9 @@ for (i in 1:(nrow(criteria_se4a))) {
   p_col <- getMembership(get(paste0("fpm_",
                                     criteria_se4a[i, 3]))$poor)
   cond_data <-
-    add_column(cond_data, !!as.character(paste0(criteria_se4a[i, 3], "_g")) := g_col)
+    mutate(cond_data, !!as.character(paste0(criteria_se4a[i, 3], "_g")) := g_col, .keep = c("all"))
   cond_data <-
-    add_column(cond_data, !!as.character(paste0(criteria_se4a[i, 3], "_p")) := p_col)
+    mutate(cond_data, !!as.character(paste0(criteria_se4a[i, 3], "_p")) := p_col, .keep = c("all"))
   
   n = 2
   fpm_conc_var <-
@@ -2878,10 +3287,14 @@ for (i in 1:n_cse4b) {
 
 for (i in 1:n_cse4b) {
   new_col <-
-    get(paste0("r_", criteria_se4b[i, 11], "_rsmp")) %>% raster::extract(xy) # extract the raster values using xy points
+    get(paste0("rast_", criteria_se4b[i, 11], "_rsmp")) %>% raster::extract(xy) # extract the raster values using xy points
+  
+  new_col <- new_col[[1]]
+  
+  
   
   cond_data <-
-    add_column(cond_data, !!as.character(paste0(criteria_se4b[i, 3])) := new_col)   # add the raster values to the cond_data tibble, this needs to be dynamic so uses the !! and := operators
+    mutate(cond_data, !!as.character(paste0(criteria_se4b[i, 3])) := new_col, .keep = c("all"))   # add the raster values to the cond_data tibble, this needs to be dynamic so uses the !! and := operators
   
 }
 
@@ -3036,9 +3449,9 @@ for (i in 1:(nrow(criteria_se4b))) {
   p_col <- getMembership(get(paste0("fpm_",
                                     criteria_se4b[i, 3]))$poor)
   cond_data <-
-    add_column(cond_data, !!as.character(paste0(criteria_se4b[i, 3], "_g")) := g_col)
+    mutate(cond_data, !!as.character(paste0(criteria_se4b[i, 3], "_g")) := g_col, .keep = c("all"))
   cond_data <-
-    add_column(cond_data, !!as.character(paste0(criteria_se4b[i, 3], "_p")) := p_col)
+    mutate(cond_data, !!as.character(paste0(criteria_se4b[i, 3], "_p")) := p_col, .keep = c("all"))
   
   n = 2
   fpm_conc_var <-
@@ -3095,10 +3508,14 @@ for (i in 1:n_cse4c) {
 
 for (i in 1:n_cse4c) {
   new_col <-
-    get(paste0("r_", criteria_se4c[i, 11], "_rsmp")) %>% raster::extract(xy) # extract the raster values using xy points
+    get(paste0("rast_", criteria_se4c[i, 11], "_rsmp")) %>% raster::extract(xy) # extract the raster values using xy points
+  
+  new_col <- new_col[[1]]
+  
+  
   
   cond_data <-
-    add_column(cond_data, !!as.character(paste0(criteria_se4c[i, 3])) := new_col)   # add the raster values to the cond_data tibble, this needs to be dynamic so uses the !! and := operators
+    mutate(cond_data, !!as.character(paste0(criteria_se4c[i, 3])) := new_col, .keep = c("all"))   # add the raster values to the cond_data tibble, this needs to be dynamic so uses the !! and := operators
   
 }
 
@@ -3253,9 +3670,9 @@ for (i in 1:(nrow(criteria_se4c))) {
   p_col <- getMembership(get(paste0("fpm_",
                                     criteria_se4c[i, 3]))$poor)
   cond_data <-
-    add_column(cond_data, !!as.character(paste0(criteria_se4c[i, 3], "_g")) := g_col)
+    mutate(cond_data, !!as.character(paste0(criteria_se4c[i, 3], "_g")) := g_col, .keep = c("all"))
   cond_data <-
-    add_column(cond_data, !!as.character(paste0(criteria_se4c[i, 3], "_p")) := p_col)
+    mutate(cond_data, !!as.character(paste0(criteria_se4c[i, 3], "_p")) := p_col, .keep = c("all"))
   
   n = 2
   fpm_conc_var <-
@@ -3563,9 +3980,9 @@ o_col <- getMembership(get(paste0("fpm_",
 s_col <- getMembership(get(paste0("fpm_",
                                   criteria_ba2b_3a[1, 3]))$suboptimal)
 cond_data <-
-  add_column(cond_data, !!as.character(paste0(criteria_ba2b_3a[1, 3], "_o")) := o_col)
+  mutate(cond_data, !!as.character(paste0(criteria_ba2b_3a[1, 3], "_o")) := o_col, .keep = c("all"))
 cond_data <-
-  add_column(cond_data, !!as.character(paste0(criteria_ba2b_3a[1, 3], "_s")) := s_col)
+  mutate(cond_data, !!as.character(paste0(criteria_ba2b_3a[1, 3], "_s")) := s_col, .keep = c("all"))
 
 n = 2
 fpm_conc_var <-
@@ -3573,7 +3990,7 @@ fpm_conc_var <-
 fpm_conc_name <-
   c(as.character(paste0(criteria_ba2b_3a[1, 4], " optimal")), as.character(paste0(criteria_ba2b_3a[1, 4], " suboptimal")))
 fpm_plot_title <-
-  "Precipitation\noptimality\nmembership"
+  "Precipitation optimality membership"
 
 plot_fpm <- rasterize_plot_fpm(n, fpm_conc_var, fpm_conc_name, cond_data)
 print(plot_fpm)
@@ -3713,9 +4130,9 @@ o_col <- getMembership(get(paste0("fpm_",
 s_col <- getMembership(get(paste0("fpm_",
                                   criteria_ba2b_3b[1, 3]))$suboptimal)
 cond_data <-
-  add_column(cond_data, !!as.character(paste0(criteria_ba2b_3b[1, 3], "_o")) := o_col)
+  mutate(cond_data, !!as.character(paste0(criteria_ba2b_3b[1, 3], "_o")) := o_col, .keep = c("all"))
 cond_data <-
-  add_column(cond_data, !!as.character(paste0(criteria_ba2b_3b[1, 3], "_s")) := s_col)
+  mutate(cond_data, !!as.character(paste0(criteria_ba2b_3b[1, 3], "_s")) := s_col, .keep = c("all"))
 
 n = 2
 fpm_conc_var <-
@@ -3869,9 +4286,9 @@ o_col <- getMembership(get(paste0("fpm_",
 s_col <- getMembership(get(paste0("fpm_",
                                   criteria_ba2b[1, 2]))$suboptimal)
 cond_data <-
-  add_column(cond_data, !!as.character(paste0(criteria_ba2b[1, 2], "_o")) := o_col)
+  mutate(cond_data, !!as.character(paste0(criteria_ba2b[1, 2], "_o")) := o_col, .keep = c("all"))
 cond_data <-
-  add_column(cond_data, !!as.character(paste0(criteria_ba2b[1, 2], "_s")) := s_col)
+  mutate(cond_data, !!as.character(paste0(criteria_ba2b[1, 2], "_s")) := s_col, .keep = c("all"))
 
 n = 2
 fpm_conc_var <-
@@ -3879,7 +4296,7 @@ fpm_conc_var <-
 fpm_conc_name <-
   c(as.character(paste0(criteria_ba1_2b[1, 4], " optimal")), as.character(paste0(criteria_ba1_2b[1, 4], " suboptimal")))
 fpm_plot_title <-
-  "Climatic\nAptitude\nmembership"
+  "Climatic Aptitude membership"
 
 plot_fpm <- rasterize_plot_fpm(n, fpm_conc_var, fpm_conc_name, cond_data)
 print(plot_fpm)
@@ -4054,9 +4471,9 @@ o_col <- getMembership(get(paste0("fpm_",
 s_col <- getMembership(get(paste0("fpm_",
                                   criteria_ba1_2c[1, 3]))$suboptimal)
 cond_data <-
-  add_column(cond_data, !!as.character(paste0(criteria_ba1_2c[1, 3], "_o")) := o_col)
+  mutate(cond_data, !!as.character(paste0(criteria_ba1_2c[1, 3], "_o")) := o_col, .keep = c("all"))
 cond_data <-
-  add_column(cond_data, !!as.character(paste0(criteria_ba1_2c[1, 3], "_s")) := s_col)
+  mutate(cond_data, !!as.character(paste0(criteria_ba1_2c[1, 3], "_s")) := s_col, .keep = c("all"))
 
 n = 2
 fpm_conc_var <-
@@ -4064,7 +4481,7 @@ fpm_conc_var <-
 fpm_conc_name <-
   c(as.character(paste0(criteria_ba1_2c[1, 4], " optimal")), as.character(paste0(criteria_ba1_2c[1, 4], " suboptimal")))
 fpm_plot_title <-
-  "Soil Physical\nProperties\noptimality\nmembership"
+  "Soil Physical Properties optimality membership"
 
 plot_fpm <- rasterize_plot_fpm(n, fpm_conc_var, fpm_conc_name, cond_data)
 print(plot_fpm)
@@ -4238,9 +4655,9 @@ o_col <- getMembership(get(paste0("fpm_",
 s_col <- getMembership(get(paste0("fpm_",
                                   criteria_ba1_2d[1, 3]))$suboptimal)
 cond_data <-
-  add_column(cond_data, !!as.character(paste0(criteria_ba1_2d[1, 3], "_o")) := o_col)
+  mutate(cond_data, !!as.character(paste0(criteria_ba1_2d[1, 3], "_o")) := o_col, .keep = c("all"))
 cond_data <-
-  add_column(cond_data, !!as.character(paste0(criteria_ba1_2d[1, 3], "_s")) := s_col)
+  mutate(cond_data, !!as.character(paste0(criteria_ba1_2d[1, 3], "_s")) := s_col, .keep = c("all"))
 
 n = 2
 fpm_conc_var <-
@@ -4248,7 +4665,7 @@ fpm_conc_var <-
 fpm_conc_name <-
   c(as.character(paste0(criteria_ba1_2d[1, 4], " optimal")), as.character(paste0(criteria_ba1_2d[1, 4], " suboptimal")))
 fpm_plot_title <-
-  "Soil Fertility\noptimality\nmembership"
+  "Soil Fertility optimality membership"
 
 plot_fpm <- rasterize_plot_fpm(n, fpm_conc_var, fpm_conc_name, cond_data)
 print(plot_fpm)
@@ -4422,9 +4839,9 @@ o_col <- getMembership(get(paste0("fpm_",
 s_col <- getMembership(get(paste0("fpm_",
                                   criteria_ba1_2e[1, 3]))$suboptimal)
 cond_data <-
-  add_column(cond_data, !!as.character(paste0(criteria_ba1_2e[1, 3], "_o")) := o_col)
+  mutate(cond_data, !!as.character(paste0(criteria_ba1_2e[1, 3], "_o")) := o_col, .keep = c("all"))
 cond_data <-
-  add_column(cond_data, !!as.character(paste0(criteria_ba1_2e[1, 3], "_s")) := s_col)
+  mutate(cond_data, !!as.character(paste0(criteria_ba1_2e[1, 3], "_s")) := s_col, .keep = c("all"))
 
 n = 2
 fpm_conc_var <-
@@ -4432,7 +4849,7 @@ fpm_conc_var <-
 fpm_conc_name <-
   c(as.character(paste0(criteria_ba1_2e[1, 4], " optimal")), as.character(paste0(criteria_ba1_2e[1, 4], " suboptimal")))
 fpm_plot_title <-
-  "Landscape\noptimality\nmembership"
+  "Landscape optimality membership"
 
 plot_fpm <- rasterize_plot_fpm(n, fpm_conc_var, fpm_conc_name, cond_data)
 print(plot_fpm)
@@ -4581,9 +4998,9 @@ assign(paste0("rb_", criteria_ba1[1, 2]), RuleBase(prop, conc)) %>% print()
     s_col <- getMembership(get(paste0("fpm_",
                                       criteria_ba1[1, 2]))$suboptimal)
     cond_data <-
-      add_column(cond_data,!!as.character(paste0(criteria_ba1[1, 2], "_o")) := o_col)
+      mutate(cond_data,!!as.character(paste0(criteria_ba1[1, 2], "_o")) := o_col, .keep = c("all"))
     cond_data <-
-      add_column(cond_data,!!as.character(paste0(criteria_ba1[1, 2], "_s")) := s_col)
+      mutate(cond_data,!!as.character(paste0(criteria_ba1[1, 2], "_s")) := s_col, .keep = c("all"))
     
     n = 2
     fpm_conc_var <-
@@ -4591,7 +5008,7 @@ assign(paste0("rb_", criteria_ba1[1, 2]), RuleBase(prop, conc)) %>% print()
     fpm_conc_name <-
       c(as.character(paste0(criteria_suit[1, 4], " optimal")), as.character(paste0(criteria_suit[1, 4], " suboptimal")))
     fpm_plot_title <-
-      "Biophysical\nAptitude\nmembership"
+      "Biophysical Aptitude membership"
     
     plot_fpm <- rasterize_plot_fpm(n, fpm_conc_var, fpm_conc_name, cond_data)
     print(plot_fpm)
@@ -4701,38 +5118,21 @@ assign(paste0("rb_", criteria_ba1[1, 2], "_nuance"),
        RuleBase(prop, Conclusion(
          ba_1_nuance = c(
            "N2",
-           "N2",
-           "N2",
            "N1",
-           "N2",
            "N1",
-           "N2",
            "N1",
-           "N2",
            "N1",
-           "N2",
            "N1",
-           "N2",
            "S3",
-           "N2",
            "S2l",
-           "N2",
            "S3",
-           "N2",
            "S3",
-           "N2",
            "S3",
-           "N2",
            "S2f",
-           "N2",
            "S3",
-           "N2",
            "S2p",
-           "N2",
            "S2c",
-           "N2",
-           "S1"
-         )
+           "S1"         )
        ))) %>% print()
 
 # add to the list of previous rule bases
@@ -4787,21 +5187,21 @@ N2_col <- getMembership(get(paste0("fpm_",
                                    criteria_ba1[1, 2]))$N2)
 
 cond_data <-
-  add_column(cond_data,!!as.character(paste0(criteria_ba1[1, 2], "_S1")) := S1_col)
+  mutate(cond_data,!!as.character(paste0(criteria_ba1[1, 2], "_S1")) := S1_col, .keep = c("all"))
 cond_data <-
-  add_column(cond_data,!!as.character(paste0(criteria_ba1[1, 2], "_S2c")) := S2c_col)
+  mutate(cond_data,!!as.character(paste0(criteria_ba1[1, 2], "_S2c")) := S2c_col, .keep = c("all"))
 cond_data <-
-  add_column(cond_data,!!as.character(paste0(criteria_ba1[1, 2], "_S2f")) := S2f_col)
+  mutate(cond_data,!!as.character(paste0(criteria_ba1[1, 2], "_S2f")) := S2f_col, .keep = c("all"))
 cond_data <-
-  add_column(cond_data,!!as.character(paste0(criteria_ba1[1, 2], "_S2l")) := S2l_col)
+  mutate(cond_data,!!as.character(paste0(criteria_ba1[1, 2], "_S2l")) := S2l_col, .keep = c("all"))
 cond_data <-
-  add_column(cond_data,!!as.character(paste0(criteria_ba1[1, 2], "_S2p")) := S2p_col)
+  mutate(cond_data,!!as.character(paste0(criteria_ba1[1, 2], "_S2p")) := S2p_col, .keep = c("all"))
 cond_data <-
-  add_column(cond_data,!!as.character(paste0(criteria_ba1[1, 2], "_S3")) := S3_col)
+  mutate(cond_data,!!as.character(paste0(criteria_ba1[1, 2], "_S3")) := S3_col, .keep = c("all"))
 cond_data <-
-  add_column(cond_data,!!as.character(paste0(criteria_ba1[1, 2], "_N1")) := N1_col)
+  mutate(cond_data,!!as.character(paste0(criteria_ba1[1, 2], "_N1")) := N1_col, .keep = c("all"))
 cond_data <-
-  add_column(cond_data,!!as.character(paste0(criteria_ba1[1, 2], "_N2")) := N2_col)
+  mutate(cond_data,!!as.character(paste0(criteria_ba1[1, 2], "_N2")) := N2_col, .keep = c("all"))
 
 
 
@@ -4822,7 +5222,7 @@ fpm_conc_var <-
 fpm_conc_name <-
   c("S1", "S2c", "S2f", "S2l", "S2p", "S3", "N1", "N2")
 fpm_plot_title <-
-  "Biophysical\nAptitude\nnuanced\nmembership"
+  "Biophysical Aptitude nuanced membership"
 
 plot_fpm <- rasterize_plot_fpm(n, fpm_conc_var, fpm_conc_name, cond_data)
 print(plot_fpm)
@@ -4843,7 +5243,7 @@ cat("## Export aptitude results
 <div class="fold o">
 ```{r rulebases_ba_export02, cache = TRUE, cache.whatever=params$Agg, cache.whatever=params$Agg, warning=FALSE, eval=ba_crit}
 
-apt_sf <- st_as_sf(cond_data, coords = c("x", "y"), crs = crs_irm)
+apt_sf <- st_as_sf(cond_data, coords = c("x", "y"), crs = crs_lam)
 output_sf(apt_sf, paste0("apt_", params$INN1))
 
 ``` 
@@ -5065,14 +5465,14 @@ assign(paste0("fpm_", criteria_se3a_4a[1, 3]), eval(parse(text = w)))
 g_col <- getMembership(get(paste0("fpm_",
                                   criteria_se3a_4a[1, 3]))$good)
 cond_data <-
-  add_column(cond_data,!!as.character(paste0(criteria_se3a_4a[1, 3], "_g")) := g_col)
+  mutate(cond_data,!!as.character(paste0(criteria_se3a_4a[1, 3], "_g")) := g_col, .keep = c("all"))
 
 if (ext_conclusion2 == "moderate" |
     ext_conclusion3 == "moderate") {
   m_col <- getMembership(get(paste0("fpm_",
                                     criteria_se3a_4a[1, 3]))$moderate)
   cond_data <-
-    add_column(cond_data,!!as.character(paste0(criteria_se3a_4a[1, 3], "_m")) := m_col)
+    mutate(cond_data,!!as.character(paste0(criteria_se3a_4a[1, 3], "_m")) := m_col, .keep = c("all"))
   
   ext_rb <- "gmp"
 } else
@@ -5081,7 +5481,7 @@ if (ext_conclusion2 == "moderate" |
 p_col <- getMembership(get(paste0("fpm_",
                                   criteria_se3a_4a[1, 3]))$poor)
 cond_data <-
-  add_column(cond_data,!!as.character(paste0(criteria_se3a_4a[1, 3], "_p")) := p_col)
+  mutate(cond_data,!!as.character(paste0(criteria_se3a_4a[1, 3], "_p")) := p_col, .keep = c("all"))
 
 
 if (ext_rb == "gmp") {
@@ -5320,14 +5720,14 @@ assign(paste0("fpm_", criteria_se3a_4b[1, 3]), eval(parse(text = w)))
 g_col <- getMembership(get(paste0("fpm_",
                                   criteria_se3a_4b[1, 3]))$good)
 cond_data <-
-  add_column(cond_data,!!as.character(paste0(criteria_se3a_4b[1, 3], "_g")) := g_col)
+  mutate(cond_data,!!as.character(paste0(criteria_se3a_4b[1, 3], "_g")) := g_col, .keep = c("all"))
 
 if (lab_conclusion2 == "moderate" |
     lab_conclusion3 == "moderate") {
   m_col <- getMembership(get(paste0("fpm_",
                                     criteria_se3a_4b[1, 3]))$moderate)
   cond_data <-
-    add_column(cond_data,!!as.character(paste0(criteria_se3a_4b[1, 3], "_m")) := m_col)
+    mutate(cond_data,!!as.character(paste0(criteria_se3a_4b[1, 3], "_m")) := m_col, .keep = c("all"))
   
   lab_rb <- "gmp"
 } else
@@ -5336,7 +5736,7 @@ if (lab_conclusion2 == "moderate" |
 p_col <- getMembership(get(paste0("fpm_",
                                   criteria_se3a_4b[1, 3]))$poor)
 cond_data <-
-  add_column(cond_data,!!as.character(paste0(criteria_se3a_4b[1, 3], "_p")) := p_col)
+  mutate(cond_data,!!as.character(paste0(criteria_se3a_4b[1, 3], "_p")) := p_col, .keep = c("all"))
 
 
 if (lab_rb == "gmp") {
@@ -5578,14 +5978,14 @@ if (fp_crit == 1) {
   g_col <- getMembership(get(paste0("fpm_",
                                     criteria_se3b_4c[1, 3]))$good)
   cond_data <-
-    add_column(cond_data, !!as.character(paste0(criteria_se3b_4c[1, 3], "_g")) := g_col)
+    mutate(cond_data, !!as.character(paste0(criteria_se3b_4c[1, 3], "_g")) := g_col, .keep = c("all"))
   
   if (fp_conclusion2 == "moderate" |
       fp_conclusion3 == "moderate") {
     m_col <- getMembership(get(paste0("fpm_",
                                       criteria_se3b_4c[1, 3]))$moderate)
     cond_data <-
-      add_column(cond_data, !!as.character(paste0(criteria_se3b_4c[1, 3], "_m")) := m_col)
+      mutate(cond_data, !!as.character(paste0(criteria_se3b_4c[1, 3], "_m")) := m_col, .keep = c("all"))
     
     fp_rb <- "gmp"
   } else
@@ -5594,7 +5994,7 @@ if (fp_crit == 1) {
   p_col <- getMembership(get(paste0("fpm_",
                                     criteria_se3b_4c[1, 3]))$poor)
   cond_data <-
-    add_column(cond_data, !!as.character(paste0(criteria_se3b_4c[1, 3], "_p")) := p_col)
+    mutate(cond_data, !!as.character(paste0(criteria_se3b_4c[1, 3], "_p")) := p_col, .keep = c("all"))
   
   
   if (fp_rb == "gmp") {
@@ -6062,7 +6462,7 @@ fpm_se_3b <-
   g_col <- getMembership(get(paste0("fpm_",
                                     criteria_se2a_3b[1, 3]))$good)
   cond_data <-
-    add_column(cond_data, !!as.character(paste0(criteria_se2a_3b[1, 3], "_g")) := g_col)
+    mutate(cond_data, !!as.character(paste0(criteria_se2a_3b[1, 3], "_g")) := g_col, .keep = c("all"))
   
    
   if (fp_rb == "gmp") {
@@ -6080,7 +6480,7 @@ fpm_se_3b <-
     m_col <- getMembership(get(paste0("fpm_",
                                       criteria_se2a_3b[1, 3]))$moderate)
     cond_data <-
-      add_column(cond_data, !!as.character(paste0(criteria_se2a_3b[1, 3], "_m")) := m_col)
+      mutate(cond_data, !!as.character(paste0(criteria_se2a_3b[1, 3], "_m")) := m_col, .keep = c("all"))
     
     inp_rb <- "gmp"
 
@@ -6097,7 +6497,7 @@ fpm_se_3b <-
     m_col <- getMembership(get(paste0("fpm_",
                                       criteria_se2a_3b[1, 3]))$moderate)
     cond_data <-
-      add_column(cond_data, !!as.character(paste0(criteria_se2a_3b[1, 3], "_m")) := m_col)
+      mutate(cond_data, !!as.character(paste0(criteria_se2a_3b[1, 3], "_m")) := m_col, .keep = c("all"))
     
     inp_rb <- "gmp"
     
@@ -6109,7 +6509,7 @@ fpm_se_3b <-
   p_col <- getMembership(get(paste0("fpm_",
                                     criteria_se2a_3b[1, 3]))$poor)
   cond_data <-
-    add_column(cond_data, !!as.character(paste0(criteria_se2a_3b[1, 3], "_p")) := p_col)
+    mutate(cond_data, !!as.character(paste0(criteria_se2a_3b[1, 3], "_p")) := p_col, .keep = c("all"))
   
     
 if  (inp_rb == "gmp" ){   
@@ -6502,7 +6902,7 @@ n_cse2a_3a <- nrow(criteria_se2a_3a)
 g_col <- getMembership(get(paste0("fpm_",
                                   criteria_se2a_3a[1, 3]))$good)
 cond_data <-
-  add_column(cond_data,!!as.character(paste0(criteria_se2a_3a[1, 3], "_g")) := g_col)
+  mutate(cond_data,!!as.character(paste0(criteria_se2a_3a[1, 3], "_g")) := g_col, .keep = c("all"))
 
 
 
@@ -6524,7 +6924,7 @@ if (ext_rb == "gmp") {
       m_col <- getMembership(get(paste0("fpm_",
                                         criteria_se2a_3a[1, 3]))$moderate)
       cond_data <-
-        add_column(cond_data,!!as.character(paste0(criteria_se2a_3a[1, 3], "_m")) := m_col)
+        mutate(cond_data,!!as.character(paste0(criteria_se2a_3a[1, 3], "_m")) := m_col, .keep = c("all"))
       
       mgt_rb <- "gmp"
     }
@@ -6541,7 +6941,7 @@ if (ext_rb == "gmp") {
       m_col <- getMembership(get(paste0("fpm_",
                                         criteria_se2a_3a[1, 3]))$moderate)
       cond_data <-
-        add_column(cond_data,!!as.character(paste0(criteria_se2a_3a[1, 3], "_m")) := m_col)
+        mutate(cond_data,!!as.character(paste0(criteria_se2a_3a[1, 3], "_m")) := m_col, .keep = c("all"))
       
       mgt_rb <- "gmp"
     }
@@ -6563,7 +6963,7 @@ if (ext_rb == "gmp") {
       m_col <- getMembership(get(paste0("fpm_",
                                         criteria_se2a_3a[1, 3]))$moderate)
       cond_data <-
-        add_column(cond_data,!!as.character(paste0(criteria_se2a_3a[1, 3], "_m")) := m_col)
+        mutate(cond_data,!!as.character(paste0(criteria_se2a_3a[1, 3], "_m")) := m_col, .keep = c("all"))
       
       mgt_rb <- "gmp"
     }
@@ -6580,7 +6980,7 @@ if (ext_rb == "gmp") {
       m_col <- getMembership(get(paste0("fpm_",
                                         criteria_se2a_3a[1, 3]))$moderate)
       cond_data <-
-        add_column(cond_data,!!as.character(paste0(criteria_se2a_3a[1, 3], "_m")) := m_col)
+        mutate(cond_data,!!as.character(paste0(criteria_se2a_3a[1, 3], "_m")) := m_col, .keep = c("all"))
       
       mgt_rb <- "gmp"
     }
@@ -6590,7 +6990,7 @@ if (ext_rb == "gmp") {
 p_col <- getMembership(get(paste0("fpm_",
                                   criteria_se2a_3a[1, 3]))$poor)
 cond_data <-
-  add_column(cond_data,!!as.character(paste0(criteria_se2a_3a[1, 3], "_p")) := p_col)
+  mutate(cond_data,!!as.character(paste0(criteria_se2a_3a[1, 3], "_p")) := p_col, .keep = c("all"))
 
 
 if (mgt_rb == "gmp") {
@@ -7079,7 +7479,7 @@ n_cse1_2a <- nrow(criteria_se1_2a)
 h_col <- getMembership(get(paste0("fpm_",
                                   criteria_se1_2a[1, 3]))$high)
 cond_data <-
-  add_column(cond_data,!!as.character(paste0(criteria_se1_2a[1, 3], "_h")) := h_col)
+  mutate(cond_data,!!as.character(paste0(criteria_se1_2a[1, 3], "_h")) := h_col, .keep = c("all"))
 
 
 
@@ -7101,7 +7501,7 @@ if (mgt_rb == "gmp") {
       m_col <- getMembership(get(paste0("fpm_",
                                         criteria_se1_2a[1, 3]))$moderate)
       cond_data <-
-        add_column(cond_data,!!as.character(paste0(criteria_se1_2a[1, 3], "_m")) := m_col)
+        mutate(cond_data,!!as.character(paste0(criteria_se1_2a[1, 3], "_m")) := m_col, .keep = c("all"))
       
       fpf_rb <- "hml"
     }
@@ -7118,7 +7518,7 @@ if (mgt_rb == "gmp") {
       m_col <- getMembership(get(paste0("fpm_",
                                         criteria_se1_2a[1, 3]))$moderate)
       cond_data <-
-        add_column(cond_data,!!as.character(paste0(criteria_se1_2a[1, 3], "_m")) := m_col)
+        mutate(cond_data,!!as.character(paste0(criteria_se1_2a[1, 3], "_m")) := m_col, .keep = c("all"))
       
       fpf_rb <- "hml"
     }
@@ -7138,7 +7538,7 @@ if (mgt_rb == "gmp") {
       m_col <- getMembership(get(paste0("fpm_",
                                         criteria_se1_2a[1, 3]))$moderate)
       cond_data <-
-        add_column(cond_data,!!as.character(paste0(criteria_se1_2a[1, 3], "_m")) := m_col)
+        mutate(cond_data,!!as.character(paste0(criteria_se1_2a[1, 3], "_m")) := m_col, .keep = c("all"))
       
       fpf_rb <- "hml"
     }
@@ -7152,7 +7552,7 @@ if (mgt_rb == "gmp") {
       m_col <- getMembership(get(paste0("fpm_",
                                         criteria_se1_2a[1, 3]))$moderate)
       cond_data <-
-        add_column(cond_data,!!as.character(paste0(criteria_se1_2a[1, 3], "_m")) := m_col)
+        mutate(cond_data,!!as.character(paste0(criteria_se1_2a[1, 3], "_m")) := m_col, .keep = c("all"))
       
       fpf_rb <- "hml"
     }
@@ -7162,7 +7562,7 @@ if (mgt_rb == "gmp") {
 l_col <- getMembership(get(paste0("fpm_",
                                   criteria_se1_2a[1, 3]))$low)
 cond_data <-
-  add_column(cond_data,!!as.character(paste0(criteria_se1_2a[1, 3], "_l")) := l_col)
+  mutate(cond_data,!!as.character(paste0(criteria_se1_2a[1, 3], "_l")) := l_col, .keep = c("all"))
 
 
 if (fpf_rb == "hml") {
@@ -7481,7 +7881,7 @@ assign(paste0("fpm_", criteria_se1_2b[1, 3]), eval(parse(text = w)))
 g_col <- getMembership(get(paste0("fpm_",
                                   criteria_se1_2b[1, 3]))$good)
 cond_data <-
-  add_column(cond_data,!!as.character(paste0(criteria_se1_2b[1, 3], "_g")) := g_col)
+  mutate(cond_data,!!as.character(paste0(criteria_se1_2b[1, 3], "_g")) := g_col, .keep = c("all"))
 
 if (ma_conclusion2 == "moderate" |
     ma_conclusion3 == "moderate" |
@@ -7491,7 +7891,7 @@ if (ma_conclusion2 == "moderate" |
   m_col <- getMembership(get(paste0("fpm_",
                                     criteria_se1_2b[1, 3]))$moderate)
   cond_data <-
-    add_column(cond_data,!!as.character(paste0(criteria_se1_2b[1, 3], "_m")) := m_col)
+    mutate(cond_data,!!as.character(paste0(criteria_se1_2b[1, 3], "_m")) := m_col, .keep = c("all"))
   
   ma_rb <- "gmp"
 } else
@@ -7500,7 +7900,7 @@ if (ma_conclusion2 == "moderate" |
 p_col <- getMembership(get(paste0("fpm_",
                                   criteria_se1_2b[1, 3]))$poor)
 cond_data <-
-  add_column(cond_data,!!as.character(paste0(criteria_se1_2b[1, 3], "_p")) := p_col)
+  mutate(cond_data,!!as.character(paste0(criteria_se1_2b[1, 3], "_p")) := p_col, .keep = c("all"))
 
 
 if (ma_rb == "gmp") {
@@ -7976,7 +8376,7 @@ n_cse1 <- nrow(criteria_se1)
 h_col <- getMembership(get(paste0("fpm_",
                                   criteria_se1[1, 3]))$high)
 cond_data <-
-  add_column(cond_data,!!as.character(paste0(criteria_se1[1, 3], "_h")) := h_col)
+  mutate(cond_data,!!as.character(paste0(criteria_se1[1, 3], "_h")) := h_col, .keep = c("all"))
 
 
 
@@ -7998,7 +8398,7 @@ if (fpf_rb == "hml") {
       m_col <- getMembership(get(paste0("fpm_",
                                         criteria_se1[1, 3]))$moderate)
       cond_data <-
-        add_column(cond_data,!!as.character(paste0(criteria_se1[1, 3], "_m")) := m_col)
+        mutate(cond_data,!!as.character(paste0(criteria_se1[1, 3], "_m")) := m_col, .keep = c("all"))
       
       sef_rb <- "hml"
     }
@@ -8015,7 +8415,7 @@ if (fpf_rb == "hml") {
       m_col <- getMembership(get(paste0("fpm_",
                                         criteria_se1[1, 3]))$moderate)
       cond_data <-
-        add_column(cond_data,!!as.character(paste0(criteria_se1[1, 3], "_m")) := m_col)
+        mutate(cond_data,!!as.character(paste0(criteria_se1[1, 3], "_m")) := m_col, .keep = c("all"))
       
       sef_rb <- "hml"
     }
@@ -8035,7 +8435,7 @@ if (fpf_rb == "hml") {
       m_col <- getMembership(get(paste0("fpm_",
                                         criteria_se1[1, 3]))$moderate)
       cond_data <-
-        add_column(cond_data,!!as.character(paste0(criteria_se1[1, 3], "_m")) := m_col)
+        mutate(cond_data,!!as.character(paste0(criteria_se1[1, 3], "_m")) := m_col, .keep = c("all"))
       
       sef_rb <- "hml"
     }
@@ -8049,7 +8449,7 @@ if (fpf_rb == "hml") {
       m_col <- getMembership(get(paste0("fpm_",
                                         criteria_se1[1, 3]))$moderate)
       cond_data <-
-        add_column(cond_data,!!as.character(paste0(criteria_se1[1, 3], "_m")) := m_col)
+        mutate(cond_data,!!as.character(paste0(criteria_se1[1, 3], "_m")) := m_col, .keep = c("all"))
       
       sef_rb <- "hml"
     }
@@ -8059,7 +8459,7 @@ if (fpf_rb == "hml") {
 l_col <- getMembership(get(paste0("fpm_",
                                   criteria_se1[1, 3]))$low)
 cond_data <-
-  add_column(cond_data,!!as.character(paste0(criteria_se1[1, 3], "_l")) := l_col)
+  mutate(cond_data,!!as.character(paste0(criteria_se1[1, 3], "_l")) := l_col, .keep = c("all"))
 
 
 if (sef_rb == "hml") {
@@ -8101,7 +8501,7 @@ cat("## Export feasibility results
 <div class="fold o">
 ```{r rulebases_se_export02, cache = TRUE, cache.whatever=params$Agg, cache.whatever=params$Agg, warning=FALSE, eval=sef_crit}
 
-se_sf <- st_as_sf(cond_data, coords = c("x", "y"), crs = crs_irm)
+se_sf <- st_as_sf(cond_data, coords = c("x", "y"), crs = crs_lam)
 output_sf(se_sf, paste0("se_", params$INN1))
 
 ``` 
@@ -8472,9 +8872,9 @@ h_col <- getMembership(fpm_adop_0$high)
 
 if ("adop_0_h" %in% colnames(cond_data)) {
   cond_data <- cond_data  %>% dplyr::select(-(adop_0_h))
-  cond_data <- add_column(cond_data, adop_0_h := h_col)
+  cond_data <- mutate(cond_data, adop_0_h := h_col, .keep = c("all"))
 }   else {
-  cond_data <- add_column(cond_data, adop_0_h := h_col)
+  cond_data <- mutate(cond_data, adop_0_h := h_col, .keep = c("all"))
 }
 
 if (sef_rb == "hml") {
@@ -8491,9 +8891,9 @@ if (sef_rb == "hml") {
     
     if ("adop_0_m" %in% colnames(cond_data)) {
       cond_data <- cond_data  %>% dplyr::select(-(adop_0_m))
-      cond_data <- add_column(cond_data, adop_0_m := m_col)
+      cond_data <- mutate(cond_data, adop_0_m := m_col, .keep = c("all"))
     }   else {
-      cond_data <- add_column(cond_data, adop_0_m := m_col)
+      cond_data <- mutate(cond_data, adop_0_m := m_col, .keep = c("all"))
     }
     
     adop_rb <- "hml"
@@ -8512,9 +8912,9 @@ if (sef_rb == "hml") {
     
     if ("adop_0_m" %in% colnames(cond_data)) {
       cond_data <- cond_data  %>% dplyr::select(-(adop_0_m))
-      cond_data <- add_column(cond_data, adop_0_m := m_col)
+      cond_data <- mutate(cond_data, adop_0_m := m_col, .keep = c("all"))
     }   else {
-      cond_data <- add_column(cond_data, adop_0_m := m_col)
+      cond_data <- mutate(cond_data, adop_0_m := m_col, .keep = c("all"))
     }
     
     adop_rb <- "hml"
@@ -8527,9 +8927,9 @@ l_col <- getMembership(fpm_adop_0$low)
 
 if ("adop_0_l" %in% colnames(cond_data)) {
   cond_data <- cond_data  %>% dplyr::select(-(adop_0_l))
-  cond_data <- add_column(cond_data, adop_0_l := l_col)
+  cond_data <- mutate(cond_data, adop_0_l := l_col, .keep = c("all"))
 }   else {
-  cond_data <- add_column(cond_data, adop_0_l := l_col)
+  cond_data <- mutate(cond_data, adop_0_l := l_col, .keep = c("all"))
 }
 
 adop_rb <- "hml"
@@ -9316,67 +9716,67 @@ S2se_col <- getMembership(fpm_adop_0_nuance$S2se)
 if ("adop_0_nuance_S1" %in% colnames(cond_data)) {
   cond_data <- cond_data  %>% dplyr::select(-(adop_0_nuance_S1))
   cond_data <-
-    add_column(cond_data, adop_0_nuance_S1 := S1_col)
+    mutate(cond_data, adop_0_nuance_S1 := S1_col, .keep = c("all"))
 }   else {
-  cond_data <- add_column(cond_data, adop_0_nuance_S1 := S1_col)
+  cond_data <- mutate(cond_data, adop_0_nuance_S1 := S1_col, .keep = c("all"))
 }
 if ("adop_0_nuance_S2c" %in% colnames(cond_data)) {
   cond_data <- cond_data  %>% dplyr::select(-(adop_0_nuance_S2c))
   cond_data <-
-    add_column(cond_data, adop_0_nuance_S2c := S2c_col)
+    mutate(cond_data, adop_0_nuance_S2c := S2c_col, .keep = c("all"))
 }   else {
   cond_data <-
-    add_column(cond_data, adop_0_nuance_S2c := S2c_col)
+    mutate(cond_data, adop_0_nuance_S2c := S2c_col, .keep = c("all"))
 }
 if ("adop_0_nuance_S2f" %in% colnames(cond_data)) {
   cond_data <- cond_data  %>% dplyr::select(-(adop_0_nuance_S2f))
   cond_data <-
-    add_column(cond_data, adop_0_nuance_S2f := S2f_col)
+    mutate(cond_data, adop_0_nuance_S2f := S2f_col, .keep = c("all"))
 }   else {
   cond_data <-
-    add_column(cond_data, adop_0_nuance_S2f := S2f_col)
+    mutate(cond_data, adop_0_nuance_S2f := S2f_col, .keep = c("all"))
 }
 if ("adop_0_nuance_S2l" %in% colnames(cond_data)) {
   cond_data <- cond_data  %>% dplyr::select(-(adop_0_nuance_S2l))
   cond_data <-
-    add_column(cond_data, adop_0_nuance_S2l := S2l_col)
+    mutate(cond_data, adop_0_nuance_S2l := S2l_col, .keep = c("all"))
 }   else {
-  cond_data <- add_column(cond_data, adop_0_nuance_S2l := S2l_col)
+  cond_data <- mutate(cond_data, adop_0_nuance_S2l := S2l_col, .keep = c("all"))
 }
 if ("adop_0_nuance_S2p" %in% colnames(cond_data)) {
   cond_data <- cond_data  %>% dplyr::select(-(adop_0_nuance_S2p))
   cond_data <-
-    add_column(cond_data, adop_0_nuance_S2p := S2l_col)
+    mutate(cond_data, adop_0_nuance_S2p := S2l_col, .keep = c("all"))
 }   else {
-  cond_data <- add_column(cond_data, adop_0_nuance_S2p := S2l_col)
+  cond_data <- mutate(cond_data, adop_0_nuance_S2p := S2l_col, .keep = c("all"))
 }
 if ("adop_0_nuance_S3" %in% colnames(cond_data)) {
   cond_data <- cond_data  %>% dplyr::select(-(adop_0_nuance_S3))
   cond_data <-
-    add_column(cond_data, adop_0_nuance_S3 := S3_col)
+    mutate(cond_data, adop_0_nuance_S3 := S3_col, .keep = c("all"))
 }   else {
-  cond_data <- add_column(cond_data, adop_0_nuance_S3 := S3_col)
+  cond_data <- mutate(cond_data, adop_0_nuance_S3 := S3_col, .keep = c("all"))
 }
 if ("adop_0_nuance_N1" %in% colnames(cond_data)) {
   cond_data <- cond_data  %>% dplyr::select(-(adop_0_nuance_N1))
   cond_data <-
-    add_column(cond_data, adop_0_nuance_N1 := N1_col)
+    mutate(cond_data, adop_0_nuance_N1 := N1_col, .keep = c("all"))
 }   else {
-  cond_data <- add_column(cond_data, adop_0_nuance_N1 := N1_col)
+  cond_data <- mutate(cond_data, adop_0_nuance_N1 := N1_col, .keep = c("all"))
 }
 if ("adop_0_nuance_N2" %in% colnames(cond_data)) {
   cond_data <- cond_data  %>% dplyr::select(-(adop_0_nuance_N2))
   cond_data <-
-    add_column(cond_data, adop_0_nuance_N2 := N2_col)
+    mutate(cond_data, adop_0_nuance_N2 := N2_col, .keep = c("all"))
 }   else {
-  cond_data <- add_column(cond_data, adop_0_nuance_N2 := N2_col)
+  cond_data <- mutate(cond_data, adop_0_nuance_N2 := N2_col, .keep = c("all"))
 }
 if ("adop_0_nuance_S2se" %in% colnames(cond_data)) {
   cond_data <- cond_data  %>% dplyr::select(-(adop_0_nuance_S2se))
   cond_data <-
-    add_column(cond_data, adop_0_nuance_S2se := S2se_col)
+    mutate(cond_data, adop_0_nuance_S2se := S2se_col, .keep = c("all"))
 }   else {
-  cond_data <- add_column(cond_data, adop_0_nuance_S2se := S2se_col)
+  cond_data <- mutate(cond_data, adop_0_nuance_S2se := S2se_col, .keep = c("all"))
 }
 
 n = 9
@@ -9436,7 +9836,7 @@ if ("score" %in% colnames(cond_data)) {
 d0 <-
   cond_data %>% dplyr::select(score, x, y) %>% na.omit %>% st_as_sf(coords = c("x", "y"))
 
-d1 <- rasterize(d0, ra_mask, field = "score")
+d1 <- rasterize(d0, rast_mask_proj, field = "score")
 
 dB <- brick(d1)
 names(dB) <- c('score')
@@ -9475,7 +9875,7 @@ if ("scorenuance" %in% colnames(cond_data)) {
 d0 <-
   cond_data %>% dplyr::select(scorenuance, x, y) %>% na.omit %>% st_as_sf(coords = c("x", "y"))
 
-d1 <- rasterize(d0, ra_mask, field = "scorenuance")
+d1 <- rasterize(d0, rast_mask_proj, field = "scorenuance")
 
 dB <- brick(d1)
 names(dB) <- c('scorenuance')
@@ -9495,7 +9895,7 @@ cat("## Export likelihood for adoption results
 <div class="fold o">
 ```{r rulebases_adop_export02, cache = TRUE, cache.whatever=params$Agg, cache.whatever=params$Agg, warning=FALSE, eval=adop_crit}
 
-adop_sf <- st_as_sf(cond_data, coords = c("x", "y"), crs = crs_irm)
+adop_sf <- st_as_sf(cond_data, coords = c("x", "y"), crs = crs_lam)
 output_sf(adop_sf, paste0("adop_", params$INN1))
 
 ``` 
@@ -9519,7 +9919,7 @@ The left map is _without_, the right map  _with_ triangulation points. These poi
 ```{r classified_adop_membership_maps02 , cache = TRUE, cache.whatever=params$Agg, warning=FALSE, timeit = TRUE, eval=adop_crit}
 # idem + overlay triangulation adoption points
 
-d_v_adop_tri <- sfc_as_cols(v_triangulation) %>%
+d_vect_adop_tri <- sfc_as_cols(vect_triangulation) %>%
     mutate(
         adopclass = ifelse(grepl(pattern = "high", x = Adoption, ignore.case = TRUE), "high", ifelse(grepl(pattern = "moderate", x = Adoption, ignore.case = TRUE), "moderate", "low")),
         type = NA
@@ -9527,18 +9927,18 @@ d_v_adop_tri <- sfc_as_cols(v_triangulation) %>%
     dplyr::filter(!is.na(Adoption))
 
 
-d_v_adop_tri$type[grepl(pattern = " AE", x = d_v_adop_tri$Adoption, ignore.case = TRUE)] <- "b"
-d_v_adop_tri$type[grepl(pattern = " EA", x = d_v_adop_tri$Adoption, ignore.case = TRUE)] <- "b"
-d_v_adop_tri$type[grepl(pattern = "bio", x = d_v_adop_tri$Adoption, ignore.case = TRUE)] <- "b"
-d_v_adop_tri$type[grepl(pattern = "SE", x = d_v_adop_tri$Adoption, ignore.case = TRUE)] <- "s"
-d_v_adop_tri$type[grepl(pattern = "soil", x = d_v_adop_tri$Adoption, ignore.case = TRUE)] <- "b"
-d_v_adop_tri$type[grepl(pattern = "lowland", x = d_v_adop_tri$Adoption, ignore.case = TRUE)] <- "b"
-d_v_adop_tri$type[grepl(pattern = " temp", x = d_v_adop_tri$Adoption, ignore.case = TRUE)] <- "b"
-d_v_adop_tri$type[grepl(pattern = " elevation", x = d_v_adop_tri$Adoption, ignore.case = TRUE)] <- "b"
-d_v_adop_tri$type[grepl(pattern = "market", x = d_v_adop_tri$Adoption, ignore.case = TRUE)] <- "s"
-d_v_adop_tri$type[grepl(pattern = "rain", x = d_v_adop_tri$Adoption, ignore.case = TRUE)] <- "b"
+d_vect_adop_tri$type[grepl(pattern = " AE", x = d_vect_adop_tri$Adoption, ignore.case = TRUE)] <- "b"
+d_vect_adop_tri$type[grepl(pattern = " EA", x = d_vect_adop_tri$Adoption, ignore.case = TRUE)] <- "b"
+d_vect_adop_tri$type[grepl(pattern = "bio", x = d_vect_adop_tri$Adoption, ignore.case = TRUE)] <- "b"
+d_vect_adop_tri$type[grepl(pattern = "SE", x = d_vect_adop_tri$Adoption, ignore.case = TRUE)] <- "s"
+d_vect_adop_tri$type[grepl(pattern = "soil", x = d_vect_adop_tri$Adoption, ignore.case = TRUE)] <- "b"
+d_vect_adop_tri$type[grepl(pattern = "lowland", x = d_vect_adop_tri$Adoption, ignore.case = TRUE)] <- "b"
+d_vect_adop_tri$type[grepl(pattern = " temp", x = d_vect_adop_tri$Adoption, ignore.case = TRUE)] <- "b"
+d_vect_adop_tri$type[grepl(pattern = " elevation", x = d_vect_adop_tri$Adoption, ignore.case = TRUE)] <- "b"
+d_vect_adop_tri$type[grepl(pattern = "market", x = d_vect_adop_tri$Adoption, ignore.case = TRUE)] <- "s"
+d_vect_adop_tri$type[grepl(pattern = "rain", x = d_vect_adop_tri$Adoption, ignore.case = TRUE)] <- "b"
 
-d_v_adop_tri %>%
+d_vect_adop_tri %>%
     dplyr::select(Adoption, adopclass, type) %>%
     (knitr::kable) %>% kable_styling("striped", full_width = F) %>% scroll_box(height = "300px")
 ``` 
@@ -9560,9 +9960,9 @@ if (params$RES1 != 2) {
   if (adop_rb == "hml") {
     d0 <-
       cond_data %>% dplyr::select(adop_0_h, adop_0_m, adop_0_l, x , y) %>% na.omit %>% st_as_sf(coords = c("x", "y"))
-    d1 <- rasterize(d0, ra_mask, field = "adop_0_h")
-    d2 <- rasterize(d0, ra_mask, field = "adop_0_m")
-    d3 <- rasterize(d0, ra_mask, field = "adop_0_l")
+    d1 <- rasterize(d0, rast_mask_proj, field = "adop_0_h")
+    d2 <- rasterize(d0, rast_mask_proj, field = "adop_0_m")
+    d3 <- rasterize(d0, rast_mask_proj, field = "adop_0_l")
     dB_adop <- brick(d1, d2, d3)
     names(dB_adop) <- c('high', 'moderate', 'low')
     
@@ -9575,8 +9975,8 @@ if (params$RES1 != 2) {
   } else {
     d0 <-
       cond_data %>% dplyr::select(adop_h, adop_l, x , y) %>% na.omit %>% st_as_sf(coords = c("x", "y"))
-    d1 <- rasterize(d0, ra_mask, field = "adop_0_h")
-    d2 <- rasterize(d0, ra_mask, field = "adop_0_l")
+    d1 <- rasterize(d0, rast_mask_proj, field = "adop_0_h")
+    d2 <- rasterize(d0, rast_mask_proj, field = "adop_0_l")
     dB_adop <- brick(d1, d2)
     names(dB_adop) <- c('high', 'low')
     
@@ -9640,12 +10040,12 @@ if (params$RES1 != 2) {
   
 g2 + 
     geom_point(
-        data = d_v_adop_tri, 
+        data = d_vect_adop_tri, 
         mapping = aes(x = x, y = y, colour = ifelse(adopclass == "high" , "green", "red")), 
         size = 2
     ) +
     geom_text(
-        data = d_v_adop_tri, 
+        data = d_vect_adop_tri, 
         mapping = aes(x = x+800, y = y+800, label = ifelse(type == "b", "b", "b/s"))
     ) + 
   scale_colour_identity() 
@@ -9673,7 +10073,7 @@ if (params$RES1 != 2) {
   
   # get the polygons showing the layer with the max value in dB_adop
   # sf method of raster to stars then to sf
-  maxadop0_poly1 <- st_transform(st_as_sf(st_as_stars(maxadop0)), crs_irm)
+  maxadop0_poly1 <- st_transform(st_as_sf(st_as_stars(maxadop0)), crs_lam)
  
   # join the polygons with the aptitude points
   maxadop0_poly2 <- st_join(maxadop0_poly1, adop_sf)
@@ -9777,15 +10177,15 @@ if (params$RES1 != 1) {
   
   d0_nuance <-
     cond_data %>% dplyr::select(adop_0_nuance_S1, adop_0_nuance_S2c, adop_0_nuance_S2l, adop_0_nuance_S2p, adop_0_nuance_S2f, adop_0_nuance_S2se, adop_0_nuance_S3, adop_0_nuance_N1, adop_0_nuance_N2, x , y) %>% na.omit %>% st_as_sf(coords = c("x", "y"))
-  d1_nuance <- rasterize(d0_nuance, ra_mask, field = "adop_0_nuance_S1")
-  d2_nuance <- rasterize(d0_nuance, ra_mask, field = "adop_0_nuance_S2c")
-  d3_nuance <- rasterize(d0_nuance, ra_mask, field = "adop_0_nuance_S2l")
-  d4_nuance <- rasterize(d0_nuance, ra_mask, field = "adop_0_nuance_S2p")
-  d5_nuance <- rasterize(d0_nuance, ra_mask, field = "adop_0_nuance_S2f")
-  d6_nuance <- rasterize(d0_nuance, ra_mask, field = "adop_0_nuance_S2se")
-  d7_nuance <- rasterize(d0_nuance, ra_mask, field = "adop_0_nuance_S3")
-  d8_nuance <- rasterize(d0_nuance, ra_mask, field = "adop_0_nuance_N1")
-  d9_nuance <- rasterize(d0_nuance, ra_mask, field = "adop_0_nuance_N2")
+  d1_nuance <- rasterize(d0_nuance, rast_mask_proj, field = "adop_0_nuance_S1")
+  d2_nuance <- rasterize(d0_nuance, rast_mask_proj, field = "adop_0_nuance_S2c")
+  d3_nuance <- rasterize(d0_nuance, rast_mask_proj, field = "adop_0_nuance_S2l")
+  d4_nuance <- rasterize(d0_nuance, rast_mask_proj, field = "adop_0_nuance_S2p")
+  d5_nuance <- rasterize(d0_nuance, rast_mask_proj, field = "adop_0_nuance_S2f")
+  d6_nuance <- rasterize(d0_nuance, rast_mask_proj, field = "adop_0_nuance_S2se")
+  d7_nuance <- rasterize(d0_nuance, rast_mask_proj, field = "adop_0_nuance_S3")
+  d8_nuance <- rasterize(d0_nuance, rast_mask_proj, field = "adop_0_nuance_N1")
+  d9_nuance <- rasterize(d0_nuance, rast_mask_proj, field = "adop_0_nuance_N2")
   dB_adop_nuance <-
     brick(
       d1_nuance,
@@ -9895,12 +10295,12 @@ if (params$RES1 != 1) {
   
 g2_nuance + 
     geom_point(
-        data = d_v_adop_tri, 
+        data = d_vect_adop_tri, 
         mapping = aes(x = x, y = y, colour = ifelse(adopclass == "high" , "green", "red")), 
         size = 2
     ) +
     geom_text(
-        data = d_v_adop_tri, 
+        data = d_vect_adop_tri, 
         mapping = aes(x = x+800, y = y+800, label = ifelse(type == "b", "b", "b/s"))
     ) + 
   scale_colour_identity()
@@ -9929,7 +10329,7 @@ if (params$RES1 != 1) {
   
   # get the polygons showing the layer with the max value in dB
   # sf method of raster to stars then to sf
-  maxadop0_nuance_poly1 <- st_transform(st_as_sf(st_as_stars(maxadop0_nuance)), crs_irm)
+  maxadop0_nuance_poly1 <- st_transform(st_as_sf(st_as_stars(maxadop0_nuance)), crs_lam)
   
   # join the polygons with the aptitude points
   maxadop0_nuance_poly2 <- st_join(maxadop0_nuance_poly1, adop_sf)
@@ -10024,11 +10424,170 @@ cat("## Classified Map of Biophysical Aptitude")
 
 ```
 
+
+```{r classified_ba_membership_maps02, echo=FALSE, results='asis', eval=ba_crit}
+
+cat("### Biophysical Aptitude - one class")
+
+```
+
 <div class="fold o"> 
-```{r classified_ba_membership_maps02 , cache = TRUE, cache.whatever=params$Agg, warning=FALSE, timeit = TRUE, eval=ba_crit}
+```{r classified_ba_membership_maps02a , cache = TRUE, cache.whatever=params$Agg, fig.width=12, out.width="100%", message=FALSE, warning=FALSE, timeit = TRUE, eval=ba_crit}
+# create classified aptitude map 
+
+if (params$RES1 != 2) {
+  # new method because of cond_data dropped no data
+  
+  d0 <-
+    cond_data %>% dplyr::select(ba_1_o, x , y) %>% na.omit %>% st_as_sf(coords = c("x", "y"))
+  dB_1 <- rasterize(d0, rast_mask_proj, field = "ba_1_o")
+  dB_ba <- classify(dB_1, matrix(c(-0.5, 0, 0, 0, 1, 3),
+        ncol = 3,
+        byrow = TRUE)
+      )
+  names(dB_ba) <- c('optimal')
+  
+  output_geotiff(dB_ba, paste0("1class_ba1_", params$INN1))
+
+  # export class as polygon
+  v_dB_ba <- as.polygons(dB_ba, dissolve = T)
+  
+  writeVector(v_dB_ba, paste0("data/output/1class_ba1_", params$INN1,".shp"), overwrite = TRUE)
+  
+  
+  d_ba <- dB_ba %>%
+    as.data.frame(xy = TRUE) %>%
+    na.omit
+  m <- d_ba %>% dplyr::select(-x,-y)
+  
+  g <- ggplot(data = d_ba) +
+    geom_raster(mapping = aes(x = x, y = y), fill = "green") +
+    scale_x_continuous(
+      name = "",
+      labels = function(x) {
+        1.0e-3 * x
+      }
+    ) +
+    scale_y_continuous(
+      name = "",
+      labels = function(x) {
+        1.0e-3 * x
+      }
+    ) +
+    coord_equal()
+  
+  #g2 <- add_subdiv_plot(g, paste(params$SUBDIV1))
+  g
+  
+} # end RES if statement 08/12/2019
+
+``` 
+</div>
+
+
+```{r classified_ba_membership_maps02b, echo=FALSE, results='asis', eval=ba_crit}
+
+cat("#### Biophysical Aptitude - one class Leaflet")
+
+```
+
+<div class="fold o"> 
+```{r classified_ba_membership_maps02c, fig.width=12, out.width="100%" , cache = TRUE, cache.whatever=params$Agg, warning=FALSE, timeit = TRUE, eval=ba_crit}
+
+if (params$RES1 != 2) {
+  
+  # project to geo for display in leaflet
+  v_dB_ba_geo <- terra::project(v_dB_ba, "epsg:4326")
+  
+# for the sourcing pipeline need only a raster of the potential crop areas, with non-N zones having a value of 1
+
+# reclassify dB_ba 
+  
+dB_ba_m <- c(0, 0.5, 1,
+       0.5, 1, 3, NA, NA, 0)
+dB_ba_rclmat <- matrix(dB_ba_m, ncol=3, byrow=TRUE)
+dB_ba_rcl <- classify(dB_ba$optimal, dB_ba_rclmat, include.lowest=TRUE)
+  
+dB_ba_rcl_geo <- terra::project(dB_ba_rcl, "epsg:4326", method = "near")
+writeRaster(dB_ba_rcl_geo, paste0("data/r_", params$INN1,"_pot-N.tif"), overwrite=TRUE)
+
+#plot(dB_ba_rcl_geo, main = paste0("Not sub-optimal ", params$INN1," 4 CRASA pipeline"))
+
+levels(dB_ba_rcl_geo) <- data.frame(id = c(0, 1, 3), opt = c("No Cropland", "Unsuitable", "Suitable"))
+
+cols <- c("No Cropland" = NA, "Unsuitable" = "red", "Suitable" = "darkgreen")
+
+g <-  ggplot() +
+      geom_spatraster(data = dB_ba_rcl_geo, aes(fill = opt), alpha = 1) +
+      geom_spatvector(
+        data = unwrap(vect_ISO),
+        fill = NA,
+        col = 'black',
+        na.rm = TRUE,
+        inherit.aes = FALSE
+      )  +
+      scale_fill_manual(
+        values = cols,
+        na.translate = F
+      ) +
+      xlim ((ext(unwrap(vect_ISO))[1] - 1), (ext(unwrap(vect_ISO))[2]) + 1) +
+      ylim ((ext(unwrap(vect_ISO))[3] - 1), (ext(unwrap(vect_ISO))[4]) + 1) +
+      labs(
+        fill = paste0(
+          "--------------------\nSuitability for\n",
+          params$INN1,
+          "\n",
+          ISO,
+          "\n--------------------"
+        )
+      ) +
+      theme(
+        panel.grid.major.x = element_blank(),
+        panel.grid.minor.x = element_blank(),
+        axis.title.x = element_blank(),
+        axis.title.y = element_blank()
+      ) +
+      coord_sf(expand = FALSE)
+
+g
+
+
+
+} # end RES if statement 08/12/2019
+``` 
+</div>
+
+<div class="fold o"> 
+```{r classified_ba_membership_maps02d , cache = TRUE, cache.whatever=params$Agg, warning=FALSE, timeit = TRUE, eval=ba_crit}
+
+
+if (params$RES1 != 2) {
+  
+  leaflet_widget <- leaflet(st_as_sf(v_dB_ba_geo), width = "100%") %>%
+    addProviderTiles(providers$OpenStreetMap.HOT, group = "OSM (HOT)") %>%
+    addPolygons(
+      #label = ~ stringr::str_c('Aptitude =', d_ba.optimal),
+      #labelOptions = labelOptions(direction = 'auto'),
+      color = "#03F",
+      weight = 1,
+      opacity = 0.5,
+      fillColor = "green",
+      fillOpacity = 0.2,
+      dashArray = NULL,
+      smoothFactor = 1,
+      noClip = FALSE,
+            popupOptions = NULL,
+      highlightOptions = NULL,
+    )
+  
+  frameWidget(leaflet_widget, height = '500')
+  
+} # end RES if statement 08/12/2019
+
+
 # idem + overlay triangulation aptitude points
 
-d_v_ba_tri <- sfc_as_cols(v_triangulation) %>%
+d_vect_ba_tri <- sfc_as_cols(vect_triangulation) %>%
     mutate(
         baclass = ifelse(grepl(pattern = "suboptimal", x = Aptitude, ignore.case = TRUE), "suboptimal", ifelse(grepl(pattern = "optimal", x = Aptitude, ignore.case = TRUE), "optimal", "other")),
         type = NA
@@ -10036,18 +10595,18 @@ d_v_ba_tri <- sfc_as_cols(v_triangulation) %>%
     dplyr::filter(!is.na(Aptitude))
 
 
-d_v_ba_tri$type[grepl(pattern = " AE", x = d_v_ba_tri$Aptitude, ignore.case = TRUE)] <- "b"
-d_v_ba_tri$type[grepl(pattern = " EA", x = d_v_ba_tri$Aptitude, ignore.case = TRUE)] <- "b"
-d_v_ba_tri$type[grepl(pattern = "bio", x = d_v_ba_tri$Aptitude, ignore.case = TRUE)] <- "b"
-d_v_ba_tri$type[grepl(pattern = "SE", x = d_v_ba_tri$Aptitude, ignore.case = TRUE)] <- "s"
-d_v_ba_tri$type[grepl(pattern = "soil", x = d_v_ba_tri$Aptitude, ignore.case = TRUE)] <- "b"
-d_v_ba_tri$type[grepl(pattern = "lowland", x = d_v_ba_tri$Aptitude, ignore.case = TRUE)] <- "b"
-d_v_ba_tri$type[grepl(pattern = " temp", x = d_v_ba_tri$Aptitude, ignore.case = TRUE)] <- "b"
-d_v_ba_tri$type[grepl(pattern = " elevation", x = d_v_ba_tri$Aptitude, ignore.case = TRUE)] <- "b"
-d_v_ba_tri$type[grepl(pattern = "market", x = d_v_ba_tri$Aptitude, ignore.case = TRUE)] <- "s"
-d_v_ba_tri$type[grepl(pattern = "rain", x = d_v_ba_tri$Aptitude, ignore.case = TRUE)] <- "b"
+d_vect_ba_tri$type[grepl(pattern = " AE", x = d_vect_ba_tri$Aptitude, ignore.case = TRUE)] <- "b"
+d_vect_ba_tri$type[grepl(pattern = " EA", x = d_vect_ba_tri$Aptitude, ignore.case = TRUE)] <- "b"
+d_vect_ba_tri$type[grepl(pattern = "bio", x = d_vect_ba_tri$Aptitude, ignore.case = TRUE)] <- "b"
+d_vect_ba_tri$type[grepl(pattern = "SE", x = d_vect_ba_tri$Aptitude, ignore.case = TRUE)] <- "s"
+d_vect_ba_tri$type[grepl(pattern = "soil", x = d_vect_ba_tri$Aptitude, ignore.case = TRUE)] <- "b"
+d_vect_ba_tri$type[grepl(pattern = "lowland", x = d_vect_ba_tri$Aptitude, ignore.case = TRUE)] <- "b"
+d_vect_ba_tri$type[grepl(pattern = " temp", x = d_vect_ba_tri$Aptitude, ignore.case = TRUE)] <- "b"
+d_vect_ba_tri$type[grepl(pattern = " elevation", x = d_vect_ba_tri$Aptitude, ignore.case = TRUE)] <- "b"
+d_vect_ba_tri$type[grepl(pattern = "market", x = d_vect_ba_tri$Aptitude, ignore.case = TRUE)] <- "s"
+d_vect_ba_tri$type[grepl(pattern = "rain", x = d_vect_ba_tri$Aptitude, ignore.case = TRUE)] <- "b"
 
-d_v_ba_tri %>%
+d_vect_ba_tri %>%
     dplyr::select(Aptitude, baclass, type) %>%
     (knitr::kable) %>% kable_styling("striped", full_width = F) %>% scroll_box(height = "300px")
 ``` 
@@ -10068,16 +10627,21 @@ if (params$RES1 != 2) {
   
   d0 <-
     cond_data %>% dplyr::select(ba_1_o, ba_1_s, x , y) %>% na.omit %>% st_as_sf(coords = c("x", "y"))
-  d1 <- rasterize(d0, ra_mask, field = "ba_1_o")
-  d2 <- rasterize(d0, ra_mask, field = "ba_1_s")
-  dB_ba <- brick(d1, d2)
+  d1 <- rasterize(d0, rast_mask_proj, field = "ba_1_o")
+  d2 <- rasterize(d0, rast_mask_proj, field = "ba_1_s")
+  dB_ba <- rast(list(d1, d2))
   names(dB_ba) <- c('optimal', 'suboptimal')
   
   # get max value and export
   dM <- which.max(dB_ba)
-  dM_brick <- brick(d1, d2, dM)
+  dM_brick <- rast(list(d1, d2, dM))
   names(dM_brick) <- c('optimal', 'suboptimal', 'class')
   output_geotiff(dM_brick, paste0("2class_ba1_", params$INN1))
+  
+  # export class as polygon
+  v_dM <- as.polygons(dM, dissolve = T)
+  
+  writeVector(v_dM, paste0("spatial_data/output/2class_ba1_", params$INN1,".shp"), overwrite = TRUE)
   
   
   d_ba <- dB_ba %>%
@@ -10131,12 +10695,12 @@ if (params$RES1 != 2) {
   
 g2 + 
     geom_point(
-        data = d_v_ba_tri, 
+        data = d_vect_ba_tri, 
         mapping = aes(x = x, y = y, colour = ifelse(baclass == "optimal" , "green", "red")), 
         size = 2
     ) +
     geom_text(
-        data = d_v_ba_tri, 
+        data = d_vect_ba_tri, 
         mapping = aes(x = x+800, y = y+800, label = ifelse(type == "b", "b", "b/s"))
     ) + 
   scale_colour_identity() 
@@ -10164,7 +10728,7 @@ if (params$RES1 != 2) {
   
   # get the polygons showing the layer with the max value in dB_ba
   # sf method of raster to stars then to sf
-  maxba1_poly1 <- st_transform(st_as_sf(st_as_stars(maxba1)), crs_irm)
+  maxba1_poly1 <- st_transform(st_as_sf(st_as_stars(maxba1)), crs_lam)
   
   # join the polygons with the aptitude points
   maxba1_poly2 <- st_join(maxba1_poly1, apt_sf)
@@ -10192,8 +10756,8 @@ if (params$RES1 != 2) {
       color = "#03F",
       weight = 1,
       opacity = 0.5,
-      fill = layer,
-      fillColor = ~ pal(layer),
+      fill = which.max,
+      fillColor = ~ pal(which.max),
       fillOpacity = 0.2,
       dashArray = NULL,
       smoothFactor = 1,
@@ -10257,17 +10821,17 @@ if (params$RES1 != 1) {
                                 ba_1_N2,
                                 x ,
                                 y) %>% na.omit %>% st_as_sf(coords = c("x", "y"))
-  d1_nuance <- rasterize(d0_nuance, ra_mask, field = "ba_1_S1")
-  d2_nuance <- rasterize(d0_nuance, ra_mask, field = "ba_1_S2c")
-  d3_nuance <- rasterize(d0_nuance, ra_mask, field = "ba_1_S2l")
-  d4_nuance <- rasterize(d0_nuance, ra_mask, field = "ba_1_S2p")
-  d5_nuance <- rasterize(d0_nuance, ra_mask, field = "ba_1_S2f")
-  d6_nuance <- rasterize(d0_nuance, ra_mask, field = "ba_1_S3")
-  d7_nuance <- rasterize(d0_nuance, ra_mask, field = "ba_1_N1")
-  d8_nuance <- rasterize(d0_nuance, ra_mask, field = "ba_1_N2")
+  d1_nuance <- rasterize(d0_nuance, rast_mask_proj, field = "ba_1_S1")
+  d2_nuance <- rasterize(d0_nuance, rast_mask_proj, field = "ba_1_S2c")
+  d3_nuance <- rasterize(d0_nuance, rast_mask_proj, field = "ba_1_S2l")
+  d4_nuance <- rasterize(d0_nuance, rast_mask_proj, field = "ba_1_S2p")
+  d5_nuance <- rasterize(d0_nuance, rast_mask_proj, field = "ba_1_S2f")
+  d6_nuance <- rasterize(d0_nuance, rast_mask_proj, field = "ba_1_S3")
+  d7_nuance <- rasterize(d0_nuance, rast_mask_proj, field = "ba_1_N1")
+  d8_nuance <- rasterize(d0_nuance, rast_mask_proj, field = "ba_1_N2")
   
   dB_ba_nuance <-
-    brick(
+    rast(list(
       d1_nuance,
       d2_nuance,
       d3_nuance,
@@ -10276,7 +10840,7 @@ if (params$RES1 != 1) {
       d6_nuance,
       d7_nuance,
       d8_nuance
-    )
+    ))
   names(dB_ba_nuance) <-
     c(
       "ba_1_S1",
@@ -10292,7 +10856,7 @@ if (params$RES1 != 1) {
   
   # get max value and export
   dM <- which.max(dB_ba_nuance)
-  dM_brick <- brick(
+  dM_brick <- rast(list(
     d1_nuance,
     d2_nuance,
     d3_nuance,
@@ -10302,7 +10866,7 @@ if (params$RES1 != 1) {
     d7_nuance,
     d8_nuance,
     dM
-  )
+  ))
   names(dM_brick) <-
     c(
       'ba_1_S1',
@@ -10316,6 +10880,11 @@ if (params$RES1 != 1) {
       'class'
     )
   output_geotiff(dM_brick, paste0("8class_ba1_", params$INN1))
+  
+    # export class as polygon
+  v_dM <- as.polygons(dM, dissolve = T)
+  
+  writeVector(v_dM, paste0("spatial_data/output/8class_ba1_", params$INN1,".shp"), overwrite = TRUE)
   
   
   d_ba_nuance <- dB_ba_nuance %>%
@@ -10391,12 +10960,12 @@ if (params$RES1 != 1) {
   
 g2_nuance + 
     geom_point(
-        data = d_v_ba_tri, 
+        data = d_vect_ba_tri, 
         mapping = aes(x = x, y = y, colour = ifelse(baclass == "optimal" , "green", "red")), 
         size = 2
     ) +
     geom_text(
-        data = d_v_ba_tri, 
+        data = d_vect_ba_tri, 
         mapping = aes(x = x+800, y = y+800, label = ifelse(type == "b", "b", "b/s"))
     ) + 
   scale_colour_identity() 
@@ -10405,6 +10974,7 @@ g2_nuance +
 
 ``` 
 </div>
+
 
 ```{r classified_ba_membership_maps_nuance04, echo=FALSE, results='asis', eval=ba_crit}
 
@@ -10424,17 +10994,40 @@ if (params$RES1 != 1) {
   
   # get the polygons showing the layer with the max value in dB
   # sf method of raster to stars then to sf
-  maxba1_nuance_poly1 <- st_transform(st_as_sf(st_as_stars(maxba1_nuance)), crs_irm)
+  maxba1_nuance_poly1 <- st_transform(st_as_sf(st_as_stars(maxba1_nuance)), crs_lam)
     
   # join the polygons with the aptitude points
   maxba1_nuance_poly2 <- st_join(maxba1_nuance_poly1, apt_sf)
   
   maxba1_nuance_poly3 <- cbind(maxba1_nuance_poly2, d_ba_nuance$class) # add the adaptation class from d_ba_nuance
   
-  
-  # project to geo for display in leaflet
+  # project to geo for display in leaflet and to export
   maxba1_nuance_poly3_geo <- st_transform(maxba1_nuance_poly3, crs = 4326)
   
+  v_maxba1_nuance_poly3_geo <- vect(maxba1_nuance_poly3_geo)
+  
+  writeVector(v_maxba1_nuance_poly3_geo, paste0("data/output/8class_ba1_", params$INN1,"_geo.shp"), overwrite=TRUE)
+  
+  
+  # for the sourcing pipeline need only a raster of the potential crop areas, with S1 and S2 zones having a value of 3 and other areas a value of 1 or 2
+
+# join to get S1 and S2 areas
+  
+dB_ba_nuance$ba_1_S1S2  <- (dB_ba_nuance$ba_1_S1 + dB_ba_nuance$ba_1_S2c + dB_ba_nuance$ba_1_S2l + dB_ba_nuance$ba_1_S2p + dB_ba_nuance$ba_1_S2f)
+  
+# reclassify dB_ba_nuance
+  
+dB_ba_nuance_m <- c(0, 0.5, 1,
+       0.5, 1, 3, NA, NA, 0)
+dB_ba_nuance_rclmat <- matrix(dB_ba_nuance_m, ncol=3, byrow=TRUE)
+dB_ba_nuance_rcl <- classify(dB_ba_nuance$ba_1_S1S2, dB_ba_nuance_rclmat, include.lowest=TRUE)
+dB_ba_nuance_rcl_geo <- terra::project(dB_ba_nuance_rcl, "epsg:4326", method = "near")
+
+plot(dB_ba_nuance_rcl_geo, main = paste0("Reclassified ", params$INN1," 4 CRASA pipeline"))
+
+writeRaster(dB_ba_nuance_rcl_geo, paste0("data/r_", params$INN1,"_pot.tif"), overwrite=TRUE)  
+  
+
 ba_nuance_palette <- (c(rgb(51,160,44, maxColorValue = 255),  #S1  
                          rgb(178,223,138, maxColorValue = 255), #S2c
                          rgb(166,206,227, maxColorValue = 255), #S2l  
@@ -10454,8 +11047,8 @@ pal <- colorFactor(ba_nuance_palette, domain = c(1:8), na.color = "#808080")
       color = "#03F",
       weight = 1,
       opacity = 0.5,
-      fill = layer,
-      fillColor = ~ pal(layer),
+      fill = which.max,
+      fillColor = ~ pal(which.max),
       fillOpacity = 0.2,
       dashArray = NULL,
       smoothFactor = 1,
@@ -10504,7 +11097,7 @@ cat("## Classified Map of Socioeconomic Feasibility")
 ```{r classified_se_membership_maps02 , cache = TRUE, cache.whatever=params$Agg, warning=FALSE, timeit = TRUE, eval=sef_crit}
 # idem + overlay triangulation aptitude points
 
-d_v_se_tri <- sfc_as_cols(v_triangulation) %>%
+d_vect_se_tri <- sfc_as_cols(vect_triangulation) %>%
     mutate(
         seclass = ifelse(grepl(pattern = "high", x = Feasibility, ignore.case = TRUE), "high", ifelse(grepl(pattern = "moderate", x = Feasibility, ignore.case = TRUE), "moderate", "low")),
         type = NA
@@ -10512,18 +11105,18 @@ d_v_se_tri <- sfc_as_cols(v_triangulation) %>%
     dplyr::filter(!is.na(Feasibility))
 
 
-d_v_se_tri$type[grepl(pattern = " AE", x = d_v_se_tri$Feasibility, ignore.case = TRUE)] <- "b"
-d_v_se_tri$type[grepl(pattern = " EA", x = d_v_se_tri$Feasibility, ignore.case = TRUE)] <- "b"
-d_v_se_tri$type[grepl(pattern = "bio", x = d_v_se_tri$Feasibility, ignore.case = TRUE)] <- "b"
-d_v_se_tri$type[grepl(pattern = "SE", x = d_v_se_tri$Feasibility, ignore.case = TRUE)] <- "s"
-d_v_se_tri$type[grepl(pattern = "soil", x = d_v_se_tri$Feasibility, ignore.case = TRUE)] <- "b"
-d_v_se_tri$type[grepl(pattern = "lowland", x = d_v_se_tri$Feasibility, ignore.case = TRUE)] <- "b"
-d_v_se_tri$type[grepl(pattern = " temp", x = d_v_se_tri$Feasibility, ignore.case = TRUE)] <- "b"
-d_v_se_tri$type[grepl(pattern = " elevation", x = d_v_se_tri$Feasibility, ignore.case = TRUE)] <- "b"
-d_v_se_tri$type[grepl(pattern = "market", x = d_v_se_tri$Feasibility, ignore.case = TRUE)] <- "s"
-d_v_se_tri$type[grepl(pattern = "rain", x = d_v_se_tri$Feasibility, ignore.case = TRUE)] <- "b"
+d_vect_se_tri$type[grepl(pattern = " AE", x = d_vect_se_tri$Feasibility, ignore.case = TRUE)] <- "b"
+d_vect_se_tri$type[grepl(pattern = " EA", x = d_vect_se_tri$Feasibility, ignore.case = TRUE)] <- "b"
+d_vect_se_tri$type[grepl(pattern = "bio", x = d_vect_se_tri$Feasibility, ignore.case = TRUE)] <- "b"
+d_vect_se_tri$type[grepl(pattern = "SE", x = d_vect_se_tri$Feasibility, ignore.case = TRUE)] <- "s"
+d_vect_se_tri$type[grepl(pattern = "soil", x = d_vect_se_tri$Feasibility, ignore.case = TRUE)] <- "b"
+d_vect_se_tri$type[grepl(pattern = "lowland", x = d_vect_se_tri$Feasibility, ignore.case = TRUE)] <- "b"
+d_vect_se_tri$type[grepl(pattern = " temp", x = d_vect_se_tri$Feasibility, ignore.case = TRUE)] <- "b"
+d_vect_se_tri$type[grepl(pattern = " elevation", x = d_vect_se_tri$Feasibility, ignore.case = TRUE)] <- "b"
+d_vect_se_tri$type[grepl(pattern = "market", x = d_vect_se_tri$Feasibility, ignore.case = TRUE)] <- "s"
+d_vect_se_tri$type[grepl(pattern = "rain", x = d_vect_se_tri$Feasibility, ignore.case = TRUE)] <- "b"
 
-d_v_se_tri %>%
+d_vect_se_tri %>%
     dplyr::select(Feasibility, seclass, type) %>%
     (knitr::kable) %>% kable_styling("striped", full_width = F) %>% scroll_box(height = "300px")
 ``` 
@@ -10544,9 +11137,9 @@ cat("### Socioeconomic Feasibility - three classes")
 if (sef_rb == "hml") {
   d0 <-
     cond_data %>% dplyr::select(se_1_h, se_1_m, se_1_l, x , y) %>% na.omit %>% st_as_sf(coords = c("x", "y"))
-  d1 <- rasterize(d0, ra_mask, field = "se_1_h")
-  d2 <- rasterize(d0, ra_mask, field = "se_1_m")
-  d3 <- rasterize(d0, ra_mask, field = "se_1_l")
+  d1 <- rasterize(d0, rast_mask_proj, field = "se_1_h")
+  d2 <- rasterize(d0, rast_mask_proj, field = "se_1_m")
+  d3 <- rasterize(d0, rast_mask_proj, field = "se_1_l")
   dB_se <- brick(d1, d2, d3)
   names(dB_se) <- c('high', 'moderate', 'low')
 
@@ -10559,8 +11152,8 @@ if (sef_rb == "hml") {
 } else {
   d0 <-
     cond_data %>% dplyr::select(se_1_h, se_1_l, x , y) %>% na.omit %>% st_as_sf(coords = c("x", "y"))
-  d1 <- rasterize(d0, ra_mask, field = "se_1_h")
-  d2 <- rasterize(d0, ra_mask, field = "se_1_l")
+  d1 <- rasterize(d0, rast_mask_proj, field = "se_1_h")
+  d2 <- rasterize(d0, rast_mask_proj, field = "se_1_l")
   dB_se <- brick(d1, d2)
   names(dB_se) <- c('high', 'low')
 
@@ -10622,12 +11215,12 @@ if (params$RES1 != 2) {
   
 g2 + 
     geom_point(
-        data = d_v_se_tri, 
+        data = d_vect_se_tri, 
         mapping = aes(x = x, y = y, colour = ifelse(seclass == "optimal" , "green", "red")), 
         size = 2
     ) +
     geom_text(
-        data = d_v_se_tri, 
+        data = d_vect_se_tri, 
         mapping = aes(x = x+800, y = y+800, label = ifelse(type == "s", "s", "s/b"))
     ) + 
   scale_colour_identity() 
@@ -10654,7 +11247,7 @@ if (params$RES1 != 2) {
   
   # get the polygons showing the layer with the max value in dB_se
   # sf method of raster to stars then to sf
-  maxse1_poly1 <- st_transform(st_as_sf(st_as_stars(maxse1)), crs_irm)
+  maxse1_poly1 <- st_transform(st_as_sf(st_as_stars(maxse1)), crs_lam)
   
   # join the polygons with the aptitude points
   maxse1_poly2 <- st_join(maxse1_poly1, se_sf)
@@ -10731,15 +11324,15 @@ The table and maps shows the area in hectares within each subdivision of each li
 ```{r statistics_adop_02, cache = TRUE, cache.whatever=params$Agg, fig.width=8, fig.height=7, out.width="100%", warning=FALSE, eval=adop_crit}
 
 if (params$RES1 != 2) {
-  extr <- raster::extract(dB_adop, v_subdiv, fun = sum, na.rm = TRUE)
+  extr <- raster::extract(dB_adop, vect_subdiv, fun = sum, na.rm = TRUE)
   
   extr <-
     (extr * Stat_factor_ha) # calculates area depending on the aggregation level
   
   for (i in seq_len(ncol(extr)))
-    v_subdiv[[colnames(extr)[i]]] <- extr[, i]
+    vect_subdiv[[colnames(extr)[i]]] <- extr[, i]
  
-  output_sf(v_subdiv, paste0("adop_subdiv_area_", params$INN1)) # save as a geojson file
+  output_sf(vect_subdiv, paste0("adop_subdiv_area_", params$INN1)) # save as a geojson file
   
   
   # where: n is the number of maps to produce (the number of values for the aptitude)
@@ -10771,18 +11364,18 @@ The table and maps shows the area in hectares within each subdivision of each nu
 # 03/03/2019 A FARROW adde
 
 if (params$RES1 != 1) {
-  extr <- raster::extract(dB_adop_nuance, v_subdiv, fun = sum, na.rm = TRUE)
+  extr <- raster::extract(dB_adop_nuance, vect_subdiv, fun = sum, na.rm = TRUE)
   
   extr <-
     (extr * Stat_factor_ha) # calculates area depending on the aggregation level
   
   for (i in seq_len(ncol(extr)))
-    v_subdiv[[colnames(extr)[i]]] <- extr[, i]
+    vect_subdiv[[colnames(extr)[i]]] <- extr[, i]
   
 
-  output_sf(v_subdiv, paste0("adop_nuance_subdiv_area_", params$INN1)) # save as a geojson file
+  output_sf(vect_subdiv, paste0("adop_nuance_subdiv_area_", params$INN1)) # save as a geojson file
 
-  output_csv(v_subdiv, paste0("adop_nuance_subdiv_area_", params$INN1)) # save as a csv file  
+  output_csv(vect_subdiv, paste0("adop_nuance_subdiv_area_", params$INN1)) # save as a csv file  
   
   # where: n is the number of maps to produce (the number of values for the aptitude)
   #        fill_var_list is a vector of the possible values for aptitude
@@ -10815,15 +11408,15 @@ The table and maps shows the percentage of each subdivision of each likelihood f
 # 03/03/2019 A FARROW adde
 
 if (params$RES1 != 2) {
-  extr <- raster::extract(dB_adop, v_subdiv, fun = mean, na.rm = TRUE)
+  extr <- raster::extract(dB_adop, vect_subdiv, fun = mean, na.rm = TRUE)
   
   extr <- (extr * 100) # calculates % of the total area
   
   for (i in seq_len(ncol(extr)))
-    v_subdiv[[colnames(extr)[i]]] <- extr[, i]
+    vect_subdiv[[colnames(extr)[i]]] <- extr[, i]
   
 
-  output_sf(v_subdiv, paste0("adop_subdiv_pc_", params$INN1)) # save as a geojson file
+  output_sf(vect_subdiv, paste0("adop_subdiv_pc_", params$INN1)) # save as a geojson file
   
   
   # where: n is the number of maps to produce (the number of values for the aptitude)
@@ -10855,15 +11448,15 @@ The table and maps shows the the percentage of each subdivision of each nuanced 
 # 03/03/2019 A FARROW adde
 
 if (params$RES1 != 1) {
-  extr <- raster::extract(dB_adop_nuance, v_subdiv, fun = mean, na.rm = TRUE)
+  extr <- raster::extract(dB_adop_nuance, vect_subdiv, fun = mean, na.rm = TRUE)
   
   extr <- (extr * 100) # calculates % of the total area
   
   for (i in seq_len(ncol(extr)))
-    v_subdiv[[colnames(extr)[i]]] <- extr[, i]
+    vect_subdiv[[colnames(extr)[i]]] <- extr[, i]
   
 
-  output_sf(v_subdiv, paste0("adop_nuance_subdiv_pc_", params$INN1)) # save as a geojson file
+  output_sf(vect_subdiv, paste0("adop_nuance_subdiv_pc_", params$INN1)) # save as a geojson file
   
   
   # where: n is the number of maps to produce (the number of values for the aptitude)
@@ -10897,17 +11490,17 @@ The table and maps shows the area in hectares within each subdivision of each ap
 # 03/03/2019 A FARROW adde
 
 if (params$RES1 != 2) {
-  extr <- raster::extract(dB_ba, v_subdiv, fun = sum, na.rm = TRUE)
+  extr <- raster::extract(dB_ba, vect_subdiv, fun = sum, na.rm = TRUE)
   
   extr <-
     (extr * Stat_factor_ha) # calculates area depending on the aggregation level
   
   for (i in seq_len(ncol(extr)))
-    v_subdiv[[colnames(extr)[i]]] <- extr[, i]
+    vect_subdiv[[colnames(extr)[i]]] <- extr[, i]
   
 
-  output_sf(v_subdiv, paste0("ba_subdiv_area_", params$INN1)) # save as a geojson file
-  output_csv(v_subdiv, paste0("ba_subdiv_area_", params$INN1)) # save as a csv file  
+  output_sf(vect_subdiv, paste0("ba_subdiv_area_", params$INN1)) # save as a geojson file
+  output_csv(vect_subdiv, paste0("ba_subdiv_area_", params$INN1)) # save as a csv file  
   
   # where: n is the number of maps to produce (the number of values for the aptitude)
   #        fill_var_list is a vector of the possible values for aptitude
@@ -10938,17 +11531,17 @@ The table and maps shows the area in hectares within each subdivision of each nu
 # 03/03/2019 A FARROW adde
 
 if (params$RES1 != 1) {
-  extr <- raster::extract(dB_ba_nuance, v_subdiv, fun = sum, na.rm = TRUE)
+  extr <- raster::extract(dB_ba_nuance, vect_subdiv, fun = sum, na.rm = TRUE)
   
   extr <-
     (extr * Stat_factor_ha) # calculates area depending on the aggregation level
   
   for (i in seq_len(ncol(extr)))
-    v_subdiv[[colnames(extr)[i]]] <- extr[, i]
+    vect_subdiv[[colnames(extr)[i]]] <- extr[, i]
   
 
-  output_sf(v_subdiv, paste0("ba_nuance_subdiv_area_", params$INN1)) # save as a geojson file
-  output_csv(v_subdiv, paste0("ba_nuance_subdiv_area_", params$INN1)) # save as a csv file
+  output_sf(vect_subdiv, paste0("ba_nuance_subdiv_area_", params$INN1)) # save as a geojson file
+  output_csv(vect_subdiv, paste0("ba_nuance_subdiv_area_", params$INN1)) # save as a csv file
   
   # where: n is the number of maps to produce (the number of values for the aptitude)
   #        fill_var_list is a vector of the possible values for aptitude
@@ -10981,16 +11574,16 @@ The table and maps shows the percentage of each subdivision of each aptitude cla
 # 03/03/2019 A FARROW adde
 
 if (params$RES1 != 2) {
-  extr <- raster::extract(dB_ba, v_subdiv, fun = mean, na.rm = TRUE)
+  extr <- raster::extract(dB_ba, vect_subdiv, fun = mean, na.rm = TRUE)
   
   extr <- (extr * 100) # calculates % of the total area
   
   for (i in seq_len(ncol(extr)))
-    v_subdiv[[colnames(extr)[i]]] <- extr[, i]
+    vect_subdiv[[colnames(extr)[i]]] <- extr[, i]
   
 
-  output_sf(v_subdiv, paste0("ba_subdiv_pc_", params$INN1)) # save as a geojson file
-  output_csv(v_subdiv, paste0("ba_subdiv_pc_", params$INN1)) # save as a csv file
+  output_sf(vect_subdiv, paste0("ba_subdiv_pc_", params$INN1)) # save as a geojson file
+  output_csv(vect_subdiv, paste0("ba_subdiv_pc_", params$INN1)) # save as a csv file
   
   # where: n is the number of maps to produce (the number of values for the aptitude)
   #        fill_var_list is a vector of the possible values for aptitude
@@ -11021,16 +11614,16 @@ The table and maps shows the the percentage of each subdivision of each nuanced 
 # 03/03/2019 A FARROW adde
 
 if (params$RES1 != 1) {
-  extr <- raster::extract(dB_ba_nuance, v_subdiv, fun = mean, na.rm = TRUE)
+  extr <- raster::extract(dB_ba_nuance, vect_subdiv, fun = mean, na.rm = TRUE)
   
   extr <- (extr * 100) # calculates % of the total area
   
   for (i in seq_len(ncol(extr)))
-    v_subdiv[[colnames(extr)[i]]] <- extr[, i]
+    vect_subdiv[[colnames(extr)[i]]] <- extr[, i]
   
 
-  output_sf(v_subdiv, paste0("ba_nuance_subdiv_pc_", params$INN1)) # save as a geojson file
-  output_csv(v_subdiv, paste0("ba_nuance_subdiv_pc_", params$INN1)) # save as a csv file  
+  output_sf(vect_subdiv, paste0("ba_nuance_subdiv_pc_", params$INN1)) # save as a geojson file
+  output_csv(vect_subdiv, paste0("ba_nuance_subdiv_pc_", params$INN1)) # save as a csv file  
   
   # where: n is the number of maps to produce (the number of values for the aptitude)
   #        fill_var_list is a vector of the possible values for aptitude
@@ -11064,16 +11657,16 @@ The table and maps shows the area in hectares within each subdivision of each so
 # 03/03/2019 A FARROW adde
 
 if (params$RES1 != 2) {
-  extr <- raster::extract(dB_se, v_subdiv, fun = sum, na.rm = TRUE)
+  extr <- raster::extract(dB_se, vect_subdiv, fun = sum, na.rm = TRUE)
   
   extr <-
     (extr * Stat_factor_ha) # calculates area depending on the aggregation level
   
   for (i in seq_len(ncol(extr)))
-    v_subdiv[[colnames(extr)[i]]] <- extr[, i]
+    vect_subdiv[[colnames(extr)[i]]] <- extr[, i]
   
 
-  output_sf(v_subdiv, paste0("se_subdiv_area_", params$INN1)) # save as a geojson file
+  output_sf(vect_subdiv, paste0("se_subdiv_area_", params$INN1)) # save as a geojson file
   
   
   # where: n is the number of maps to produce (the number of values for the aptitude)
@@ -11106,15 +11699,15 @@ The table and maps shows the percentage of each subdivision of each socioeconomi
 # 03/03/2019 A FARROW adde
 
 if (params$RES1 != 2) {
-  extr <- raster::extract(dB_se, v_subdiv, fun = mean, na.rm = TRUE)
+  extr <- raster::extract(dB_se, vect_subdiv, fun = mean, na.rm = TRUE)
   
   extr <- (extr * 100) # calculates % of the total area
   
   for (i in seq_len(ncol(extr)))
-    v_subdiv[[colnames(extr)[i]]] <- extr[, i]
+    vect_subdiv[[colnames(extr)[i]]] <- extr[, i]
   
 
-  output_sf(v_subdiv, paste0("se_subdiv_pc_", params$INN1)) # save as a geojson file
+  output_sf(vect_subdiv, paste0("se_subdiv_pc_", params$INN1)) # save as a geojson file
   
   
   # where: n is the number of maps to produce (the number of values for the aptitude)
@@ -11700,33 +12293,33 @@ The vector data are not projected and in geojson format. Here they are loaded an
 <div class="fold o">   
 ```{r spatialdataload_vector_01_i2, cache = TRUE, out.width="100%", include = TRUE, echo=FALSE}
 
-v_subdiv <- load_crs_vector_data( paste0("subdiv_", params$INN2), crs_irm)
-v_subdiv$id <- as.integer(rownames(v_subdiv))
-v_subdiv$id <- formatC(v_subdiv$id, width = 2, format = "d", flag = "0") # add an id field
+vect_subdiv <- load_crs_vector_data( paste0("subdiv_", params$INN2), crs_irm)
+vect_subdiv$id <- as.integer(rownames(vect_subdiv))
+vect_subdiv$id <- formatC(vect_subdiv$id, width = 2, format = "d", flag = "0") # add an id field
 
 nudge_xval <-
-  ((st_bbox(v_subdiv)[3] - st_bbox(v_subdiv)[1]) /  (nrow(v_subdiv) * 2.5))
+  ((st_bbox(vect_subdiv)[3] - st_bbox(vect_subdiv)[1]) /  (nrow(vect_subdiv) * 2.5))
 cat("nudge_xval =", nudge_xval)
 nudge_yval <-
-  ((st_bbox(v_subdiv)[4] - st_bbox(v_subdiv)[2]) /  (nrow(v_subdiv) * 2.5))
+  ((st_bbox(vect_subdiv)[4] - st_bbox(vect_subdiv)[2]) /  (nrow(vect_subdiv) * 2.5))
 cat("nudge_yval =", nudge_yval)
 
 
-v_subdiv_pt <- st_centroid(v_subdiv)
-expr <- paste0("v_subdiv_pt$", params$SUBDIV2)
-v_subdiv_pt$subdiv_label <- paste(v_subdiv_pt$id, "=", eval(parse(text=(expr))))
-v_subdiv_pt$subdiv_label <- factor(v_subdiv_pt$subdiv_label)
+vect_subdiv_pt <- st_centroid(vect_subdiv)
+expr <- paste0("vect_subdiv_pt$", params$SUBDIV2)
+vect_subdiv_pt$subdiv_label <- paste(vect_subdiv_pt$id, "=", eval(parse(text=(expr))))
+vect_subdiv_pt$subdiv_label <- factor(vect_subdiv_pt$subdiv_label)
 
   
-v_triangulation <- load_crs_vector_data( paste0("triangulation_", params$INN2), crs_irm)
+vect_triangulation <- load_crs_vector_data( paste0("triangulation_", params$INN2), crs_irm)
 
-crs(v_subdiv)
+crs(vect_subdiv)
 
 g <- ggplot()+
-      geom_sf(data=v_subdiv)+
-      geom_sf_text(data=v_subdiv, aes_string(label = paste(params$SUBDIV2))) +
-      geom_sf(data=v_triangulation, color = "Red")+
-      geom_sf_text(data=v_triangulation, aes_string(label = paste(params$TRI2)), color = "Red", size = 2)+
+      geom_sf(data=vect_subdiv)+
+      geom_sf_text(data=vect_subdiv, aes_string(label = paste(params$SUBDIV2))) +
+      geom_sf(data=vect_triangulation, color = "Red")+
+      geom_sf_text(data=vect_triangulation, aes_string(label = paste(params$TRI2)), color = "Red", size = 2)+
       coord_sf(datum=st_crs(crs_irm))
 g
 
@@ -20721,7 +21314,7 @@ The left map is _without_, the right map  _with_ triangulation points. These poi
 ```{r classified_adop_membership_maps02_i2 , cache = TRUE, cache.whatever=params$Agg, warning=FALSE, timeit = TRUE, eval=adop_crit}
 # idem + overlay triangulation adoption points
 
-d_v_adop_tri <- sfc_as_cols(v_triangulation) %>%
+d_vect_adop_tri <- sfc_as_cols(vect_triangulation) %>%
     mutate(
         adopclass = ifelse(grepl(pattern = "high", x = Adoption, ignore.case = TRUE), "high", ifelse(grepl(pattern = "moderate", x = Adoption, ignore.case = TRUE), "moderate", "low")),
         type = NA
@@ -20729,18 +21322,18 @@ d_v_adop_tri <- sfc_as_cols(v_triangulation) %>%
     dplyr::filter(!is.na(Adoption))
 
 
-d_v_adop_tri$type[grepl(pattern = " AE", x = d_v_adop_tri$Adoption, ignore.case = TRUE)] <- "b"
-d_v_adop_tri$type[grepl(pattern = " EA", x = d_v_adop_tri$Adoption, ignore.case = TRUE)] <- "b"
-d_v_adop_tri$type[grepl(pattern = "bio", x = d_v_adop_tri$Adoption, ignore.case = TRUE)] <- "b"
-d_v_adop_tri$type[grepl(pattern = "SE", x = d_v_adop_tri$Adoption, ignore.case = TRUE)] <- "s"
-d_v_adop_tri$type[grepl(pattern = "soil", x = d_v_adop_tri$Adoption, ignore.case = TRUE)] <- "b"
-d_v_adop_tri$type[grepl(pattern = "lowland", x = d_v_adop_tri$Adoption, ignore.case = TRUE)] <- "b"
-d_v_adop_tri$type[grepl(pattern = " temp", x = d_v_adop_tri$Adoption, ignore.case = TRUE)] <- "b"
-d_v_adop_tri$type[grepl(pattern = " elevation", x = d_v_adop_tri$Adoption, ignore.case = TRUE)] <- "b"
-d_v_adop_tri$type[grepl(pattern = "market", x = d_v_adop_tri$Adoption, ignore.case = TRUE)] <- "s"
-d_v_adop_tri$type[grepl(pattern = "rain", x = d_v_adop_tri$Adoption, ignore.case = TRUE)] <- "b"
+d_vect_adop_tri$type[grepl(pattern = " AE", x = d_vect_adop_tri$Adoption, ignore.case = TRUE)] <- "b"
+d_vect_adop_tri$type[grepl(pattern = " EA", x = d_vect_adop_tri$Adoption, ignore.case = TRUE)] <- "b"
+d_vect_adop_tri$type[grepl(pattern = "bio", x = d_vect_adop_tri$Adoption, ignore.case = TRUE)] <- "b"
+d_vect_adop_tri$type[grepl(pattern = "SE", x = d_vect_adop_tri$Adoption, ignore.case = TRUE)] <- "s"
+d_vect_adop_tri$type[grepl(pattern = "soil", x = d_vect_adop_tri$Adoption, ignore.case = TRUE)] <- "b"
+d_vect_adop_tri$type[grepl(pattern = "lowland", x = d_vect_adop_tri$Adoption, ignore.case = TRUE)] <- "b"
+d_vect_adop_tri$type[grepl(pattern = " temp", x = d_vect_adop_tri$Adoption, ignore.case = TRUE)] <- "b"
+d_vect_adop_tri$type[grepl(pattern = " elevation", x = d_vect_adop_tri$Adoption, ignore.case = TRUE)] <- "b"
+d_vect_adop_tri$type[grepl(pattern = "market", x = d_vect_adop_tri$Adoption, ignore.case = TRUE)] <- "s"
+d_vect_adop_tri$type[grepl(pattern = "rain", x = d_vect_adop_tri$Adoption, ignore.case = TRUE)] <- "b"
 
-d_v_adop_tri %>%
+d_vect_adop_tri %>%
     dplyr::select(Adoption, adopclass, type) %>%
     (knitr::kable) %>% kable_styling("striped", full_width = F) %>% scroll_box(height = "300px")
 ``` 
@@ -20859,12 +21452,12 @@ if (params$RES2 != 2) {
   
 g2 + 
     geom_point(
-        data = d_v_adop_tri, 
+        data = d_vect_adop_tri, 
         mapping = aes(x = x, y = y, colour = ifelse(adopclass == "high" , "green", "red")), 
         size = 2
     ) +
     geom_text(
-        data = d_v_adop_tri, 
+        data = d_vect_adop_tri, 
         mapping = aes(x = x+800, y = y+800, label = ifelse(type == "b", "b", "b/s"))
     ) + 
   scale_colour_identity() 
@@ -21115,12 +21708,12 @@ if (params$RES2 != 1) {
   
 g2_nuance_i2 + 
     geom_point(
-        data = d_v_adop_tri, 
+        data = d_vect_adop_tri, 
         mapping = aes(x = x, y = y, colour = ifelse(adopclass == "high" , "green", "red")), 
         size = 2
     ) +
     geom_text(
-        data = d_v_adop_tri, 
+        data = d_vect_adop_tri, 
         mapping = aes(x = x+800, y = y+800, label = ifelse(type == "b", "b", "b/s"))
     ) + 
   scale_colour_identity()
@@ -21248,7 +21841,7 @@ cat("## Classified Map of Biophysical Aptitude")
 ```{r classified_ba_membership_maps02_i2 , cache = TRUE, cache.whatever=params$Agg, warning=FALSE, timeit = TRUE, eval=ba_crit}
 # idem + overlay triangulation aptitude points
 
-d_v_ba_tri <- sfc_as_cols(v_triangulation) %>%
+d_vect_ba_tri <- sfc_as_cols(vect_triangulation) %>%
     mutate(
         baclass = ifelse(grepl(pattern = "suboptimal", x = Aptitude, ignore.case = TRUE), "suboptimal", ifelse(grepl(pattern = "optimal", x = Aptitude, ignore.case = TRUE), "optimal", "other")),
         type = NA
@@ -21256,18 +21849,18 @@ d_v_ba_tri <- sfc_as_cols(v_triangulation) %>%
     dplyr::filter(!is.na(Aptitude))
 
 
-d_v_ba_tri$type[grepl(pattern = " AE", x = d_v_ba_tri$Aptitude, ignore.case = TRUE)] <- "b"
-d_v_ba_tri$type[grepl(pattern = " EA", x = d_v_ba_tri$Aptitude, ignore.case = TRUE)] <- "b"
-d_v_ba_tri$type[grepl(pattern = "bio", x = d_v_ba_tri$Aptitude, ignore.case = TRUE)] <- "b"
-d_v_ba_tri$type[grepl(pattern = "SE", x = d_v_ba_tri$Aptitude, ignore.case = TRUE)] <- "s"
-d_v_ba_tri$type[grepl(pattern = "soil", x = d_v_ba_tri$Aptitude, ignore.case = TRUE)] <- "b"
-d_v_ba_tri$type[grepl(pattern = "lowland", x = d_v_ba_tri$Aptitude, ignore.case = TRUE)] <- "b"
-d_v_ba_tri$type[grepl(pattern = " temp", x = d_v_ba_tri$Aptitude, ignore.case = TRUE)] <- "b"
-d_v_ba_tri$type[grepl(pattern = " elevation", x = d_v_ba_tri$Aptitude, ignore.case = TRUE)] <- "b"
-d_v_ba_tri$type[grepl(pattern = "market", x = d_v_ba_tri$Aptitude, ignore.case = TRUE)] <- "s"
-d_v_ba_tri$type[grepl(pattern = "rain", x = d_v_ba_tri$Aptitude, ignore.case = TRUE)] <- "b"
+d_vect_ba_tri$type[grepl(pattern = " AE", x = d_vect_ba_tri$Aptitude, ignore.case = TRUE)] <- "b"
+d_vect_ba_tri$type[grepl(pattern = " EA", x = d_vect_ba_tri$Aptitude, ignore.case = TRUE)] <- "b"
+d_vect_ba_tri$type[grepl(pattern = "bio", x = d_vect_ba_tri$Aptitude, ignore.case = TRUE)] <- "b"
+d_vect_ba_tri$type[grepl(pattern = "SE", x = d_vect_ba_tri$Aptitude, ignore.case = TRUE)] <- "s"
+d_vect_ba_tri$type[grepl(pattern = "soil", x = d_vect_ba_tri$Aptitude, ignore.case = TRUE)] <- "b"
+d_vect_ba_tri$type[grepl(pattern = "lowland", x = d_vect_ba_tri$Aptitude, ignore.case = TRUE)] <- "b"
+d_vect_ba_tri$type[grepl(pattern = " temp", x = d_vect_ba_tri$Aptitude, ignore.case = TRUE)] <- "b"
+d_vect_ba_tri$type[grepl(pattern = " elevation", x = d_vect_ba_tri$Aptitude, ignore.case = TRUE)] <- "b"
+d_vect_ba_tri$type[grepl(pattern = "market", x = d_vect_ba_tri$Aptitude, ignore.case = TRUE)] <- "s"
+d_vect_ba_tri$type[grepl(pattern = "rain", x = d_vect_ba_tri$Aptitude, ignore.case = TRUE)] <- "b"
 
-d_v_ba_tri %>%
+d_vect_ba_tri %>%
     dplyr::select(Aptitude, baclass, type) %>%
     (knitr::kable) %>% kable_styling("striped", full_width = F) %>% scroll_box(height = "300px")
 ``` 
@@ -21341,12 +21934,12 @@ if (params$RES2 != 2) {
   
 g2_i2 + 
     geom_point(
-        data = d_v_ba_tri, 
+        data = d_vect_ba_tri, 
         mapping = aes(x = x, y = y, colour = ifelse(baclass == "optimal" , "green", "red")), 
         size = 2
     ) +
     geom_text(
-        data = d_v_ba_tri, 
+        data = d_vect_ba_tri, 
         mapping = aes(x = x+800, y = y+800, label = ifelse(type == "b", "b", "b/s"))
     ) + 
   scale_colour_identity() 
@@ -21602,12 +22195,12 @@ if (params$RES2 != 1) {
   
 g2_nuance_i2 + 
     geom_point(
-        data = d_v_ba_tri, 
+        data = d_vect_ba_tri, 
         mapping = aes(x = x, y = y, colour = ifelse(baclass == "optimal" , "green", "red")), 
         size = 2
     ) +
     geom_text(
-        data = d_v_ba_tri, 
+        data = d_vect_ba_tri, 
         mapping = aes(x = x+800, y = y+800, label = ifelse(type == "b", "b", "b/s"))
     ) + 
   scale_colour_identity() 
@@ -21715,7 +22308,7 @@ cat("## Classified Map of Socioeconomic Feasibility")
 ```{r classified_se_membership_maps02_i2 , cache = TRUE, cache.whatever=params$Agg, warning=FALSE, timeit = TRUE, eval=sef_crit}
 # idem + overlay triangulation aptitude points
 
-d_v_se_tri <- sfc_as_cols(v_triangulation) %>%
+d_vect_se_tri <- sfc_as_cols(vect_triangulation) %>%
     mutate(
         seclass = ifelse(grepl(pattern = "high", x = Feasibility, ignore.case = TRUE), "high", ifelse(grepl(pattern = "moderate", x = Feasibility, ignore.case = TRUE), "moderate", "low")),
         type = NA
@@ -21723,18 +22316,18 @@ d_v_se_tri <- sfc_as_cols(v_triangulation) %>%
     dplyr::filter(!is.na(Feasibility))
 
 
-d_v_se_tri$type[grepl(pattern = " AE", x = d_v_se_tri$Feasibility, ignore.case = TRUE)] <- "b"
-d_v_se_tri$type[grepl(pattern = " EA", x = d_v_se_tri$Feasibility, ignore.case = TRUE)] <- "b"
-d_v_se_tri$type[grepl(pattern = "bio", x = d_v_se_tri$Feasibility, ignore.case = TRUE)] <- "b"
-d_v_se_tri$type[grepl(pattern = "SE", x = d_v_se_tri$Feasibility, ignore.case = TRUE)] <- "s"
-d_v_se_tri$type[grepl(pattern = "soil", x = d_v_se_tri$Feasibility, ignore.case = TRUE)] <- "b"
-d_v_se_tri$type[grepl(pattern = "lowland", x = d_v_se_tri$Feasibility, ignore.case = TRUE)] <- "b"
-d_v_se_tri$type[grepl(pattern = " temp", x = d_v_se_tri$Feasibility, ignore.case = TRUE)] <- "b"
-d_v_se_tri$type[grepl(pattern = " elevation", x = d_v_se_tri$Feasibility, ignore.case = TRUE)] <- "b"
-d_v_se_tri$type[grepl(pattern = "market", x = d_v_se_tri$Feasibility, ignore.case = TRUE)] <- "s"
-d_v_se_tri$type[grepl(pattern = "rain", x = d_v_se_tri$Feasibility, ignore.case = TRUE)] <- "b"
+d_vect_se_tri$type[grepl(pattern = " AE", x = d_vect_se_tri$Feasibility, ignore.case = TRUE)] <- "b"
+d_vect_se_tri$type[grepl(pattern = " EA", x = d_vect_se_tri$Feasibility, ignore.case = TRUE)] <- "b"
+d_vect_se_tri$type[grepl(pattern = "bio", x = d_vect_se_tri$Feasibility, ignore.case = TRUE)] <- "b"
+d_vect_se_tri$type[grepl(pattern = "SE", x = d_vect_se_tri$Feasibility, ignore.case = TRUE)] <- "s"
+d_vect_se_tri$type[grepl(pattern = "soil", x = d_vect_se_tri$Feasibility, ignore.case = TRUE)] <- "b"
+d_vect_se_tri$type[grepl(pattern = "lowland", x = d_vect_se_tri$Feasibility, ignore.case = TRUE)] <- "b"
+d_vect_se_tri$type[grepl(pattern = " temp", x = d_vect_se_tri$Feasibility, ignore.case = TRUE)] <- "b"
+d_vect_se_tri$type[grepl(pattern = " elevation", x = d_vect_se_tri$Feasibility, ignore.case = TRUE)] <- "b"
+d_vect_se_tri$type[grepl(pattern = "market", x = d_vect_se_tri$Feasibility, ignore.case = TRUE)] <- "s"
+d_vect_se_tri$type[grepl(pattern = "rain", x = d_vect_se_tri$Feasibility, ignore.case = TRUE)] <- "b"
 
-d_v_se_tri %>%
+d_vect_se_tri %>%
     dplyr::select(Feasibility, seclass, type) %>%
     (knitr::kable) %>% kable_styling("striped", full_width = F) %>% scroll_box(height = "300px")
 ``` 
@@ -21837,12 +22430,12 @@ if (params$RES2 != 2) {
   
 g2_i2 + 
     geom_point(
-        data = d_v_se_tri, 
+        data = d_vect_se_tri, 
         mapping = aes(x = x, y = y, colour = ifelse(seclass == "optimal" , "green", "red")), 
         size = 2
     ) +
     geom_text(
-        data = d_v_se_tri, 
+        data = d_vect_se_tri, 
         mapping = aes(x = x+800, y = y+800, label = ifelse(type == "s", "s", "s/b"))
     ) + 
   scale_colour_identity() 
@@ -21946,15 +22539,15 @@ The table and maps shows the area in hectares within each subdivision of each li
 ```{r statistics_adop_02_i2, cache = TRUE, cache.whatever=params$Agg, fig.width=8, fig.height=7, out.width="100%", warning=FALSE, eval=adop_crit}
 
 if (params$RES2 != 2) {
-  extr <- raster::extract(dB_adop_i2, v_subdiv, fun = sum, na.rm = TRUE)
+  extr <- raster::extract(dB_adop_i2, vect_subdiv, fun = sum, na.rm = TRUE)
   
   extr <-
     (extr * Stat_factor_ha) # calculates area depending on the aggregation level
   
   for (i in seq_len(ncol(extr)))
-    v_subdiv[[colnames(extr)[i]]] <- extr[, i]
+    vect_subdiv[[colnames(extr)[i]]] <- extr[, i]
  
-  output_sf(v_subdiv, paste0("adop_subdiv_area_", params$INN2)) # save as a geojson file
+  output_sf(vect_subdiv, paste0("adop_subdiv_area_", params$INN2)) # save as a geojson file
   
   
   # where: n is the number of maps to produce (the number of values for the aptitude)
@@ -21986,18 +22579,18 @@ The table and maps shows the area in hectares within each subdivision of each nu
 # 03/03/2019 A FARROW adde
 
 if (params$RES2 != 1) {
-  extr <- raster::extract(dB_adop_nuance_i2, v_subdiv, fun = sum, na.rm = TRUE)
+  extr <- raster::extract(dB_adop_nuance_i2, vect_subdiv, fun = sum, na.rm = TRUE)
   
   extr <-
     (extr * Stat_factor_ha) # calculates area depending on the aggregation level
   
   for (i in seq_len(ncol(extr)))
-    v_subdiv[[colnames(extr)[i]]] <- extr[, i]
+    vect_subdiv[[colnames(extr)[i]]] <- extr[, i]
   
 
-  output_sf(v_subdiv, paste0("adop_nuance_subdiv_area_", params$INN2)) # save as a geojson file
+  output_sf(vect_subdiv, paste0("adop_nuance_subdiv_area_", params$INN2)) # save as a geojson file
 
-  output_csv(v_subdiv, paste0("adop_nuance_subdiv_area_", params$INN2)) # save as a csv file  
+  output_csv(vect_subdiv, paste0("adop_nuance_subdiv_area_", params$INN2)) # save as a csv file  
   
   # where: n is the number of maps to produce (the number of values for the aptitude)
   #        fill_var_list is a vector of the possible values for aptitude
@@ -22030,15 +22623,15 @@ The table and maps shows the percentage of each subdivision of each likelihood f
 # 03/03/2019 A FARROW adde
 
 if (params$RES2 != 2) {
-  extr <- raster::extract(dB_adop_i2, v_subdiv, fun = mean, na.rm = TRUE)
+  extr <- raster::extract(dB_adop_i2, vect_subdiv, fun = mean, na.rm = TRUE)
   
   extr <- (extr * 100) # calculates % of the total area
   
   for (i in seq_len(ncol(extr)))
-    v_subdiv[[colnames(extr)[i]]] <- extr[, i]
+    vect_subdiv[[colnames(extr)[i]]] <- extr[, i]
   
 
-  output_sf(v_subdiv, paste0("adop_subdiv_pc_", params$INN2)) # save as a geojson file
+  output_sf(vect_subdiv, paste0("adop_subdiv_pc_", params$INN2)) # save as a geojson file
   
   
   # where: n is the number of maps to produce (the number of values for the aptitude)
@@ -22070,15 +22663,15 @@ The table and maps shows the the percentage of each subdivision of each nuanced 
 # 03/03/2019 A FARROW adde
 
 if (params$RES2 != 1) {
-  extr <- raster::extract(dB_adop_nuance_i2, v_subdiv, fun = mean, na.rm = TRUE)
+  extr <- raster::extract(dB_adop_nuance_i2, vect_subdiv, fun = mean, na.rm = TRUE)
   
   extr <- (extr * 100) # calculates % of the total area
   
   for (i in seq_len(ncol(extr)))
-    v_subdiv[[colnames(extr)[i]]] <- extr[, i]
+    vect_subdiv[[colnames(extr)[i]]] <- extr[, i]
   
 
-  output_sf(v_subdiv, paste0("adop_nuance_subdiv_pc_", params$INN2)) # save as a geojson file
+  output_sf(vect_subdiv, paste0("adop_nuance_subdiv_pc_", params$INN2)) # save as a geojson file
   
   
   # where: n is the number of maps to produce (the number of values for the aptitude)
@@ -22112,17 +22705,17 @@ The table and maps shows the area in hectares within each subdivision of each ap
 # 03/03/2019 A FARROW adde
 
 if (params$RES2 != 2) {
-  extr <- raster::extract(dB_ba_i2, v_subdiv, fun = sum, na.rm = TRUE)
+  extr <- raster::extract(dB_ba_i2, vect_subdiv, fun = sum, na.rm = TRUE)
   
   extr <-
     (extr * Stat_factor_ha) # calculates area depending on the aggregation level
   
   for (i in seq_len(ncol(extr)))
-    v_subdiv[[colnames(extr)[i]]] <- extr[, i]
+    vect_subdiv[[colnames(extr)[i]]] <- extr[, i]
   
 
-  output_sf(v_subdiv, paste0("ba_subdiv_area_", params$INN2)) # save as a geojson file
-  output_csv(v_subdiv, paste0("ba_subdiv_area_", params$INN2)) # save as a csv file  
+  output_sf(vect_subdiv, paste0("ba_subdiv_area_", params$INN2)) # save as a geojson file
+  output_csv(vect_subdiv, paste0("ba_subdiv_area_", params$INN2)) # save as a csv file  
   
   # where: n is the number of maps to produce (the number of values for the aptitude)
   #        fill_var_list is a vector of the possible values for aptitude
@@ -22153,17 +22746,17 @@ The table and maps shows the area in hectares within each subdivision of each nu
 # 03/03/2019 A FARROW adde
 
 if (params$RES2 != 1) {
-  extr <- raster::extract(dB_ba_nuance_i2, v_subdiv, fun = sum, na.rm = TRUE)
+  extr <- raster::extract(dB_ba_nuance_i2, vect_subdiv, fun = sum, na.rm = TRUE)
   
   extr <-
     (extr * Stat_factor_ha) # calculates area depending on the aggregation level
   
   for (i in seq_len(ncol(extr)))
-    v_subdiv[[colnames(extr)[i]]] <- extr[, i]
+    vect_subdiv[[colnames(extr)[i]]] <- extr[, i]
   
 
-  output_sf(v_subdiv, paste0("ba_nuance_subdiv_area_", params$INN2)) # save as a geojson file
-  output_csv(v_subdiv, paste0("ba_nuance_subdiv_area_", params$INN2)) # save as a csv file
+  output_sf(vect_subdiv, paste0("ba_nuance_subdiv_area_", params$INN2)) # save as a geojson file
+  output_csv(vect_subdiv, paste0("ba_nuance_subdiv_area_", params$INN2)) # save as a csv file
   
   # where: n is the number of maps to produce (the number of values for the aptitude)
   #        fill_var_list is a vector of the possible values for aptitude
@@ -22196,16 +22789,16 @@ The table and maps shows the percentage of each subdivision of each aptitude cla
 # 03/03/2019 A FARROW adde
 
 if (params$RES2 != 2) {
-  extr <- raster::extract(dB_ba_i2, v_subdiv, fun = mean, na.rm = TRUE)
+  extr <- raster::extract(dB_ba_i2, vect_subdiv, fun = mean, na.rm = TRUE)
   
   extr <- (extr * 100) # calculates % of the total area
   
   for (i in seq_len(ncol(extr)))
-    v_subdiv[[colnames(extr)[i]]] <- extr[, i]
+    vect_subdiv[[colnames(extr)[i]]] <- extr[, i]
   
 
-  output_sf(v_subdiv, paste0("ba_subdiv_pc_", params$INN2)) # save as a geojson file
-  output_csv(v_subdiv, paste0("ba_subdiv_pc_", params$INN2)) # save as a csv file
+  output_sf(vect_subdiv, paste0("ba_subdiv_pc_", params$INN2)) # save as a geojson file
+  output_csv(vect_subdiv, paste0("ba_subdiv_pc_", params$INN2)) # save as a csv file
   
   # where: n is the number of maps to produce (the number of values for the aptitude)
   #        fill_var_list is a vector of the possible values for aptitude
@@ -22236,16 +22829,16 @@ The table and maps shows the the percentage of each subdivision of each nuanced 
 # 03/03/2019 A FARROW adde
 
 if (params$RES2 != 1) {
-  extr <- raster::extract(dB_ba_nuance_i2, v_subdiv, fun = mean, na.rm = TRUE)
+  extr <- raster::extract(dB_ba_nuance_i2, vect_subdiv, fun = mean, na.rm = TRUE)
   
   extr <- (extr * 100) # calculates % of the total area
   
   for (i in seq_len(ncol(extr)))
-    v_subdiv[[colnames(extr)[i]]] <- extr[, i]
+    vect_subdiv[[colnames(extr)[i]]] <- extr[, i]
   
 
-  output_sf(v_subdiv, paste0("ba_nuance_subdiv_pc_", params$INN2)) # save as a geojson file
-  output_csv(v_subdiv, paste0("ba_nuance_subdiv_pc_", params$INN2)) # save as a csv file  
+  output_sf(vect_subdiv, paste0("ba_nuance_subdiv_pc_", params$INN2)) # save as a geojson file
+  output_csv(vect_subdiv, paste0("ba_nuance_subdiv_pc_", params$INN2)) # save as a csv file  
   
   # where: n is the number of maps to produce (the number of values for the aptitude)
   #        fill_var_list is a vector of the possible values for aptitude
@@ -22279,16 +22872,16 @@ The table and maps shows the area in hectares within each subdivision of each so
 # 03/03/2019 A FARROW adde
 
 if (params$RES2 != 2) {
-  extr <- raster::extract(dB_se_i2, v_subdiv, fun = sum, na.rm = TRUE)
+  extr <- raster::extract(dB_se_i2, vect_subdiv, fun = sum, na.rm = TRUE)
   
   extr <-
     (extr * Stat_factor_ha) # calculates area depending on the aggregation level
   
   for (i in seq_len(ncol(extr)))
-    v_subdiv[[colnames(extr)[i]]] <- extr[, i]
+    vect_subdiv[[colnames(extr)[i]]] <- extr[, i]
   
 
-  output_sf(v_subdiv, paste0("se_subdiv_area_", params$INN2)) # save as a geojson file
+  output_sf(vect_subdiv, paste0("se_subdiv_area_", params$INN2)) # save as a geojson file
   
   
   # where: n is the number of maps to produce (the number of values for the aptitude)
@@ -22321,15 +22914,15 @@ The table and maps shows the percentage of each subdivision of each socioeconomi
 # 03/03/2019 A FARROW adde
 
 if (params$RES2 != 2) {
-  extr <- raster::extract(dB_se_i2, v_subdiv, fun = mean, na.rm = TRUE)
+  extr <- raster::extract(dB_se_i2, vect_subdiv, fun = mean, na.rm = TRUE)
   
   extr <- (extr * 100) # calculates % of the total area
   
   for (i in seq_len(ncol(extr)))
-    v_subdiv[[colnames(extr)[i]]] <- extr[, i]
+    vect_subdiv[[colnames(extr)[i]]] <- extr[, i]
   
 
-  output_sf(v_subdiv, paste0("se_subdiv_pc_", params$INN2)) # save as a geojson file
+  output_sf(vect_subdiv, paste0("se_subdiv_pc_", params$INN2)) # save as a geojson file
   
   
   # where: n is the number of maps to produce (the number of values for the aptitude)
