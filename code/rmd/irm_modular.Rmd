@@ -17,7 +17,7 @@ params:
   INN1: lg_potato
   RES1: 3
   GRS1: 1
-  SUBDIV1: RK_NAME
+  SUBDIV1: Kebelle
   TRI1: Aptitude
   SOS1: 1
   INN2: NA
@@ -301,7 +301,7 @@ if (params$GRS1 == 1){
 } else {grs_crit <- FALSE}
 
 # season onset spatial?
-if (params$SOS == 1){
+if (params$SOS1 == 1){
     sos_crit <- TRUE
 } else {sos_crit <- FALSE}
 
@@ -451,36 +451,39 @@ The vector data are not projected and in geojson format. Here they are loaded an
 ```{r spatialdataload_vector_01, cache = FALSE, out.width="100%", include = TRUE, echo=FALSE}
 
 
-vect_subdiv <- load_crs_vector_data( paste0("subdiv_", params$INN1), crs_irm)
-vect_subdiv$id <- as.integer(rownames(vect_subdiv))
-vect_subdiv$id <- formatC(vect_subdiv$id, width = 2, format = "d", flag = "0") # add an id field
+vect_subdiv <- load_vector_data( paste0("subdiv_", params$INN1))
 
-vect_subdiv_extent <- extent(vect_subdiv)
+vect_subdiv$id <- seq.int(nrow(vect_subdiv))# add an id field
+vect_subdiv$id <- formatC(vect_subdiv$id, width = 2, format = "d", flag = "0") #format the id field
 
+vect_subdiv_extent <- ext(vect_subdiv) # get the extent
 nudge_xval <-
-  ((st_bbox(vect_subdiv)[3] - st_bbox(vect_subdiv)[1]) /  (nrow(vect_subdiv) * 2.5))
+  ((vect_subdiv_extent[2] - vect_subdiv_extent[1]) /  (nrow(vect_subdiv) * 2.5))
 cat("nudge_xval =", nudge_xval)
 nudge_yval <-
-  ((st_bbox(vect_subdiv)[4] - st_bbox(vect_subdiv)[2]) /  (nrow(vect_subdiv) * 2.5))
+  ((vect_subdiv_extent[4] - vect_subdiv_extent[3]) /  (nrow(vect_subdiv) * 2.5))
 cat("nudge_yval =", nudge_yval)
 
-vect_subdiv_pt <- st_centroid(vect_subdiv)
+vect_subdiv_pt <- centroids(vect_subdiv)
 expr <- paste0("vect_subdiv_pt$", params$SUBDIV1)
 vect_subdiv_pt$subdiv_label <- paste(vect_subdiv_pt$id, "=", eval(parse(text=(expr))))
 vect_subdiv_pt$subdiv_label <- factor(vect_subdiv_pt$subdiv_label)
 
+g <- ggplot()
+g2 <- add_subdiv_plot(g)
+g2
+```
+</div>
 
-vect_triangulation <- load_crs_vector_data( paste0("triangulation_", params$INN1), crs_irm)
+<div class="fold o">   
+```{r spatialdataload_vector_02, cache = FALSE, out.width="100%", include = TRUE, echo=FALSE}
 
-crs(vect_subdiv)
+vect_triangulation <-
+  load_vector_data(paste0("triangulation_", params$INN1))
+vect_triangulation$id <- as.integer(rownames(vect_triangulation))
+vect_triangulation$id <- formatC(vect_triangulation$id, width = 2, format = "d", flag = "0") # add an 
 
-g <- ggplot()+
-      geom_sf(data=vect_subdiv)+
-      geom_sf_text(data=vect_subdiv, aes_string(label = paste(params$SUBDIV1))) +
-      geom_sf(data=vect_triangulation, color = "Red")+
-      geom_sf_text(data=vect_triangulation, aes_string(label = paste(params$TRI1)), color = "Red", size = 2)+
-      coord_sf(datum=st_crs(crs_irm))
-g
+
 
 ```
 </div>

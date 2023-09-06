@@ -34,7 +34,7 @@ load_vector_data <-
         ".geojson",
         sep = ""
       ))
-    vector_name <-  writeVector(here(vector_filename)))
+    vector_name <-  vect(here(vector_filename))
     return(vector_name)
   }
         
@@ -876,25 +876,39 @@ plot_kebele_maps_old <- function(n, fill_var, pal_col) {
 # thanks to https://www.edureka.co/community/52697/change-the-order-of-multiple-legends-in-ggplot for the legend order
 
 
-add_subdiv_plot <- function(map1, subdiv_var) {
+add_subdiv_plot <- function(map1) {
   addsubdiv_map <-       map1 +
-    geom_sf(
-      data = v_subdiv,
-      mapping = aes_string(label = subdiv_var),
-      fill = NA,
-      colour = "black"
+    geom_spatvector(data = vect_subdiv,
+                    colour = "dark grey",
+                    fill = NA) +
+    geom_spatvector(
+      data = vect_subdiv_pt,
+      aes(fill = subdiv_label),
+      colour = "black",
+      shape = 21,
+      size = 2
     ) +
-    geom_sf_text(
-      data = v_subdiv_pt,
+    geom_spatvector_text(
+      data = vect_subdiv_pt,
       aes(label = id),
+      colour = "black",
+      size = 2,
       nudge_x = nudge_xval,
       nudge_y = nudge_yval
-    )  +
-    geom_sf(data = v_subdiv_pt, aes(shape = subdiv_label)) +
-    scale_shape_manual(values = 1:nlevels(v_subdiv_pt$subdiv_label)) +
-    labs(shape = "Sub-division name") +
-    theme(legend.direction = "vertical", legend.box = "horizontal") +
-    guides(alpha = guide_legend(order = 2), shape = guide_legend(order = 3), fill = guide_legend(order = 1)) +     coord_sf()
+    ) +
+    
+    #scale_shape_manual(values = 1:nlevels(vect_subdiv_pt$subdiv_label)) +
+    scale_fill_manual(values = 1:nlevels(vect_subdiv_pt$subdiv_label)) +
+    #labs(shape = "Sub-division name") +
+    labs(fill = "Sub-division name") +
+    theme(legend.direction = "vertical", 
+          legend.box = "horizontal",
+          axis.title.x = element_blank(),
+          axis.title.y = element_blank()) +
+    guides(#alpha = guide_legend(order = 2),
+      #shape = guide_legend(order = 3),
+      #colour = guide_legend(order = 1)
+      fill = guide_legend(order = 1)) 
   
   return(addsubdiv_map)
 }
