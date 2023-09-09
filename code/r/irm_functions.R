@@ -5,19 +5,31 @@
 #        raster_or_brick has two possible values, either raster for a single layer or brick for multiple layers
 
 
+#load_raster_data <-
+#  function(data_file_prefix,
+#           raster_name,
+#           rast_or_brick) {
+#    raster_filename <-
+#      as.character(paste("spatial_data/input/",
+#                         data_file_prefix,
+#                         ".tif",
+#                         sep = ""))
+#    raster_name <-  rast_or_brick(here(raster_filename))
+#    return(raster_name)
+#  }
+
+# in terra there is no brick, just the same rast method
 load_raster_data <-
   function(data_file_prefix,
-           raster_name,
-           rast_or_brick) {
+           raster_name) {
     raster_filename <-
       as.character(paste("spatial_data/input/",
                          data_file_prefix,
                          ".tif",
                          sep = ""))
-    raster_name <-  rast_or_brick(here(raster_filename))
+    raster_name <-  rast(here(raster_filename))
     return(raster_name)
   }
-
 
 # temporary function to load vector data
 
@@ -911,4 +923,63 @@ add_subdiv_plot <- function(map1) {
       fill = guide_legend(order = 1)) 
   
   return(addsubdiv_map)
+}
+
+add_subdiv_simple_plot <- function(map1) {
+  addsubdivsimple_map <-       map1 +
+    geom_spatvector(data = vect_subdiv,
+                    colour = "dark grey",
+                    fill = NA) +
+    theme(legend.direction = "vertical", 
+          legend.box = "horizontal",
+          axis.title.x = element_blank(),
+          axis.title.y = element_blank())
+  
+  return(addsubdivsimple_map)
+}
+
+add_triangulation_plot <- function(map1) {
+  addtriangulation_map <-       map1 +
+    geom_spatvector(
+      data = vect_triangulation,
+      aes(fill = tri_label),
+      colour = "black",
+      shape = 21,
+      size = 2
+    ) +  
+    geom_spatvector_text(
+      data = vect_triangulation,
+      aes(label = id),
+      colour = "black",
+      size = 2,
+      nudge_x = nudge_xvaltri,
+      nudge_y = nudge_yvaltri
+    ) +
+    
+    scale_fill_manual(values = 1:nlevels(vect_triangulation$tri_label)) +
+    labs(fill = "Comment") +
+    theme(legend.direction = "vertical", 
+          legend.box = "horizontal",
+          axis.title.x = element_blank(),
+          axis.title.y = element_blank()) +
+    guides(#alpha = guide_legend(order = 2),
+      #shape = guide_legend(order = 3),
+      #colour = guide_legend(order = 1)
+      fill = guide_legend(order = 1))
+  
+  return(addtriangulation_map)
+         
+}
+
+base_raster_plot <- function(raster_data, fillvar, low_col, high_col, plot_title) {
+  baseraster_map <-       
+  ggplot() +
+  geom_spatraster(data = rast_mask_proj, aes(fill = !!sym(fillvar))) +
+  scale_fill_gradient(low = low_col, high = high_col) +
+  labs(title = plot_title)
+  
+  #return(paste(fillvar))  
+  return(baseraster_map)
+
+  
 }

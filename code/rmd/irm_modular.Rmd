@@ -13,7 +13,7 @@ output:
     css: js/style.css
 params:
   INT: NA
-  Agg: 20
+  Agg: 1
   INN1: lg_potato
   RES1: 3
   GRS1: 1
@@ -188,11 +188,15 @@ Boxes in green show basic rule bases which have data and a fuzzy partition defin
 <div class="fold o"> 
 ```{r rule_base_graphs, results='asis'}
 
+priorities_new_columns_filename <-
+  as.character(paste("tab_data/input/priorities_new_columns_", params$INN1, ".csv", sep = ""))
 
-edges <-  select(priorities, criterion, stack) %>% dplyr::filter( !is.na(stack)) # %>% 
+priorities_new_columns <- read.csv(here(priorities_new_columns_filename), na.strings = c("NA"))
+
+edges <-  select(priorities_new_columns, criterion, stack) %>% dplyr::filter( !is.na(stack)) # %>% 
 #as.matrix(ncol = 2)
 
-vertices <-  select(priorities, criterion) 
+vertices <-  select(priorities_new_columns, criterion) 
 
 library(igraph)
 #graph_rb <- graph_from_edgelist(edges)
@@ -410,8 +414,8 @@ growth_stages_req_temp <- dplyr::filter(growth_stages, temp_criteria == 1)
   # create a list of the growth stages and determine the start and end days of each growth period
   phen_tmp <- list()
   for (i in 1:(nrow(growth_stages) - 2)) {
-    phen_tmp[[as.character(growth_stages[i + 2, 1])]] <-
-      growth_stages[i + 2, 3]
+    phen_tmp[[as.character(growth_stages[i + 1, 1])]] <-
+      growth_stages[i + 1, 3]
   }
   
   phen_stages_beg <-
@@ -470,20 +474,35 @@ vect_subdiv_pt$subdiv_label <- paste(vect_subdiv_pt$id, "=", eval(parse(text=(ex
 vect_subdiv_pt$subdiv_label <- factor(vect_subdiv_pt$subdiv_label)
 
 g <- ggplot()
-g2 <- add_subdiv_plot(g)
-g2
+gsubdiv <- add_subdiv_plot(g)
+gsubdiv
+
 ```
 </div>
 
 <div class="fold o">   
 ```{r spatialdataload_vector_02, cache = FALSE, out.width="100%", include = TRUE, echo=FALSE}
 
-vect_triangulation <-
-  load_vector_data(paste0("triangulation_", params$INN1))
-vect_triangulation$id <- as.integer(rownames(vect_triangulation))
-vect_triangulation$id <- formatC(vect_triangulation$id, width = 2, format = "d", flag = "0") # add an 
+vect_triangulation <- load_vector_data( paste0("triangulation_", params$INN1))
 
+vect_triangulation$id <- seq.int(nrow(vect_triangulation))# add an id field
+vect_triangulation$id <- formatC(vect_triangulation$id, width = 2, format = "d", flag = "0") #format the id field
 
+vect_triangulation_extent <- ext(vect_triangulation) # get the extent
+nudge_xvaltri <-
+  ((vect_triangulation_extent[2] - vect_triangulation_extent[1]) /  (nrow(vect_triangulation) * 2.5))
+cat("nudge_xvaltri =", nudge_xvaltri)
+nudge_yvaltri <-
+  ((vect_triangulation_extent[4] - vect_triangulation_extent[3]) /  (nrow(vect_triangulation) * 2.5))
+cat("nudge_yvaltri =", nudge_yvaltri)
+
+expr <- paste0("vect_triangulation$", params$TRI1)
+vect_triangulation$tri_label <- paste(vect_triangulation$id, "=", eval(parse(text=(expr))))
+vect_triangulation$tri_label <- factor(vect_triangulation$tri_label)
+
+g <- ggplot()
+gtriangulation <- add_triangulation_plot(g)
+gtriangulation
 
 ```
 </div>
@@ -496,10 +515,6 @@ Only the mask need be in the working crs.
 
 <div class="fold o">   
 ```{r spatialdataload_raster_01, results='asis', warning=FALSE}
-
-
-
-
 
 # set the working crs using WKT arguments
 
@@ -517,11 +532,11 @@ wkt_lam <-  paste0(
         METHOD[\"Lambert Azimuthal Equal Area\",
             ID[\"EPSG\",9820]],
         PARAMETER[\"Latitude of natural origin\",",
-vect_subdiv_extent@ymin,
+vect_subdiv_extent[3],
     ",ANGLEUNIT[\"degree\",0.0174532925199433],
             ID[\"EPSG\",8801]],
         PARAMETER[\"Longitude of natural origin\",",
-vect_subdiv_extent@xmin,
+vect_subdiv_extent[1],
     ",ANGLEUNIT[\"degree\",0.0174532925199433],
             ID[\"EPSG\",8802]],
         PARAMETER[\"False easting\",1000000,
@@ -542,25 +557,15 @@ vect_subdiv_extent@xmin,
   )
 
 
-crs_lam <- st_crs(wkt_lam)
-proj4_lam <- showP4(wkt_lam)
-
 # project the country boundary to LAM
 
-vect_subdiv_proj <-  st_transform(vect_subdiv, crs_lam)
-vect_subdiv_proj <- terra::vect(vect_subdiv_proj)
-
-vect_subdiv_proj_extent <- extent(vect_subdiv_proj)
+vect_subdiv_proj <-  project(vect_subdiv, wkt_lam)
 vect_subdiv_proj_extent <- terra::ext(vect_subdiv_proj)
 
-# project the cropland to LAM
-
-vect_subdiv_cropland_proj <- terra::project(vect_subdiv_cropland, wkt_lam)
-
-# make a basic raster with dimensions of 900 * 700 with 2km resolution 
+# make a basic raster with dimensions with 100m resolution 
 # and projected crs 
 
-rast_subdiv_mask_proj_extent <- rast(crs = wkt_lam, extent = vect_subdiv_proj_extent, resolution = 2000)
+rast_subdiv_mask_proj_extent <- rast(crs = wkt_lam, extent = vect_subdiv_proj_extent, resolution = 100)
 
 # make the mask based on the country boundary
 
@@ -571,17 +576,6 @@ rast_subdiv_mask_proj <- terra::rasterize(
       background = NA
     ) 
 
-# make the mask based on the cropland
-
-rast_subdiv_cropland_mask_proj <- terra::rasterize(
-      vect_subdiv_cropland_proj,
-      rast_subdiv_mask_proj_extent,
-      field = 1,
-      background = NA
-    )
-
-
-# crs(rast_ISO_cropland_mask_proj) <- proj4_lam
 
 # subset the priorities dataframe to keep only the records that have distinct raster data files
 
@@ -600,14 +594,16 @@ for (i in seq(from = 1,
     paste0("rast_", raster_data_df[i, 11]),
     load_raster_data(
       as.character(raster_data_df[i, 11]),
-      paste0("rast_", raster_data_df[i, 11]),
-      match.fun(as.character(raster_data_df[i, 12]))
+      paste0("rast_", raster_data_df[i, 11])
     )
   )
   cat(paste0("\nrast_", raster_data_df[i, 11], " :"))
-  print(crs(get(paste0(
+  #print(crs(get(paste0(
+  #  "rast_", raster_data_df[i, 11]
+  #))))
+  print(get(paste0(
     "rast_", raster_data_df[i, 11]
-  ))))
+  )))
 }
 
 
@@ -626,15 +622,15 @@ The properties of this map are given below:
 <div class="fold o">  
 ```{r mask01, cache = TRUE, cache.whatever=params$Agg, out.width="100%", warning=FALSE}
 
+if (params$Agg == 1){rast_mask_proj <- rast_subdiv_mask_proj} else {
+  rast_mask_proj <- aggregate(rast_subdiv_mask_proj, fact = params$Agg, expand = TRUE)}
 
 
+g <- base_raster_plot(rast_mask_proj, "layer", 'red', 'blue', paste0("Aggregated mask - Resolution = ", res(rast_mask_proj), "m"))
 
-if (params$Agg == 1){rast_mask_proj <- rast_subdiv_cropland_mask_proj} else {
-  rast_mask_proj <- aggregate(rast_subdiv_cropland_mask_proj, fact = params$Agg, expand = TRUE)}
+gsubdivsimple <- add_subdiv_simple_plot(g)
+gsubdivsimple
 
-
-rast_mask_proj
-rast_mask_proj %>% terra::plot(main = paste("Aggregated mask\nResolution = ", res(rast_mask_proj)))
 
 ```
 </div>
@@ -685,13 +681,13 @@ for (i in seq(from = 1,
               by = 1)) {
   
   temp_crs <- crs(get(paste0("rast_", raster_data_df[i, 11])))
-  assign("vect_ISO_temp_crs", terra::project(vect_ISO, temp_crs))
-  assign("vect_ISO_temp_crs_extent", terra::ext(vect_ISO_temp_crs))
+  assign("vect_subdiv_temp_crs", terra::project(vect_subdiv, temp_crs))
+  assign("vect_subdiv_temp_crs_extent", terra::ext(vect_subdiv_temp_crs))
     
   assign(
     paste0("rast_", raster_data_df[i, 11], "_roughcrop"),
     crop(get(paste0("rast_", raster_data_df[i, 11])),
-      vect_ISO_temp_crs_extent)
+      vect_subdiv_temp_crs_extent)
   )  
 }
 
@@ -705,7 +701,7 @@ for (i in seq(from = 1,
 # compare the crs of the raster with the working crs
 # when different project the raster  
   
-  if ( paste(crs(get(paste0("rast_", raster_data_df[i, 11])))) %ni% paste(proj4_lam)) {  
+  if ( paste(crs(get(paste0("rast_", raster_data_df[i, 11])))) %ni% paste(wkt_lam)) {  
   
   print("different crs")  
   assign(
@@ -730,6 +726,7 @@ for (i in seq(from = 1,
 # calculate aggregate factor for each criterion for both dimensions of the raster (these are the same for a square cell shape)
   
   cat(paste(raster_data_df[i, 10]))
+  cat("\n")
 
   calc_agg_factor <-
     (res(rast_mask_proj) / res(get(paste0(
@@ -744,9 +741,10 @@ for (i in seq(from = 1,
     # this means that the mask has a higher resolution than the precipitation raster so aggregation is not necessary and the precipitation raster will stay the same resolution
     
     cat(paste("revised calculated aggregate factor 1 = ", calc_agg_factor[1]))
+    cat("\n")
   }
   
-  cat("\n")
+  
   
   if (calc_agg_factor[2] < 1) {
     calc_agg_factor[2] <- 1
@@ -770,7 +768,7 @@ for (i in seq(from = 1,
       get(paste0("rast_", raster_data_df[i, 11], "_rsmp")),
       main = paste0(
         as.character(raster_data_df[i, 10]),
-        " agg ",
+        "\nagg ",
         as.character(raster_data_df[i, 13]),
         " rsmp ",
         as.character(raster_data_df[i, 14])
@@ -778,6 +776,11 @@ for (i in seq(from = 1,
       breaks = 10
    )
   #print(plot_raster)
+  
+  cat("\n")
+  cat(paste("Dim = ", dim(get(paste0("rast_", raster_data_df[i, 11], "_rsmp")))))
+  cat("\n\n")
+  
   plot_raster
 #  terra::plot(rast_mask_proj, title = "") # this is needed (even if it is not actually plotted) to enable the plot of the raster
   
@@ -860,7 +863,8 @@ for (i in 1:n_rbba3) {
 
 ```{r requirements_climatic03, echo=FALSE, results='asis', eval=clim_crit}
 
-cat("If there are climatic criteria that are for specific growth stages and which use monthly data then the phenological stages need to be distributed over the months.")
+cat("If there are climatic criteria that are for specific growth stages and which use monthly or dekadal data then the phenological stages need to be distributed over those periods.")
+
 ```
 
 
@@ -869,15 +873,19 @@ cat("If there are climatic criteria that are for specific growth stages and whic
 
 ## division by zero rainfall is infinitive, thus edited by Atkilt
 
-values(clim_mask_m)[values(clim_mask_m) >= 0] = 0
-values(clim_mask_m)[values(clim_mask_m) < 0] = NA
+if (exists('clim_mask_m')) {
+  values(clim_mask_m)[values(clim_mask_m) >= 0] = 0
+  values(clim_mask_m)[values(clim_mask_m) < 0] = NA
+}
 
-values(clim_mask_d)[values(clim_mask_d) >= 0] = 0
-values(clim_mask_d)[values(clim_mask_d) < 0] = NA
+if (exists('clim_mask_d')) {
+  values(clim_mask_d)[values(clim_mask_d) >= 0] = 0
+  values(clim_mask_d)[values(clim_mask_d) < 0] = NA
+}
 
 # see if one of the criteria is for the total growing period, if so then generate distribution
 
-# this uses two functions from the irm package called .growth_period_long (for monthly data) and .growth_period_long_dekad (for dekadal data) 
+# this uses two functions from the irm package called .growth_period_long (for monthly data) and .growth_period_long_dekad (for dekadal data)
 
 # both functions take three arguments: day_begin, and day_end in day numbers (obtained from the growth_stages_req table) and num_years which is calculated based on whether the growing season is spread across more than one calendar year
 
@@ -885,116 +893,327 @@ values(clim_mask_d)[values(clim_mask_d) < 0] = NA
 # for each of the growth stages for which there are requirements create a new raster brick
 
 # monthly distribution
-
-for (i in 1:(nrow(growth_stages_req))) {
-  period_name <- as.character(growth_stages_req[i, 1])
-  v_m <-
-    .growth_period_long(phen_stages_beg[period_name], phen_stages_end[period_name], num_years)
-  assign(paste0("rast_period_m_", growth_stages_req[i, 1]),
-         clim_mask_m %>%
-           app(function(x) {
-             ifelse(is.na(x), NA_real_, v_m)
-           }))
-  
-  plot_raster <-
-    plot(get(paste0("rast_period_m_", growth_stages_req[i, 1])),
-         main = paste0("rast_period_m_",
-                        as.character(growth_stages_req[i, 1])))
-  print(plot_raster)
+if (exists('clim_mask_m')) {
+  for (i in 1:(nrow(growth_stages_req))) {
+    period_name <- as.character(growth_stages_req[i, 1])
+    v_m <-
+      .growth_period_long(phen_stages_beg[period_name], phen_stages_end[period_name], num_years)
+    assign(paste0("rast_period_m_", growth_stages_req[i, 1]),
+           clim_mask_m %>%
+             app(function(x) {
+               ifelse(is.na(x), NA_real_, v_m)
+             }))
+    
+    plot_raster <-
+      plot(get(paste0(
+        "rast_period_m_", growth_stages_req[i, 1]
+      )),
+      main = paste0("rast_period_m_",
+                    as.character(growth_stages_req[i, 1])))
+    print(plot_raster)
+  }
 }
-
 # dekadal distribution
-
-for (i in 1:(nrow(growth_stages_req))) {
-  period_name <- as.character(growth_stages_req[i, 1])
-  v_d <-
-    .growth_period_long_dekad(phen_stages_beg[period_name], phen_stages_end[period_name], num_years)
-  assign(paste0("rast_period_d_", growth_stages_req[i, 1]),
-         clim_mask_d %>%
-           app(function(x) {
-             ifelse(is.na(x), NA_real_, v_d)
-           }))
-  
-  plot_raster <-
-    plot(get(paste0("rast_period_d_", growth_stages_req[i, 1])),
-         main = paste0("rast_period_d_",
-                        as.character(growth_stages_req[i, 1])), maxnl = 36)
-  print(plot_raster)
+if (exists('clim_mask_d')) {
+  for (i in 1:(nrow(growth_stages_req))) {
+    period_name <- as.character(growth_stages_req[i, 1])
+    v_d <-
+      .growth_period_long_dekad(phen_stages_beg[period_name], phen_stages_end[period_name], num_years)
+    assign(paste0("rast_period_d_", growth_stages_req[i, 1]),
+           clim_mask_d %>%
+             app(function(x) {
+               ifelse(is.na(x), NA_real_, v_d)
+             }))
+    
+    plot_raster <-
+      plot(
+        get(paste0(
+          "rast_period_d_", growth_stages_req[i, 1]
+        )),
+        main = paste0("rast_period_d_",
+                      as.character(growth_stages_req[i, 1])),
+        maxnl = 36
+      )
+    print(plot_raster)
+  }
 }
 
 ``` 
 </div>
 
+```{r requirements_sowing_dates, echo=FALSE, results='asis', eval=clim_crit, eval=grs_crit, eval=sos_crit}
+
+cat("For climatic criteria for specific growth stages which use monthly or dekadal data , and which have a spatially variable growth period the phenological stages need to be distributed over those periods and spatially.")
+
+```
+
+<div class="fold o">   
+```{r sowing_dates_sos_pre, cache = TRUE, cache.whatever=params$Agg, fig.width=8, fig.height=7, out.width="100%", warning=FALSE, eval=grs_crit, eval=sos_crit}
+
+growth_stages_lengths <- growth_stages[-1, ]
+growth_stages_lengths
+
+growth_stages_lengths1 <- t(select(growth_stages_lengths, name, length)) %>% data.frame()
+growth_stages_lengths1
+
+growth_stages_lengths2 <- setNames(growth_stages_lengths1, growth_stages_lengths[,1])
+growth_stages_lengths2
+
+growth_stages_lengths3 <- growth_stages_lengths2[-1, ] 
+growth_stages_lengths3
+
+growth_stages_lengths3[] <- lapply(growth_stages_lengths3, as.integer)
+growth_stages_lengths3
+
+```
+<div>
+
+
+<div class="fold o">   
+```{r sowing_dates_sos_m, cache = TRUE, cache.whatever=params$Agg, fig.width=8, fig.height=7, out.width="100%", warning=FALSE, eval=grs_crit, eval=sos_crit}
+
+# model the monthly growth stages for the spatial onset of the season
+
+if (exists('clim_mask_m')) {
+  
+# get onset for Ethiopia
+rast_onset <- rast("D:/repos/sourcing_targets/data/ETH/barley/hist_barley___onset.tif")
+names(rast_onset) <- c("onset")
+rast_onset
+plot(rast_onset)
+
+# project onset for Ethiopia
+rast_onset_proj <- project(rast_onset, rast_mask_proj)
+rast_onset_proj
+plot(rast_onset_proj)
+
+# do a rough crop to boundaries of Ethiopia
+rast_onset_crop <- crop(rast_onset_proj, rast_mask_proj)
+rast_onset_crop
+plot(rast_onset_crop)
+
+rast_onset_crop_rsmp <- resample(rast_onset_crop, rast_mask_proj,  method="near")
+rast_onset_crop_rsmp
+plot(rast_onset_crop_rsmp)  
+  
+# convert to df
+onset_df <- as.data.frame(rast_onset_crop_rsmp, xy=TRUE, cells=TRUE, na.rm=NA)
+onset_df <- mutate(onset_df, onset = as.integer(onset))
+
+# add the growth stage lengths to the df
+for (i in 1:(nrow(growth_stages_lengths))) {
+  period_name <- as.character(growth_stages_lengths[i, 1])
+  cat(paste(period_name))
+  cat(eval(parse(text = paste0("growth_stages_lengths3$", period_name))))
+  onset_df <-  mutate(onset_df, !!as.character(paste0(period_name,"_l")) :=  eval(parse(text = paste0("growth_stages_lengths3$", period_name))), .keep = c("all"))
+} 
+
+
+# add the start day for the first growth stage (which is the onset)
+
+first_period_name <- as.character(growth_stages_lengths[1, 1])
+cat(paste(first_period_name))
+onset_df <-
+  mutate(onset_df,!!as.character(paste0(first_period_name, "_s")) :=  eval(parse(text = paste0(
+    "onset_df$onset"
+  ))),
+  .keep = c("all"))
+
+# add the start days for each of the growth stages (excluding the first which is the onset)
+
+for (i in 1:(nrow(growth_stages_lengths)- 2) ) {
+  
+  cat(paste(i))
+      
+  previous_period_name <- as.character(growth_stages_lengths[i, 1])
+  cat(paste("Prev = ", previous_period_name))
+  cat("\n")
+  period_name <- as.character(growth_stages_lengths[i + 1, 1])
+  cat(paste("Current = ", period_name))
+  cat("\n")
+#  cat(paste0("growth_stages_lengths3$", period_name))
+  cat(paste(parse(text =paste0("onset_df$", previous_period_name,"_s"))))
+  cat("\n")
+  cat(paste(parse(text =paste0("onset_df$", previous_period_name,"_l"))))
+  cat("\n\n")
+ 
+eval_expr <- eval(parse(text =paste0("onset_df$", previous_period_name, "_s + onset_df$", previous_period_name,"_l")))
+
+  onset_df <-
+    mutate(onset_df, !!as.character(paste0(period_name, "_s")) :=  eval_expr,
+           .keep = c("all"))
+
+}
+
+# add the end days for each of the growth stages
+
+for (i in 1:(nrow(growth_stages_lengths) - 1) ) {
+  
+  cat(paste(i))
+      
+  previous_period_name <- as.character(growth_stages_lengths[i, 1])
+  cat(paste("Prev = ", previous_period_name))
+  cat("\n")
+  period_name <- as.character(growth_stages_lengths[i, 1])
+  cat(paste("Current = ", period_name))
+  cat("\n")
+#  cat(paste0("growth_stages_lengths3$", period_name))
+  cat(paste(parse(text =paste0("onset_df$", period_name,"_s"))))
+  cat("\n")
+  cat(paste(parse(text =paste0("onset_df$", period_name,"_l"))))
+  cat("\n\n")
+ 
+eval_expr <- eval(parse(text =paste0("onset_df$", period_name, "_s + onset_df$", period_name,"_l - 1")))
+
+  onset_df <-
+    mutate(onset_df, !!as.character(paste0(period_name, "_e")) :=  eval_expr,
+           .keep = c("all"))
+
+}  
+  
+  # A Farrow 09/09/2023 reached here
+
+
+
+
+
+  for (i in 1:(nrow(growth_stages_req))) {
+    period_name <- as.character(growth_stages_req[i, 1])
+    v_m <-
+      .growth_period_long(phen_stages_beg[period_name], phen_stages_end[period_name], num_years)
+    assign(paste0("rast_period_m_", growth_stages_req[i, 1]),
+           clim_mask_m %>%
+             app(function(x) {
+               ifelse(is.na(x), NA_real_, v_m)
+             }))
+ 
+grow_p_matrix_m <- t(apply(eth_all_df, 1, growth_period_long_tbl, day_begin = "hist_barley___onset", day_end = "rip_e", num_years = num_years ))    
+    
+       
+    plot_raster <-
+      plot(get(paste0(
+        "rast_period_m_", growth_stages_req[i, 1]
+      )),
+      main = paste0("rast_period_m_",
+                    as.character(growth_stages_req[i, 1])))
+    print(plot_raster)
+  }  
+  
+  
+  
+}
+
+
+```
+</div>
+
+<div class="fold o">   
+```{r sowing_dates_sos_d, cache = TRUE, cache.whatever=params$Agg, fig.width=8, fig.height=7, out.width="100%", warning=FALSE, eval=grs_crit, eval=sos_crit}
+
+# model the dekadal growth stages for the spatial onset of the season
+
+if (exists('clim_mask_d')) {
+}
+
+```
+</div>
 
 <div class="fold o">   
 ```{r requirements_phen_stages01_sos_m, cache = TRUE, cache.whatever=params$Agg, fig.width=8, fig.height=7, out.width="100%", warning=FALSE, eval=grs_crit, eval=sos_crit}
 
-# monthly growth stages have been pre-modelled for the spatial onset of season
+
+
 
 # for each of the growth stages for which there are requirements create a new raster brick
 
 ##-- monthly distribution --
 
-for (i in 1:(nrow(growth_stages_req))) {
-  period_name <- as.character(growth_stages_req[i, 1])
-  cat("period_name = ", period_name, "\n")
-
-
-# load growth period rasters
-
-assign(paste0("rast_period_m_", period_name,"_original"),   
-rast(paste0("D:/repos/sourcing_targets/data/ZMB/soybean/mth_", period_name,"_r.tif"))) 
-  
-# reproject growth period rasters
-
-assign(paste0("rast_period_m_", period_name,"_prj"),  
-  terra::project( get(paste0("rast_period_m_", period_name,"_original")),   rast_mask_proj, "near"))
-
-# aggregate if necessary
-
-#calc_agg_factor_m <-
-#    (res(rast_mask_proj) / res(rast_period_m_total_prj))
-#  cat(paste("calculated aggregate factor m = ", calc_agg_factor_m))
-
-calc_agg_factor_m <- (res(rast_mask_proj) / res(get(paste0("rast_period_m_", period_name,"_prj"))))
-
-cat(paste("calculated aggregate factor m = ", calc_agg_factor_m))
-
-
-if (calc_agg_factor_m[1] < 1) {
-    calc_agg_factor_m[1] <- 1
+if (exists('clim_mask_m')) {
+  for (i in 1:(nrow(growth_stages_req))) {
+    period_name <- as.character(growth_stages_req[i, 1])
+    cat("period_name = ", period_name, "\n")
     
-    # this means that the mask has a higher resolution than the precipitation raster so aggregation is not necessary and the precipitation raster will stay the same resolution
     
-    cat(paste("revised calculated aggregate factor m1 = ", calc_agg_factor_m[1]))
-  }
+    # load growth period rasters
+    
+    assign(paste0("rast_period_m_", period_name, "_original"),
+           rast(
+             paste0(
+               "spatial_data/mth_",
+               period_name,
+               "_r.tif"
+             )
+           ))
+    
+    # reproject growth period rasters
+    
+    assign(
+      paste0("rast_period_m_", period_name, "_prj"),
+      terra::project(get(
+        paste0("rast_period_m_", period_name, "_original")
+      ),   rast_mask_proj, "near")
+    )
+    
+    # aggregate if necessary
+    
+    #calc_agg_factor_m <-
+    #    (res(rast_mask_proj) / res(rast_period_m_total_prj))
+    #  cat(paste("calculated aggregate factor m = ", calc_agg_factor_m))
+    
+    calc_agg_factor_m <-
+      (res(rast_mask_proj) / res(get(
+        paste0("rast_period_m_", period_name, "_prj")
+      )))
+    
+    cat(paste("calculated aggregate factor m = ", calc_agg_factor_m))
+    
+    
+    if (calc_agg_factor_m[1] < 1) {
+      calc_agg_factor_m[1] <- 1
+      
+      # this means that the mask has a higher resolution than the precipitation raster so aggregation is not necessary and the precipitation raster will stay the same resolution
+      
+      cat(paste(
+        "revised calculated aggregate factor m1 = ",
+        calc_agg_factor_m[1]
+      ))
+    }
     cat("\n")
-  
-if (calc_agg_factor_m[2] < 1) {
-    calc_agg_factor_m[2] <- 1
-    cat(paste("revised calculated aggregate factor m2 = ", calc_agg_factor_m[2]))
-  }  
-  
-# resample
-
-  cat(paste("aggregate and resample"))
- 
-#    rast_period_m_total <- 
-#    agg_resample(
-#      rast_period_m_total_prj,
-#      calc_agg_factor_m, "modal", "near")
-  
-  assign(paste0("rast_period_m_", period_name),  
-    agg_resample(get(paste0("rast_period_m_", period_name,"_prj")),
-    calc_agg_factor_m, "modal", "near"))
-  
     
-# plot
-
-  plot(get(paste0("rast_period_m_", period_name)),
-      main = paste0(period_name," - spatial monthly"))  
-  
+    if (calc_agg_factor_m[2] < 1) {
+      calc_agg_factor_m[2] <- 1
+      cat(paste(
+        "revised calculated aggregate factor m2 = ",
+        calc_agg_factor_m[2]
+      ))
+    }
+    
+    # resample
+    
+    cat(paste("aggregate and resample"))
+    
+    #    rast_period_m_total <-
+    #    agg_resample(
+    #      rast_period_m_total_prj,
+    #      calc_agg_factor_m, "modal", "near")
+    
+    assign(
+      paste0("rast_period_m_", period_name),
+      agg_resample(get(
+        paste0("rast_period_m_", period_name, "_prj")
+      ),
+      calc_agg_factor_m, "modal", "near")
+    )
+    
+    
+    # plot
+    
+    plot(get(paste0("rast_period_m_", period_name)),
+         main = paste0(period_name, " - spatial monthly"))
+    
+  }
 }
+
 ```  
 </div>    
  
@@ -1007,64 +1226,92 @@ if (calc_agg_factor_m[2] < 1) {
 
 ##-- dekadal distribution --
 
-for (i in 1:(nrow(growth_stages_req))) {
-  period_name <- as.character(growth_stages_req[i, 1])
-  cat("period_name = ", period_name, "\n")
-
-
-# load growth period rasters
-
-assign(paste0("rast_period_d_", period_name,"_original"),   
-rast(paste0("D:/repos/sourcing_targets/data/ZMB/soybean/dek_", period_name,"_r.tif"))) 
-  
-# reproject growth period rasters
-
-assign(paste0("rast_period_d_", period_name,"_prj"),  
-  terra::project( get(paste0("rast_period_d_", period_name,"_original")),   rast_mask_proj, "near"))
-
-# aggregate if necessary
-
-#calc_agg_factor_m <-
-#    (res(rast_mask_proj) / res(rast_period_m_total_prj))
-#  cat(paste("calculated aggregate factor m = ", calc_agg_factor_m))
-
-calc_agg_factor_d <- (res(rast_mask_proj) / res(get(paste0("rast_period_d_", period_name,"_prj")))) 
-
-cat(paste("calculated aggregate factor d = ", calc_agg_factor_d))
-
-
-if (calc_agg_factor_d[1] < 1) {
-    calc_agg_factor_d[1] <- 1
+if (exists('clim_mask_d')) {
+  for (i in 1:(nrow(growth_stages_req))) {
+    period_name <- as.character(growth_stages_req[i, 1])
+    cat("period_name = ", period_name, "\n")
     
-    # this means that the mask has a higher resolution than the precipitation raster so aggregation is not necessary and the precipitation raster will stay the same resolution
     
-    cat(paste("revised calculated aggregate factor d1 = ", calc_agg_factor_d[1]))
-  }
+    # load growth period rasters
+    
+    assign(paste0("rast_period_d_", period_name, "_original"),
+           rast(
+             paste0(
+               "spatial_data/dek_",
+               period_name,
+               "_r.tif"
+             )
+           ))
+    
+    # reproject growth period rasters
+    
+    assign(
+      paste0("rast_period_d_", period_name, "_prj"),
+      terra::project(get(
+        paste0("rast_period_d_", period_name, "_original")
+      ),   rast_mask_proj, "near")
+    )
+    
+    # aggregate if necessary
+    
+    #calc_agg_factor_m <-
+    #    (res(rast_mask_proj) / res(rast_period_m_total_prj))
+    #  cat(paste("calculated aggregate factor m = ", calc_agg_factor_m))
+    
+    calc_agg_factor_d <-
+      (res(rast_mask_proj) / res(get(
+        paste0("rast_period_d_", period_name, "_prj")
+      )))
+    
+    cat(paste("calculated aggregate factor d = ", calc_agg_factor_d))
+    
+    
+    if (calc_agg_factor_d[1] < 1) {
+      calc_agg_factor_d[1] <- 1
+      
+      # this means that the mask has a higher resolution than the precipitation raster so aggregation is not necessary and the precipitation raster will stay the same resolution
+      
+      cat(paste(
+        "revised calculated aggregate factor d1 = ",
+        calc_agg_factor_d[1]
+      ))
+    }
     cat("\n")
-  
-if (calc_agg_factor_d[2] < 1) {
-    calc_agg_factor_d[2] <- 1
-    cat(paste("revised calculated aggregate factor d2 = ", calc_agg_factor_d[2]))
-  }  
-  
-# resample
-
-  cat(paste("aggregate and resample"))
- 
-#    rast_period_m_total <- 
-#    agg_resample(
-#      rast_period_m_total_prj,
-#      calc_agg_factor_m, "modal", "near")
-  
-  assign(paste0("rast_period_d_", period_name),  
-    agg_resample(get(paste0("rast_period_d_", period_name,"_prj")),
-    calc_agg_factor_d, "modal", "near"))
-  
     
-# plot
-
-  plot(get(paste0("rast_period_d_", period_name)),
-      main = paste0(period_name," - spatial dekadal"), maxnl = 36)  
+    if (calc_agg_factor_d[2] < 1) {
+      calc_agg_factor_d[2] <- 1
+      cat(paste(
+        "revised calculated aggregate factor d2 = ",
+        calc_agg_factor_d[2]
+      ))
+    }
+    
+    # resample
+    
+    cat(paste("aggregate and resample"))
+    
+    #    rast_period_m_total <-
+    #    agg_resample(
+    #      rast_period_m_total_prj,
+    #      calc_agg_factor_m, "modal", "near")
+    
+    assign(
+      paste0("rast_period_d_", period_name),
+      agg_resample(get(
+        paste0("rast_period_d_", period_name, "_prj")
+      ),
+      calc_agg_factor_d, "modal", "near")
+    )
+    
+    
+    # plot
+    
+    plot(
+      get(paste0("rast_period_d_", period_name)),
+      main = paste0(period_name, " - spatial dekadal"),
+      maxnl = 36
+    )
+  }
 }
 
 ```     
@@ -10523,7 +10770,7 @@ cols <- c("No Cropland" = NA, "Unsuitable" = "red", "Suitable" = "darkgreen")
 g <-  ggplot() +
       geom_spatraster(data = dB_ba_rcl_geo, aes(fill = opt), alpha = 1) +
       geom_spatvector(
-        data = unwrap(vect_ISO),
+        data = unwrap(vect_subdiv),
         fill = NA,
         col = 'black',
         na.rm = TRUE,
@@ -10533,8 +10780,8 @@ g <-  ggplot() +
         values = cols,
         na.translate = F
       ) +
-      xlim ((ext(unwrap(vect_ISO))[1] - 1), (ext(unwrap(vect_ISO))[2]) + 1) +
-      ylim ((ext(unwrap(vect_ISO))[3] - 1), (ext(unwrap(vect_ISO))[4]) + 1) +
+      xlim ((ext(unwrap(vect_subdiv))[1] - 1), (ext(unwrap(vect_subdiv))[2]) + 1) +
+      ylim ((ext(unwrap(vect_subdiv))[3] - 1), (ext(unwrap(vect_subdiv))[4]) + 1) +
       labs(
         fill = paste0(
           "--------------------\nSuitability for\n",
