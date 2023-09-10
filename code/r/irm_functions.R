@@ -218,7 +218,13 @@ dekad <- function(x, type = c("month", "year"), ...) {
                                                                 nbins = 36L)
 }
 
+
+# temporary function to check on which days are used to define the phenological stages
+
+daystest <- function(x, start_day, end_day) {
   
+  c(round(x[start_day]),round(x[end_day]))
+}  
   
   
 # temporary function for evaluating the lowest level biophysical rule bases
