@@ -13,7 +13,7 @@ output:
     css: js/style.css
 params:
   INT: NA
-  Agg: 1
+  Agg: 10
   INN1: lg_potato
   RES1: 3
   GRS1: 1
@@ -950,6 +950,55 @@ cat("For climatic criteria for specific growth stages which use monthly or dekad
 <div class="fold o">   
 ```{r sowing_dates_sos_pre, cache = TRUE, cache.whatever=params$Agg, fig.width=8, fig.height=7, out.width="100%", warning=FALSE, eval=grs_crit, eval=sos_crit}
 
+# DO THE DATA EXIST ALREADY
+
+for (i in 1:(nrow(growth_stages_req))) {
+  period_name <- as.character(growth_stages_req[i, 1])
+  cat(paste(period_name))
+  
+  #monthly data
+  
+  if (exists('clim_mask_m')) {
+    csv_filename <- as.character(paste("tab_data/output/onset_df_",
+                                          period_name,
+                                          "_m.csv",
+                                          sep = ""))
+    
+    if (file.exists(here(csv_filename))) {
+      print('Monthly data exist')
+      assign(paste0("onset_df_", period_name,"_m"), read.csv(here(csv_filename)))
+    } else {
+      print('Does not exist')
+    }
+  }
+  
+  
+  #dekad data
+  
+  
+  if (exists('clim_mask_d')) {
+    csv_filename <- as.character(paste("tab_data/output/onset_df_",
+                                          period_name,
+                                          "_d.csv",
+                                          sep = ""))
+    
+    if (file.exists(here(csv_filename))) {
+      print('Dekad data exist')
+      assign(paste0("onset_df_", period_name,"_d"), read.csv(here(csv_filename)))
+    } else {
+      print('Does not exist')
+      
+    }
+  }
+}
+
+```
+<div>
+
+<div class="fold o">   
+```{r sowing_dates_sos_pre, cache = TRUE, cache.whatever=params$Agg, fig.width=8, fig.height=7, out.width="100%", warning=FALSE, eval=grs_crit, eval=sos_crit}
+
+
 growth_stages_lengths <- growth_stages[-1, ]
 growth_stages_lengths
 
@@ -972,11 +1021,14 @@ growth_stages_lengths3
 <div class="fold o">   
 ```{r sowing_dates_sos, cache = TRUE, cache.whatever=params$Agg, fig.width=8, fig.height=7, out.width="100%", warning=FALSE, eval=grs_crit, eval=sos_crit}
 
+
+##-----THIS NEEDS TO BE MADE DYNAMIC-----
 # get onset for Ethiopia
 rast_onset <- rast("D:/repos/sourcing_targets/data/ETH/barley/hist_barley___onset.tif")
 names(rast_onset) <- c("onset")
 rast_onset
 plot(rast_onset)
+##----------
 
 # project onset for Ethiopia
 rast_onset_proj <- project(rast_onset, rast_mask_proj)
@@ -1091,11 +1143,12 @@ When the function is applied to the tibble using 'apply' it produces a x *x* 36 
 
 I also run a portion of the function to check on which days are used to define the phenological stages."))
 
-#test the days to include
 
 for (i in 1:(nrow(growth_stages_lengths))) {
   period_name <- as.character(growth_stages_lengths[i, 1])
   cat(paste("\nCurrent = ", period_name))
+  
+  # only for total growth period
   if (period_name == "total") {
     cat(paste("\nYes Total\n "))
     cat(paste(parse(
@@ -1106,35 +1159,78 @@ for (i in 1:(nrow(growth_stages_lengths))) {
         "_e"
       )
     )))
-    expr <- parse(
-      text = paste0(
-        "t(apply(onset_df, 1, .growth_period_long_tbl, day_begin = \"onset\", day_end = \"",
-        growth_stages_lengths[nrow(growth_stages_lengths) - 1, 1],
-        "_e\", num_years = num_years))"
+    
+    # do monthly growth stages need to be created
+    if (exists('clim_mask_m')) {
+      expr_m <- parse(
+        text = paste0(
+          "t(apply(onset_df, 1, .growth_period_long_tbl, day_begin = \"onset\", day_end = \"",
+          growth_stages_lengths[nrow(growth_stages_lengths) - 1, 1],
+          "_e\", num_years = num_years))"
+        )
       )
-    )
+      
+      if (!exists(paste0(period_name, "_matrix_days_m"))) {
+        assign(paste0(period_name, "_matrix_days_m"), eval(expr_m))
+      }
+      
+      if (!exists(paste0("onset_df_", period_name, "_m"))) {
+        assign(paste0("onset_df_", period_name, "_m"),
+               data.frame(onset_df, get(
+                 paste0(period_name, "_matrix_days_m")
+               )))
+      }
+      csv_filename <-
+        as.character(paste(
+          "tab_data/output/onset_df_",
+          period_name,
+          "_m.csv",
+          sep = ""
+        ))
+      
+      write.csv(get(paste0("onset_df_", period_name, "_m")),
+                here(csv_filename))
+      
+    } # end monthly growth stages
     
-    if (!exists(paste0(period_name, "_matrix_days"))) {
-      assign(paste0(period_name, "_matrix_days"), eval(expr))
-    }
+    # do dekadal growth stages need to be created
+    if (exists('clim_mask_d')) {
+      expr_d <- parse(
+        text = paste0(
+          "t(apply(onset_df, 1, .growth_period_long_dekad_tbl, day_begin = \"onset\", day_end = \"",
+          growth_stages_lengths[nrow(growth_stages_lengths) - 1, 1],
+          "_e\", num_years = num_years))"
+        )
+      )
+      
+      if (!exists(paste0(period_name, "_matrix_days_d"))) {
+        assign(paste0(period_name, "_matrix_days_d"), eval(expr_d))
+      }
+      
+      if (!exists(paste0("onset_df_", period_name, "_d"))) {
+        assign(paste0("onset_df_", period_name, "_d"),
+               data.frame(onset_df, get(
+                 paste0(period_name, "_matrix_days_d")
+               )))
+      }
+      csv_filename <-
+        as.character(paste(
+          "tab_data/output/onset_df_",
+          period_name,
+          "_d.csv",
+          sep = ""
+        ))
+      
+      write.csv(get(paste0("onset_df_", period_name, "_d")),
+                here(csv_filename))
+      
+    } # end dekadal growth stages
     
-    if (!exists(paste0("onset_df_", period_name))) {
-      assign(paste0("onset_df_", period_name),
-             data.frame(onset_df, get(
-               paste0(period_name, "_matrix_days")
-             )))
-    }
-    csv_filename <-
-    as.character(paste("tab_data/output/onset_df_",
-                       period_name,
-                       ".csv",
-                       sep = ""))
-    
-    write.csv(get(paste0("onset_df_", period_name)), 
-             here(csv_filename))
     
     
+    # end only for total growth period
   } else {
+    # for other growth periods
     cat(paste("\nNo Total\n "))
     cat(paste(parse(
       text = paste0(
@@ -1146,48 +1242,125 @@ for (i in 1:(nrow(growth_stages_lengths))) {
         "_e"
       )
     )))
-    expr <- parse(
-      text = paste0(
-        "t(apply(onset_df, 1, .growth_period_long_tbl, day_begin = \"",
-        period_name,
-        "_s\",
+    
+    # do monthly growth stages need to be created
+    if (exists('clim_mask_m')) {
+      expr_m <- parse(
+        text = paste0(
+          "t(apply(onset_df, 1, .growth_period_long_tbl, day_begin = \"",
+          period_name,
+          "_s\",
         day_end = \"",
         period_name,
         "_e\", num_years = num_years))"
+        )
       )
-    )
+      
+      if (!exists(paste0(period_name, "_matrix_days_m"))) {
+        assign(paste0(period_name, "_matrix_days_m"), eval(expr_m))
+      }
+      
+      if (!exists(paste0("onset_df_", period_name, "_m"))) {
+        assign(paste0("onset_df_", period_name, "_m"),
+               data.frame(onset_df, get(
+                 paste0(period_name, "_matrix_days_m")
+               )))
+      }
+      
+      csv_filename <-
+        as.character(paste(
+          "tab_data/output/onset_df_",
+          period_name,
+          "_m.csv",
+          sep = ""
+        ))
+      
+      write.csv(get(paste0("onset_df_", period_name, "_m")),
+                here(csv_filename))
+      
+    } # end monthly growth stages
     
-    if (!exists(paste0(period_name, "_matrix_days"))) {
-      assign(paste0(period_name, "_matrix_days"), eval(expr))
-    }
-    
-    if (!exists(paste0("onset_df_", period_name))) {
-      assign(paste0("onset_df_", period_name),
-             data.frame(onset_df, get(
-               paste0(period_name, "_matrix_days")
-             )))
-    }
-    
-    csv_filename <-
-    as.character(paste("tab_data/output/onset_df_",
-                       period_name,
-                       ".csv",
-                       sep = ""))
-    
-    write.csv(get(paste0("onset_df_", period_name)), 
-             here(csv_filename))
+    # do dekadal growth stages need to be created
+    if (exists('clim_mask_d')) {
+      expr_d <- parse(
+        text = paste0(
+          "t(apply(onset_df, 1, .growth_period_long_dekad_tbl, day_begin = \"",
+          period_name,
+          "_s\",
+        day_end = \"",
+        period_name,
+        "_e\", num_years = num_years))"
+        )
+      )
+      
+      if (!exists(paste0(period_name, "_matrix_days_d"))) {
+        assign(paste0(period_name, "_matrix_days_d"), eval(expr_d))
+      }
+      
+      if (!exists(paste0("onset_df_", period_name, "_d"))) {
+        assign(paste0("onset_df_", period_name, "_d"),
+               data.frame(onset_df, get(
+                 paste0(period_name, "_matrix_days_d")
+               )))
+      }
+      
+      csv_filename <-
+        as.character(paste(
+          "tab_data/output/onset_df_",
+          period_name,
+          "_d.csv",
+          sep = ""
+        ))
+      
+      write.csv(get(paste0("onset_df_", period_name, "_d")),
+                here(csv_filename))
+      
+      #create dekadal raster masks for the period
+      if (!exists(paste0("vect_", period_name, "_d"))) {
+        assign(paste0("vect_", period_name, "_d"),
+               vect(
+                 read_csv(here(csv_filename), show_col_types = FALSE),
+                 geom = c("x", "y"),
+                 crs = wkt_lam
+               ))
         
+        #create an empty list of rasters
+        assign(paste0("list_rast_", period_name, "_d"),
+               list())
+        
+        
+        #create an empty raster
+        assign(paste0("rast_", period_name, "_d"), rast())
+        
+        for (j in 1:36) {
+          assign(
+            paste0("rast_", period_name, "_d_", j),
+            rasterize(get(
+              paste0("vect_", period_name, "_d")
+            ), clim_mask_d, field = paste0("X", j))
+          )
+          assign(paste0("list_rast_", period_name, "_d"),
+                 append(get(
+                   paste0("list_rast_", period_name, "_d")
+                 ), paste0("rast_", period_name, "_d_", j)))
+          expr1 <-
+            parse(text = paste0(
+              "add(rast_",
+              period_name,
+              "_d) <- (rast_",
+              period_name,
+              "_d_",
+              j,
+              ")"
+            ))
+          
+          eval(expr1)
+        }
+        plot(get(paste0("rast_", period_name, "_d")), maxnl = 36)
+      }   # end dekadal growth stages
+    }     # end other growth periods
   }
-} 
-
-## reached here 10/09/2023
-
-
-grow_e_matrix_days <- t(apply(eth_all_df , 1, daystest, start_day = "hist_barley___onset", end_day = "est_e" ))
-
-grow_f_matrix_days <- t(apply(eth_all_df, 1, daystest, start_day = "flw_s", end_day = "flw_e" ))
-grow_y_matrix_days <- t(apply(eth_all_df, 1, daystest, start_day = "yld_s", end_day = "yld_e" ))
-grow_r_matrix_days <- t(apply(eth_all_df, 1, daystest, start_day = "rip_s", end_day = "rip_e" ))
+}
 
 ```
 <div>
@@ -1197,9 +1370,60 @@ grow_r_matrix_days <- t(apply(eth_all_df, 1, daystest, start_day = "rip_s", end_
 ```{r sowing_dates_sos_m, cache = TRUE, cache.whatever=params$Agg, fig.width=8, fig.height=7, out.width="100%", warning=FALSE, eval=grs_crit, eval=sos_crit}
 # model the monthly growth stages for the spatial onset of the season
 
+
+for (i in 1:(nrow(growth_stages_lengths))) {
+  period_name <- as.character(growth_stages_lengths[i, 1])
+  cat(paste("\nCurrent = ", period_name))
+  
 if (exists('clim_mask_m')) {
 
+ if (!exists(paste0("vect_",period_name, "_m"))) {
+        assign(paste0(paste0("vect_",period_name, "_m"), vect)
+      }
+      
+      if (!exists(paste0("onset_df_", period_name, "_d"))) {  
+  
+  
+  
+#convert first to sf object
+eth_all_sf_mth_gp <-
+  st_as_sf(eth_all_df_mth_gp,
+           coords = c("x.x", "y.x"),
+           crs = 4236)
 
+#create monthly raster masks for the growing period
+mth_01_gp_r <- rasterize(eth_all_sf_mth_gp, r_prec_eth_NA, field = "X1")
+mth_02_gp_r <- rasterize(eth_all_sf_mth_gp, r_prec_eth_NA, field = "X2")
+mth_03_gp_r <- rasterize(eth_all_sf_mth_gp, r_prec_eth_NA, field = "X3")
+mth_04_gp_r <- rasterize(eth_all_sf_mth_gp, r_prec_eth_NA, field = "X4")
+mth_05_gp_r <- rasterize(eth_all_sf_mth_gp, r_prec_eth_NA, field = "X5")
+mth_06_gp_r <- rasterize(eth_all_sf_mth_gp, r_prec_eth_NA, field = "X6")
+mth_07_gp_r <- rasterize(eth_all_sf_mth_gp, r_prec_eth_NA, field = "X7")
+mth_08_gp_r <- rasterize(eth_all_sf_mth_gp, r_prec_eth_NA, field = "X8")
+mth_09_gp_r <- rasterize(eth_all_sf_mth_gp, r_prec_eth_NA, field = "X9")
+mth_10_gp_r <- rasterize(eth_all_sf_mth_gp, r_prec_eth_NA, field = "X10")
+mth_11_gp_r <- rasterize(eth_all_sf_mth_gp, r_prec_eth_NA, field = "X11")
+mth_12_gp_r <- rasterize(eth_all_sf_mth_gp, r_prec_eth_NA, field = "X12")
+
+mth_gp_r <-
+  rast(
+    list(
+      mth_01_gp_r,
+      mth_02_gp_r,
+      mth_03_gp_r,
+      mth_04_gp_r,
+      mth_05_gp_r,
+      mth_06_gp_r,
+      mth_07_gp_r,
+      mth_08_gp_r,
+      mth_09_gp_r,
+      mth_10_gp_r,
+      mth_11_gp_r,
+      mth_12_gp_r
+    )
+  )
+
+plot(mth_gp_r, main = "growing period", maxnl = 12)
 
   for (i in 1:(nrow(growth_stages_req))) {
     period_name <- as.character(growth_stages_req[i, 1])
