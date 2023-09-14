@@ -695,6 +695,27 @@ output_sf <- function(results_sf, data_file_prefix) {
   
 }
 
+# temporary function to write vect output to geojson
+
+# where: x is the projected vect data
+#        data_file_prefix is the prefix used to define the name of the output geojson
+
+output_vect <- function(results_vect, data_file_prefix) {
+  vector_filename <-
+    as.character(paste("spatial_data/output/",
+                       data_file_prefix,
+                       ".geojson",
+                       sep = ""))
+  
+  writeVector(
+    project(results_vect,
+            "epsg:4326"),
+    filename = (here(vector_filename)),
+    filetype="geojson",
+    overwrite = TRUE)
+  
+}
+
 # temporary function to write output to geotiff
 
 # where: results_raster is the projected raster data
@@ -942,6 +963,19 @@ add_subdiv_simple_plot <- function(map1) {
           axis.title.y = element_blank())
   
   return(addsubdivsimple_map)
+}
+
+add_subdiv_proj_simple_plot <- function(map1) {
+  addsubdivprojsimple_map <-       map1 +
+    geom_spatvector(data = project(vect_subdiv, wkt_lam),
+                    colour = "dark grey",
+                    fill = NA) +
+    theme(legend.direction = "vertical", 
+          legend.box = "horizontal",
+          axis.title.x = element_blank(),
+          axis.title.y = element_blank())
+  
+  return(addsubdivprojsimple_map)
 }
 
 add_triangulation_plot <- function(map1) {

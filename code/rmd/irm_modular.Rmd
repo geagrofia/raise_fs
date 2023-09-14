@@ -906,7 +906,7 @@ if (exists('clim_mask_m')) {
     
     plot_raster <-
       plot(
-        get(paste0("rast_period_d_", growth_stages_req[i, 1])),
+        get(paste0("rast_period_m_", growth_stages_req[i, 1])),
         maxnl = 12,
         breaks = c(0, 0.25, 0.5, 0.75, 1),
         axes = F,
@@ -5751,22 +5751,39 @@ n_prop <- ncol(prop_table)
 assign(paste0("rb_", criteria_ba1[1, 2], "_nuance"),
        RuleBase(prop, Conclusion(
          ba_1_nuance = c(
-           "N2",
-           "N1",
-           "N1",
-           "N1",
-           "N1",
-           "N1",
-           "S3",
-           "S2l",
-           "S3",
-           "S3",
-           "S3",
-           "S2f",
-           "S3",
-           "S2p",
-           "S2c",
-           "S1"         )
+            "N2",
+              "N2",
+              "N2",
+              "N1",
+              "N2",
+              "N1",
+              "N2",
+              "N1",
+              "N2",
+              "N1",
+              "N2",
+              "N1",
+              "N2",
+              "S3",
+              "N2",
+              "S2l",
+              "N2",
+              "S3",
+              "N2",
+              "S3",
+              "N2",
+              "S3",
+              "N2",
+              "S2f",
+              "N2",
+              "S3",
+              "N2",
+              "S2p",
+              "N2",
+              "S2c",
+              "N2",
+              "S1"         )
+         
        ))) %>% print()
 
 # add to the list of previous rule bases
@@ -5877,8 +5894,8 @@ cat("## Export aptitude results
 <div class="fold o">
 ```{r rulebases_ba_export02, cache = TRUE, cache.whatever=params$Agg, cache.whatever=params$Agg, warning=FALSE, eval=ba_crit}
 
-apt_sf <- st_as_sf(cond_data, coords = c("x", "y"), crs = crs_lam)
-output_sf(apt_sf, paste0("apt_", params$INN1))
+vect_apt <- vect(cond_data, geom = c("x", "y"), crs = wkt_lam)
+output_vect(vect_apt, paste0("apt_", params$INN1))
 
 ``` 
 </div>
@@ -9135,8 +9152,8 @@ cat("## Export feasibility results
 <div class="fold o">
 ```{r rulebases_se_export02, cache = TRUE, cache.whatever=params$Agg, cache.whatever=params$Agg, warning=FALSE, eval=sef_crit}
 
-se_sf <- st_as_sf(cond_data, coords = c("x", "y"), crs = crs_lam)
-output_sf(se_sf, paste0("se_", params$INN1))
+vect_sf <- vect(cond_data, geom = c("x", "y"), crs = wkt_lam)
+output_vect(vect_sf, paste0("sf_", params$INN1))
 
 ``` 
 </div>
@@ -10468,14 +10485,14 @@ if ("score" %in% colnames(cond_data)) {
 
 
 d0 <-
-  cond_data %>% dplyr::select(score, x, y) %>% na.omit %>% st_as_sf(coords = c("x", "y"))
+  cond_data %>% dplyr::select(score, x, y) %>% na.omit %>% vect(geom = c("x", "y"))
 
 d1 <- rasterize(d0, rast_mask_proj, field = "score")
 
-dB <- brick(d1)
+dB <- d1
 names(dB) <- c('score')
 
-d1  %>% plot(title = "Adoption\nScore (3 class)", n = 5)
+d1  %>% plot(main = "Adoption\nScore (3 class)", breaks = c(-1,-0.5,0,0.5,1))
 
 ``` 
 </div>
@@ -10507,14 +10524,14 @@ if ("scorenuance" %in% colnames(cond_data)) {
 }
 
 d0 <-
-  cond_data %>% dplyr::select(scorenuance, x, y) %>% na.omit %>% st_as_sf(coords = c("x", "y"))
+  cond_data %>% dplyr::select(scorenuance, x, y) %>% na.omit %>% vect(geom = c("x", "y"))
 
 d1 <- rasterize(d0, rast_mask_proj, field = "scorenuance")
 
-dB <- brick(d1)
+dB <- d1
 names(dB) <- c('scorenuance')
 
-d1  %>% plot(title = "Adoption\nScore (9 class)", n = 5)
+d1  %>% plot(main = "Adoption\nScore (9 class)", breaks = c(-1,-0.5,0,0.5,1))
 
 ``` 
 </div>
@@ -10529,8 +10546,8 @@ cat("## Export likelihood for adoption results
 <div class="fold o">
 ```{r rulebases_adop_export02, cache = TRUE, cache.whatever=params$Agg, cache.whatever=params$Agg, warning=FALSE, eval=adop_crit}
 
-adop_sf <- st_as_sf(cond_data, coords = c("x", "y"), crs = crs_lam)
-output_sf(adop_sf, paste0("adop_", params$INN1))
+vect_adop <- vect(cond_data, geom = c("x", "y"), crs = wkt_lam)
+output_vect(vect_adop, paste0("adop_", params$INN1))
 
 ``` 
 </div>
@@ -10553,7 +10570,7 @@ The left map is _without_, the right map  _with_ triangulation points. These poi
 ```{r classified_adop_membership_maps02 , cache = TRUE, cache.whatever=params$Agg, warning=FALSE, timeit = TRUE, eval=adop_crit}
 # idem + overlay triangulation adoption points
 
-d_vect_adop_tri <- sfc_as_cols(vect_triangulation) %>%
+d_vect_adop_tri <- vect_triangulation %>%
     mutate(
         adopclass = ifelse(grepl(pattern = "high", x = Adoption, ignore.case = TRUE), "high", ifelse(grepl(pattern = "moderate", x = Adoption, ignore.case = TRUE), "moderate", "low")),
         type = NA
@@ -10593,30 +10610,30 @@ if (params$RES1 != 2) {
   
   if (adop_rb == "hml") {
     d0 <-
-      cond_data %>% dplyr::select(adop_0_h, adop_0_m, adop_0_l, x , y) %>% na.omit %>% st_as_sf(coords = c("x", "y"))
+      cond_data %>% dplyr::select(adop_0_h, adop_0_m, adop_0_l, x , y) %>% na.omit %>% vect(geom = c("x", "y"))
     d1 <- rasterize(d0, rast_mask_proj, field = "adop_0_h")
     d2 <- rasterize(d0, rast_mask_proj, field = "adop_0_m")
     d3 <- rasterize(d0, rast_mask_proj, field = "adop_0_l")
-    dB_adop <- brick(d1, d2, d3)
+    dB_adop <- rast(list(d1, d2, d3))
     names(dB_adop) <- c('high', 'moderate', 'low')
     
     # get max value and export
     dM <- which.max(dB_adop)
-    dM_brick <- brick(d1, d2, d3, dM)
+    dM_brick <- rast(list(d1, d2, d3, dM))
     names(dM_brick) <- c('high', 'moderate', 'low', 'class')
     output_geotiff(dM_brick, paste0("3class_adop0_", params$INN1))
     
   } else {
     d0 <-
-      cond_data %>% dplyr::select(adop_h, adop_l, x , y) %>% na.omit %>% st_as_sf(coords = c("x", "y"))
+      cond_data %>% dplyr::select(adop_h, adop_l, x , y) %>% na.omit %>% vect(geom = c("x", "y"))
     d1 <- rasterize(d0, rast_mask_proj, field = "adop_0_h")
     d2 <- rasterize(d0, rast_mask_proj, field = "adop_0_l")
-    dB_adop <- brick(d1, d2)
+    dB_adop <- rast(list(d1, d2))
     names(dB_adop) <- c('high', 'low')
     
     # get max value and export
     dM <- which.max(dB_adop)
-    dM_brick <- brick(d1, d2, dM)
+    dM_brick <- rast(list(d1, d2, dM))
     names(dM_brick) <- c('high', 'low', 'class')
     output_geotiff(dM_brick, paste0("2class_adop0_", params$INN1))
     
@@ -10658,7 +10675,7 @@ if (params$RES1 != 2) {
     ) +
     coord_equal()
   
-g2 <- add_subdiv_plot(g, paste(params$SUBDIV1))
+g2 <- add_subdiv_proj_simple_plot(g)
 g2  
 } # end RES if statement 08/12/2019
 
@@ -10673,14 +10690,14 @@ g2
 if (params$RES1 != 2) {
   
 g2 + 
-    geom_point(
+    geom_spatvector(
         data = d_vect_adop_tri, 
-        mapping = aes(x = x, y = y, colour = ifelse(adopclass == "high" , "green", "red")), 
+        mapping = aes(colour = ifelse(adopclass == "high" , "green", "red")), 
         size = 2
     ) +
-    geom_text(
+    geom_spatvector_text(
         data = d_vect_adop_tri, 
-        mapping = aes(x = x+800, y = y+800, label = ifelse(type == "b", "b", "b/s"))
+        mapping = aes(label = ifelse(type == "b", "b", "b/s"))
     ) + 
   scale_colour_identity() 
 
@@ -10707,16 +10724,23 @@ if (params$RES1 != 2) {
   
   # get the polygons showing the layer with the max value in dB_adop
   # sf method of raster to stars then to sf
-  maxadop0_poly1 <- st_transform(st_as_sf(st_as_stars(maxadop0)), crs_lam)
- 
+  maxadop0_poly1 <- as.polygons(maxadop0, dissolve=FALSE)
+
+  maxadop0_poly1$class <- d_adop$class
+  
   # join the polygons with the aptitude points
-  maxadop0_poly2 <- st_join(maxadop0_poly1, adop_sf)
+  maxadop0_poly1[["id"]] <- 1:nrow(maxadop0_poly1)
+  vect_adop[["id"]] <- 1:nrow(vect_adop)
+  pinp_m <- relate(maxadop0_poly1, vect_adop, "contains", pairs=TRUE)
+  pinp_df <- dplyr::as_tibble(pinp_m)
+  maxadop0_poly2 <- merge(x = maxadop0_poly1, y = pinp_df, by.x = "id", by.y = "id.x", all.x = TRUE)
+  maxadop0_poly2 <- merge(x = maxadop0_poly2, y = vect_adop, by.x = "id.y", by.y = "id", all.x = TRUE)
   
-  maxadop0_poly3 <-
-    cbind(maxadop0_poly2, d_adop$class) # add the adaptation class from d_adop
+   # project to geo for display in leaflet
+  maxadop0_poly2_geo <- project(maxadop0_poly2, "epsg:4326")
   
-  # project to geo for display in leaflet
-  maxadop0_poly3_geo <- st_transform(maxadop0_poly3, crs = 4326)
+  # convert to sf until leaflet properly accepts spatvector
+  maxadop0_poly3_geo <- st_as_sf(maxadop0_poly2_geo)
   
   adop_palette <- (c(
     rgb(0, 158, 115, maxColorValue = 255),
@@ -10733,13 +10757,13 @@ if (params$RES1 != 2) {
   leaflet_widget <- leaflet(maxadop0_poly3_geo, width = "100%") %>%
     addProviderTiles(providers$OpenStreetMap.HOT, group = "OSM (HOT)") %>%
     addPolygons(
-      label = ~ stringr::str_c('Adoption =', d_adop.class),
+      label = ~ stringr::str_c('Adoption =', class),
       labelOptions = labelOptions(direction = 'auto'),
       color = "#03F",
       weight = 1,
       opacity = 0.5,
       fill = layer,
-      fillColor = ~ pal(layer),
+      fillColor = ~ pal(which.max),
       fillOpacity = 0.2,
       dashArray = NULL,
       smoothFactor = 1,
@@ -10792,6 +10816,8 @@ if (params$RES1 != 2) {
   
 } # end RES if statement 08/12/2019
 
+
+# reached here 14/09/2023
 ``` 
 </div>
 
@@ -10810,7 +10836,7 @@ if (params$RES1 != 1) {
   # new method because of cond_data dropped no data
   
   d0_nuance <-
-    cond_data %>% dplyr::select(adop_0_nuance_S1, adop_0_nuance_S2c, adop_0_nuance_S2l, adop_0_nuance_S2p, adop_0_nuance_S2f, adop_0_nuance_S2se, adop_0_nuance_S3, adop_0_nuance_N1, adop_0_nuance_N2, x , y) %>% na.omit %>% st_as_sf(coords = c("x", "y"))
+    cond_data %>% dplyr::select(adop_0_nuance_S1, adop_0_nuance_S2c, adop_0_nuance_S2l, adop_0_nuance_S2p, adop_0_nuance_S2f, adop_0_nuance_S2se, adop_0_nuance_S3, adop_0_nuance_N1, adop_0_nuance_N2, x , y) %>% na.omit %>% vect(geom = c("x", "y"))
   d1_nuance <- rasterize(d0_nuance, rast_mask_proj, field = "adop_0_nuance_S1")
   d2_nuance <- rasterize(d0_nuance, rast_mask_proj, field = "adop_0_nuance_S2c")
   d3_nuance <- rasterize(d0_nuance, rast_mask_proj, field = "adop_0_nuance_S2l")
@@ -10821,7 +10847,7 @@ if (params$RES1 != 1) {
   d8_nuance <- rasterize(d0_nuance, rast_mask_proj, field = "adop_0_nuance_N1")
   d9_nuance <- rasterize(d0_nuance, rast_mask_proj, field = "adop_0_nuance_N2")
   dB_adop_nuance <-
-    brick(
+    rast(list(
       d1_nuance,
       d2_nuance,
       d3_nuance,
@@ -10831,13 +10857,13 @@ if (params$RES1 != 1) {
       d7_nuance,
       d8_nuance,
       d9_nuance
-    )
+    ))
   names(dB_adop_nuance) <-
     c("adop_0_nuance_S1", "adop_0_nuance_S2c", "adop_0_nuance_S2l", "adop_0_nuance_S2p", "adop_0_nuance_S2f", "adop_0_nuance_S2se", "adop_0_nuance_S3", "adop_0_nuance_N1", "adop_0_nuance_N2")
   
   # get max value and export
   dM <- which.max(dB_adop_nuance)
-  dM_brick <- brick(
+  dM_brick <- rast(list(
     d1_nuance,
     d2_nuance,
     d3_nuance,
@@ -10848,7 +10874,7 @@ if (params$RES1 != 1) {
     d8_nuance,
     d9_nuance,
     dM
-  )
+  ))
   names(dM_brick) <-
     c(
       'adop_0_nuance_S1',
@@ -11073,7 +11099,7 @@ if (params$RES1 != 2) {
   # new method because of cond_data dropped no data
   
   d0 <-
-    cond_data %>% dplyr::select(ba_1_o, x , y) %>% na.omit %>% st_as_sf(coords = c("x", "y"))
+    cond_data %>% dplyr::select(ba_1_o, x , y) %>% na.omit %>% vect(geom = c("x", "y"))
   dB_1 <- rasterize(d0, rast_mask_proj, field = "ba_1_o")
   dB_ba <- classify(dB_1, matrix(c(-0.5, 0, 0, 0, 1, 3),
         ncol = 3,
@@ -11260,7 +11286,7 @@ if (params$RES1 != 2) {
   # new method because of cond_data dropped no data
   
   d0 <-
-    cond_data %>% dplyr::select(ba_1_o, ba_1_s, x , y) %>% na.omit %>% st_as_sf(coords = c("x", "y"))
+    cond_data %>% dplyr::select(ba_1_o, ba_1_s, x , y) %>% na.omit %>% vect(geom = c("x", "y"))
   d1 <- rasterize(d0, rast_mask_proj, field = "ba_1_o")
   d2 <- rasterize(d0, rast_mask_proj, field = "ba_1_s")
   dB_ba <- rast(list(d1, d2))
@@ -11454,7 +11480,7 @@ if (params$RES1 != 1) {
                                 ba_1_N1,
                                 ba_1_N2,
                                 x ,
-                                y) %>% na.omit %>% st_as_sf(coords = c("x", "y"))
+                                y) %>% na.omit %>% vect(geom = c("x", "y"))
   d1_nuance <- rasterize(d0_nuance, rast_mask_proj, field = "ba_1_S1")
   d2_nuance <- rasterize(d0_nuance, rast_mask_proj, field = "ba_1_S2c")
   d3_nuance <- rasterize(d0_nuance, rast_mask_proj, field = "ba_1_S2l")
@@ -11770,30 +11796,30 @@ cat("### Socioeconomic Feasibility - three classes")
 
 if (sef_rb == "hml") {
   d0 <-
-    cond_data %>% dplyr::select(se_1_h, se_1_m, se_1_l, x , y) %>% na.omit %>% st_as_sf(coords = c("x", "y"))
+    cond_data %>% dplyr::select(se_1_h, se_1_m, se_1_l, x , y) %>% na.omit %>% vect(geom = c("x", "y"))
   d1 <- rasterize(d0, rast_mask_proj, field = "se_1_h")
   d2 <- rasterize(d0, rast_mask_proj, field = "se_1_m")
   d3 <- rasterize(d0, rast_mask_proj, field = "se_1_l")
-  dB_se <- brick(d1, d2, d3)
+  dB_se <- rast(list(d1, d2, d3))
   names(dB_se) <- c('high', 'moderate', 'low')
 
   # get max value and export
   dM <- which.max(dB_se)
-  dM_brick <- brick(d1, d2, d3, dM)
+  dM_brick <- rast(list(d1, d2, d3, dM))
   names(dM_brick) <- c('high', 'moderate', 'low', 'class')
   output_geotiff(dM_brick, paste0("3class_se1_", params$INN1))
 
 } else {
   d0 <-
-    cond_data %>% dplyr::select(se_1_h, se_1_l, x , y) %>% na.omit %>% st_as_sf(coords = c("x", "y"))
+    cond_data %>% dplyr::select(se_1_h, se_1_l, x , y) %>% na.omit %>% vect(geom = c("x", "y"))
   d1 <- rasterize(d0, rast_mask_proj, field = "se_1_h")
   d2 <- rasterize(d0, rast_mask_proj, field = "se_1_l")
-  dB_se <- brick(d1, d2)
+  dB_se <- rast(list(d1, d2))
   names(dB_se) <- c('high', 'low')
 
   # get max value and export
   dM <- which.max(dB_se)
-  dM_brick <- brick(d1, d2, dM)
+  dM_brick <- rast(list(d1, d2, dM))
   names(dM_brick) <- c('high', 'low', 'class')
   output_geotiff(dM_brick, paste0("2class_se1_", params$INN1))
 }
@@ -12395,7 +12421,7 @@ if (summarise(cond_data, Average = mean(yieldpc, na.rm = T)) > 0) {
 
 # cond_data <- dplyr::select(cond_data,-yield)
 
-cond_data_sf <- cond_data %>% na.omit %>% st_as_sf(coords = c("x", "y"))
+cond_data_sf <- cond_data %>% na.omit %>% vect(geom = c("x", "y"))
 
 dBy <- rasterize(cond_data_sf, ra_mask, field="yieldpc")
 names(dBy) <- c('yieldpc')
@@ -12462,7 +12488,7 @@ if (params$INN2 == "NA") {
 if (summarise(cond_data, Average = mean(yield, na.rm = T)) > 0) {
   
 cond_data_sfp <-
-  cond_data %>% na.omit %>% st_as_sf(coords = c("x", "y"))
+  cond_data %>% na.omit %>% vect(geom = c("x", "y"))
 
 dByd <- rasterize(cond_data_sfp, ra_mask, field = "yield")
 names(dByd) <- c('yield')
@@ -12521,7 +12547,7 @@ cond_data$production <- cond_data$yieldpc *  Stat_factor_ha
 
 if (summarise(cond_data, Average = mean(production, na.rm = T)) > 0) {
   
-cond_data_sfp <- cond_data %>% na.omit %>% st_as_sf(coords = c("x", "y"))
+cond_data_sfp <- cond_data %>% na.omit %>% vect(geom = c("x", "y"))
 
 dBp <- rasterize(cond_data_sfp, ra_mask, field="production")
 names(dBp) <- c('production')
@@ -21863,14 +21889,14 @@ if ("score" %in% colnames(cond_data_i2)) {
 
 
 d0 <-
-  cond_data_i2 %>% dplyr::select(score, x, y) %>% na.omit %>% st_as_sf(coords = c("x", "y"))
+  cond_data_i2 %>% dplyr::select(score, x, y) %>% na.omit %>% vect(geom = c("x", "y"))
 
 d1 <- rasterize(d0, ra_mask, field = "score")
 
-dB <- brick(d1)
+dB <- d1
 names(dB) <- c('score')
 
-d1  %>% plot(title = "Adoption\nScore (3 class)", n = 5)
+d1  %>% plot(main = "Adoption\nScore (3 class)")
 
 ``` 
 </div>
@@ -21902,14 +21928,14 @@ if ("scorenuance" %in% colnames(cond_data_i2)) {
 }
 
 d0 <-
-  cond_data_i2 %>% dplyr::select(scorenuance, x, y) %>% na.omit %>% st_as_sf(coords = c("x", "y"))
+  cond_data_i2 %>% dplyr::select(scorenuance, x, y) %>% na.omit %>% vect(geom = c("x", "y"))
 
 d1 <- rasterize(d0, ra_mask, field = "scorenuance")
 
-dB <- brick(d1)
+dB <- d1
 names(dB) <- c('scorenuance')
 
-d1  %>% plot(title = "Adoption\nScore (9 class)", n = 5)
+d1  %>% plot(main = "Adoption\nScore (9 class)")
 
 ``` 
 </div>
@@ -21988,30 +22014,30 @@ if (params$RES2 != 2) {
   
   if (adop_rb == "hml") {
     d0_i2 <-
-      cond_data_i2 %>% dplyr::select(adop_0_h, adop_0_m, adop_0_l, x , y) %>% na.omit %>% st_as_sf(coords = c("x", "y"))
+      cond_data_i2 %>% dplyr::select(adop_0_h, adop_0_m, adop_0_l, x , y) %>% na.omit %>% vect(geom = c("x", "y"))
     d1_i2 <- rasterize(d0_i2, ra_mask, field = "adop_0_h")
     d2_i2 <- rasterize(d0_i2, ra_mask, field = "adop_0_m")
     d3_i2 <- rasterize(d0_i2, ra_mask, field = "adop_0_l")
-    dB_adop_i2 <- brick(d1_i2, d2_i2, d3_i2)
+    dB_adop_i2 <- rast(list(d1_i2, d2_i2, d3_i2))
     names(dB_adop_i2) <- c('high', 'moderate', 'low')
     
     # get max value and export
     dM <- which.max(dB_adop_i2)
-    dM_brick <- brick(d1_i2, d2_i2, d3_i2, dM)
+    dM_brick <- rast(list(d1_i2, d2_i2, d3_i2, dM))
     names(dM_brick) <- c('high', 'moderate', 'low', 'class')
     output_geotiff(dM_brick, paste0("3class_adop0_", params$INN2))
   
   } else {
     d0_i2 <-
-      cond_data_i2 %>% dplyr::select(adop_h, adop_l, x , y) %>% na.omit %>% st_as_sf(coords = c("x", "y"))
+      cond_data_i2 %>% dplyr::select(adop_h, adop_l, x , y) %>% na.omit %>% vect(geom = c("x", "y"))
     d1_i2 <- rasterize(d0_i2, ra_mask, field = "adop_0_h")
     d2_i2 <- rasterize(d0_i2, ra_mask, field = "adop_0_l")
-    dB_adop_i2 <- brick(d1_i2, d2_i2)
+    dB_adop_i2 <- rast(list(d1_i2, d2_i2))
     names(dB_adop_i2) <- c('high', 'low')
     
     # get max value and export
     dM <- which.max(dB_adop_i2)
-    dM_brick <- brick(d1_i2, d2_i2, dM)
+    dM_brick <- rast(list(d1_i2, d2_i2, dM))
     names(dM_brick) <- c('high', 'low', 'class')
     output_geotiff(dM_brick, paste0("2class_adop0_", params$INN2))
   
@@ -22066,7 +22092,7 @@ g2_i2
 
 if (params$RES2 != 2) {
   d_adop_i2_sf <-
-    d_adop_i2 %>%  na.omit %>%  st_as_sf(coords = c("x", "y"), crs = crs_irm)
+    d_adop_i2 %>%  na.omit %>%  vect(geom = c("x", "y"), crs = crs_irm)
   
   d_adop_i2_r <- st_rasterize(d_adop_i2_sf[, "class"])
   
@@ -22222,7 +22248,7 @@ if (params$RES2 != 1) {
   # new method because of cond_data_i2 dropped no data
   
   d0_nuance_i2 <-
-    cond_data_i2 %>% dplyr::select(adop_0_nuance_S1, adop_0_nuance_S2c, adop_0_nuance_S2l, adop_0_nuance_S2p, adop_0_nuance_S2f, adop_0_nuance_S2se, adop_0_nuance_S3, adop_0_nuance_N1, adop_0_nuance_N2, x , y) %>% na.omit %>% st_as_sf(coords = c("x", "y"))
+    cond_data_i2 %>% dplyr::select(adop_0_nuance_S1, adop_0_nuance_S2c, adop_0_nuance_S2l, adop_0_nuance_S2p, adop_0_nuance_S2f, adop_0_nuance_S2se, adop_0_nuance_S3, adop_0_nuance_N1, adop_0_nuance_N2, x , y) %>% na.omit %>% vect(geom = c("x", "y"))
   d1_nuance_i2 <- rasterize(d0_nuance_i2, ra_mask, field = "adop_0_nuance_S1")
   d2_nuance_i2 <- rasterize(d0_nuance_i2, ra_mask, field = "adop_0_nuance_S2c")
   d3_nuance_i2 <- rasterize(d0_nuance_i2, ra_mask, field = "adop_0_nuance_S2l")
@@ -22233,7 +22259,7 @@ if (params$RES2 != 1) {
   d8_nuance_i2 <- rasterize(d0_nuance_i2, ra_mask, field = "adop_0_nuance_N1")
   d9_nuance_i2 <- rasterize(d0_nuance_i2, ra_mask, field = "adop_0_nuance_N2")
   dB_adop_nuance_i2 <-
-    brick(
+    rast(list(
       d1_nuance_i2,
       d2_nuance_i2,
       d3_nuance_i2,
@@ -22243,14 +22269,14 @@ if (params$RES2 != 1) {
       d7_nuance_i2,
       d8_nuance_i2,
       d9_nuance_i2
-    )
+    ))
   names(dB_adop_nuance_i2) <-
     c("adop_0_nuance_S1", "adop_0_nuance_S2c", "adop_0_nuance_S2l", "adop_0_nuance_S2p", "adop_0_nuance_S2f", "adop_0_nuance_S2se", "adop_0_nuance_S3", "adop_0_nuance_N1", "adop_0_nuance_N2")
  
   
   # get max value and export
   dM <- which.max(dB_adop_nuance_i2)
-  dM_brick <- brick(
+  dM_brick <- rast(list(
     d1_nuance_i2,
     d2_nuance_i2,
     d3_nuance_i2,
@@ -22261,7 +22287,7 @@ if (params$RES2 != 1) {
     d8_nuance_i2,
     d9_nuance_i2,
     dM
-  )
+  ))
   names(dM_brick) <-
     c(
       'adop_0_nuance_S1',
@@ -22514,15 +22540,15 @@ if (params$RES2 != 2) {
 
 # new method because of cond_data_i2 dropped no data
 
-d0_i2 <- cond_data_i2 %>% dplyr::select(ba_1_o, ba_1_s, x ,y) %>% na.omit %>% st_as_sf(coords = c("x", "y"))
+d0_i2 <- cond_data_i2 %>% dplyr::select(ba_1_o, ba_1_s, x ,y) %>% na.omit %>% vect(geom = c("x", "y"))
 d1_i2 <- rasterize(d0_i2, ra_mask, field = "ba_1_o")
 d2_i2 <- rasterize(d0_i2, ra_mask, field = "ba_1_s")
-dB_ba_i2 <- brick(d1_i2, d2_i2)
+dB_ba_i2 <- rast(list(d1_i2, d2_i2))
 names(dB_ba_i2) <- c('optimal', 'suboptimal')
 
 # get max value and export
 dM <- which.max(dB_ba_i2)
-dM_brick <- brick(d1_i2, d2_i2, dM)
+dM_brick <- rast(list(d1_i2, d2_i2, dM))
 names(dM_brick) <-
   c('optimal', 'suboptimal', 'class'
   )
@@ -22693,7 +22719,7 @@ if (params$RES2 != 1) {
                                 ba_1_N1,
                                 ba_1_N2,
                                 x ,
-                                y) %>% na.omit %>% st_as_sf(coords = c("x", "y"))
+                                y) %>% na.omit %>% vect(geom = c("x", "y"))
   d1_nuance_i2 <- rasterize(d0_nuance_i2, ra_mask, field = "ba_1_S1")
   d2_nuance_i2 <- rasterize(d0_nuance_i2, ra_mask, field = "ba_1_S2c")
   d3_nuance_i2 <- rasterize(d0_nuance_i2, ra_mask, field = "ba_1_S2l")
@@ -22704,7 +22730,7 @@ if (params$RES2 != 1) {
   d8_nuance_i2 <- rasterize(d0_nuance_i2, ra_mask, field = "ba_1_N2")
   
   dB_ba_nuance_i2 <-
-    brick(
+   rast(list(
       d1_nuance_i2,
       d2_nuance_i2,
       d3_nuance_i2,
@@ -22713,7 +22739,7 @@ if (params$RES2 != 1) {
       d6_nuance_i2,
       d7_nuance_i2,
       d8_nuance_i2
-    )
+    ))
   names(dB_ba_nuance_i2) <-
     c(
       "ba_1_S1",
@@ -22728,7 +22754,7 @@ if (params$RES2 != 1) {
 
   # get max value and export
   dM <- which.max(dB_ba_nuance_i2)
-  dM_brick <- brick(
+  dM_brick <- rast(list(
     d1_nuance_i2,
     d2_nuance_i2,
     d3_nuance_i2,
@@ -22738,7 +22764,7 @@ if (params$RES2 != 1) {
     d7_nuance_i2,
     d8_nuance_i2,
     dM
-  )
+  ))
   names(dM_brick) <-
     c(
       'ba_1_S1',
@@ -22981,31 +23007,31 @@ cat("### Socioeconomic Feasibility - two or three classes")
 
 if (sef_rb == "hml") {
   d0_i2 <-
-    cond_data_i2 %>% dplyr::select(se_1_h, se_1_m, se_1_l, x , y) %>% na.omit %>% st_as_sf(coords = c("x", "y"))
+    cond_data_i2 %>% dplyr::select(se_1_h, se_1_m, se_1_l, x , y) %>% na.omit %>% vect(geom = c("x", "y"))
   d1_i2 <- rasterize(d0_i2, ra_mask, field = "se_1_h")
   d2_i2 <- rasterize(d0_i2, ra_mask, field = "se_1_m")
   d3_i2 <- rasterize(d0_i2, ra_mask, field = "se_1_l")
-  dB_se_i2 <- brick(d1_i2, d2_i2, d3_i2)
+  dB_se_i2 <- rast(list(d1_i2, d2_i2, d3_i2))
   names(dB_se_i2) <- c('high', 'moderate', 'low')
   
   # get max value and export
   dM <- which.max(dB_se_i2)
-  dM_brick <- brick(d1_i2, d2_i2, d3_i2, dM)
+  dM_brick <- rast(list(d1_i2, d2_i2, d3_i2, dM))
   names(dM_brick) <-
     c('high', 'moderate', 'low', 'class')
   output_geotiff(dM_brick, paste0("3class_se1_", params$INN2))
   
 } else {
   d0_i2 <-
-    cond_data_i2 %>% dplyr::select(se_1_h, se_1_l, x , y) %>% na.omit %>% st_as_sf(coords = c("x", "y"))
+    cond_data_i2 %>% dplyr::select(se_1_h, se_1_l, x , y) %>% na.omit %>% vect(geom = c("x", "y"))
   d1_i2 <- rasterize(d0_i2, ra_mask, field = "se_1_h")
   d2_i2 <- rasterize(d0_i2, ra_mask, field = "se_1_l")
-  dB_se_i2 <- brick(d1_i2, d2_i2)
+  dB_se_i2 <- rast(list(d1_i2, d2_i2))
   names(dB_se_i2) <- c('high', 'low')
   
   # get max value and export
   dM <- which.max(dB_se_i2)
-  dM_brick <- brick(d1_i2, d2_i2, dM)
+  dM_brick <- rast(list(d1_i2, d2_i2, dM))
   names(dM_brick) <-
     c('high', 'low', 'class')
   output_geotiff(dM_brick, paste0("2class_se1_", params$INN2))
@@ -23608,7 +23634,7 @@ str(cond_data_i2$yieldpc)
 
 # cond_data_i2 <- dplyr::select(cond_data_i2,-yield)
 
-cond_data_i2_sf <- cond_data_i2 %>% na.omit %>% st_as_sf(coords = c("x", "y"))
+cond_data_i2_sf <- cond_data_i2 %>% na.omit %>% vect(geom = c("x", "y"))
 
 dBy <- rasterize(cond_data_i2_sf, ra_mask, field="yieldpc")
 names(dBy) <- c('yieldpc')
@@ -23651,7 +23677,7 @@ gy2
 <div class="fold o"> 
 ```{r calc_yield_2_i2, cache = TRUE, cache.whatever=params$Agg, fig.width=12,  out.width="100%", message=FALSE, warning=FALSE, timeit = TRUE}
 
-#dy_sf <- dy %>%  na.omit %>%  st_as_sf(coords = c("x", "y"), crs = crs_irm)
+#dy_sf <- dy %>%  na.omit %>%  vect(geom = c("x", "y"), crs = crs_irm)
 
 #dy_r <- st_rasterize(dy_sf[,"yieldpc"])
 
@@ -23678,7 +23704,7 @@ yield_tab_i2 %>% kable(digits = 3) %>% kable_styling("striped", full_width = T) 
 cond_data_i2$yield <- cond_data_i2$yieldpc / 100 * yield_tab_i2$YI
 cat("Intercrop yield")
 
-cond_data_sfp_i2 <- cond_data_i2 %>% na.omit %>% st_as_sf(coords = c("x", "y"))
+cond_data_sfp_i2 <- cond_data_i2 %>% na.omit %>% vect(geom = c("x", "y"))
 
 dByd_i2 <- rasterize(cond_data_sfp_i2, ra_mask, field="yield")
 names(dByd_i2) <- c('yield')
@@ -23719,7 +23745,7 @@ gyd2_i2
 <div class="fold o"> 
 ```{r calc_yield_4_i2, cache = TRUE, cache.whatever=params$Agg, fig.width=12,  out.width="100%", message=FALSE, warning=FALSE, timeit = TRUE}
 
-#dyd_i2_sf <- dyd_i2 %>%  na.omit %>%  st_as_sf(coords = c("x", "y"), crs = crs_irm)
+#dyd_i2_sf <- dyd_i2 %>%  na.omit %>%  vect(geom = c("x", "y"), crs = crs_irm)
 
 #dyd_i2_r <- st_rasterize(dyd_i2_sf[,"yield"])
 
@@ -23740,7 +23766,7 @@ The IRM script converts yield proportion to production using the yield values fo
 cond_data_i2$production <- cond_data_i2$yield * Stat_factor_ha
 cat("Intercrop production")
 
-cond_data_sfp_i2 <- cond_data_i2 %>% na.omit %>% st_as_sf(coords = c("x", "y"))
+cond_data_sfp_i2 <- cond_data_i2 %>% na.omit %>% vect(geom = c("x", "y"))
 
 dBp_i2 <- rasterize(cond_data_sfp_i2, ra_mask, field="production")
 names(dBp_i2) <- c('production')
@@ -23782,7 +23808,7 @@ gp2_i2
 <div class="fold o"> 
 ```{r calc_yield_6_i2, cache = TRUE, cache.whatever=params$Agg, fig.width=12,  out.width="100%", message=FALSE, warning=FALSE, timeit = TRUE}
 
-#dp_i2_sf <- dp_i2 %>%  na.omit %>%  st_as_sf(coords = c("x", "y"), crs = crs_irm)
+#dp_i2_sf <- dp_i2 %>%  na.omit %>%  vect(geom = c("x", "y"), crs = crs_irm)
 
 #dp_i2_r <- st_rasterize(dp_i2_sf[,"production"])
 
@@ -23801,7 +23827,7 @@ gp2_i2
 # create classified suitability map
 
 d0 <-
-  cond_data %>% dplyr::select(yieldpc, x , y) %>% na.omit #%>% st_as_sf(coords = c("x", "y"))
+  cond_data %>% dplyr::select(yieldpc, x , y) %>% na.omit #%>% vect(geom = c("x", "y"))
 
 d1 <- cond_data_i2 %>% dplyr::select(yieldpc) %>% na.omit %>%
   dplyr::rename(yieldpc_i2 = yieldpc)
@@ -23839,7 +23865,7 @@ d2 <- d2 %>%
   rowwise() %>%
   do(row = as_tibble(.)) %>%
   mutate(diff = f(row)) %>%
-  unnest(cols = c(row)) #%>% st_as_sf(coords = c("x", "y"))
+  unnest(cols = c(row)) #%>% vect(geom = c("x", "y"))
 
 d2$class <-
   factor(d2$class,
@@ -23895,7 +23921,7 @@ gc2
 <div class="fold o"> 
 ```{r classified compare_score_maps2, cache = TRUE, cache.whatever=params$Agg, fig.width=12,  out.width="100%", message=FALSE, warning=FALSE, timeit = TRUE}
 
-d2_sf <- d2 %>%  na.omit %>%  st_as_sf(coords = c("x", "y"), crs = crs_irm)
+d2_sf <- d2 %>%  na.omit %>%  vect(geom = c("x", "y"), crs = crs_irm)
 
 d2_r <- st_rasterize(d2_sf[,"diff"])
 
