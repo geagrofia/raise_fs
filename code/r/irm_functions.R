@@ -760,22 +760,22 @@ output_stars_geotiff <- function(results_raster, data_file_prefix) {
 }
 # temporary function to write output to csv
 
-# where: results_sf is the projected sf data
+# where: results_vect is the projected vect data
 #        data_file_prefix is the prefix used to define the name of the output csv
 
 
-output_csv <- function(results_sf, data_file_prefix) {
+output_csv <- function(results_vect, data_file_prefix) {
   csv_filename <-
     as.character(paste("tab_data/output/",
                        data_file_prefix,
                        ".csv",
                        sep = ""))
-  
-  write_sf(
-    results_sf,
-    dsn = (here(csv_filename)),
-    delete_layer = TRUE,
-    delete_dsn = TRUE
+  write_csv(
+  #writeVector(
+    results_vect,
+    (here(csv_filename))#,
+    #filetype = "csv",
+    #overwrite=TRUE
   )
   
 }
@@ -799,20 +799,60 @@ output_txt <- function(text_object, data_file_prefix) {
   
 }
 
-# temporary function to create kebele level maps
+# temporary function to create kebele level maps with sf
+
+# where: n is the number of maps to produce (the number of values for the suitability)
+#        fill_var_list is a vector of the possible values for suitability
+#        pal_col is a vector of the names of the colour palette
+
+plot_subdiv_maps <- function(n, fill_var_list, pal_col) {
+  subdiv_map_list <- list()
+  
+  for (i in 1:n)   {
+    fillvar <- fill_var_list[[i]]
+    subdiv_map_list[[i]] <-
+      ggplot() +
+      geom_spatvector(data = vect_subdiv, aes(group = "id", fill = !!sym(fillvar))) +
+      scale_fill_distiller(
+        type = "seq",
+        palette = pal_col[i],
+        direction = 1,
+        guide = "legend"
+      ) +
+      scale_x_continuous(
+        name = "",
+        labels = function(x) {
+          1.0e-3 * x
+        }
+      ) +
+      scale_y_continuous(
+        name = "",
+        labels = function(x) {
+          1.0e-3 * x
+        }
+      )  +
+      geom_spatvector(data = d_vect_ba_tri, aes(colour = ifelse(baclass == "optimal" , "green", "red")),
+                      size = 2) +
+      geom_spatvector_text(data = d_vect_ba_tri, aes(label = ifelse(type == "b", "b", "b/s"))) +
+      scale_colour_identity()
+  }
+  return(subdiv_map_list)
+}  
+
+# temporary function to create kebele level maps with sf
 
 # where: n is the number of maps to produce (the number of values for the suitability)
 #        fill_var_list is a vector of the possible values for suitability
 #        pal_col is a vector of the names of the colour palette
 
 
-plot_subdiv_maps <- function(n, fill_var_list, pal_col) {
+plot_subdiv_maps_sf <- function(n, fill_var_list, pal_col) {
   subdiv_map_list <- list()
   
   for (i in 1:n)   {
     subdiv_map_list[[i]] <-
       ggplot() +
-      geom_sf(data = v_subdiv, (aes_string(
+      geom_sf(data = vect_subdiv, (aes_string(
         group = "id", fill = (fill_var_list[i])
       ))) +
       coord_sf(datum = st_crs(crs_irm)) +

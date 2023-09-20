@@ -1,7 +1,7 @@
 ---
 title: "IRM guide to directories and parameter files"
 author: "A Farrow"
-date: "05/02/2021"
+date: "16/09/2023"
 output:
   html_document:  
     code_folding: "show"
@@ -45,7 +45,11 @@ The raise_fs Rmd code directory.
 File             | Description
 -----------------|----------------------------------
 irm_modular.Rmd  |  the current name for the script to run IRM
-irm_modular.html|  the current output html file
+irm_modular.html |  the current output html file
+irm-training1-script1 rules.Rmd | training script with fake data
+irm-training1-script2-hierarchy_2rb.Rmd | training script with data from Lay Gayint
+
+
 
  
 ### 	Project_dir/raise_fs/code/rmd/figures/...
@@ -77,25 +81,16 @@ The directory of spatial data used as an **input** in IRM.
 
 File             | Description
 -----------------|----------------------------------
-ag_land_arsi.tif | Agricultural land geotif (any CRS)
- basesat_arsi.tif  | Base saturation geotif (any CRS)
- cec_arsi.tif | CEC geotif (any CRS)
- cor_frag_arsi.tif | Coarse fragments geotif (any CRS)
- **crs_arsi_hawassa09.txt** | Text file of arsi_hawassa09 CRS in proj4 format
- depth_arsi.tif | Soil Depth geotif (any CRS)
- drain_arsi.tif | drainage (#) geotif (any CRS)
- ec_arsi.tif | electrical conductivity (dS/m) geotif (any CRS)
- ex_bases_arsi.tif | Exchangeable bases geotif (any CRS)
- **mask_arsi_hawassa09.tif** | Mask geotif (uses the arsi_hawassa09 CRS)
- pHh2o_arsi.tif | Soil pH-H2O (between 0 and 14) geotif (any CRS)
- prec_m_arsi.tif | monthly precipitation sum (mm) geotif (any CRS)
- slope_arsi.tif | slope (degrees) geotif (any CRS)
- soc_arsi.tif | soil organic carbon (g/kg) geotif (any CRS)
- srtm_arsi.tif | elevation (masl) geotif (any CRS)
- **subdiv_arsi_hawassa09.geojson** | subdivision multipart polygons of modelling area geojson (WGS84 CRS)
- tavg_m_arsi.tif | monthly mean tempreature (degC) geotif (any CRS)
- **triangulation_arsi_hawassa09.geojson** | triangulation points geojson (WGS84 CRS)
- txt_arsi.tif | soil texture (USDA #) geotif (any CRS)
+**mask_lg_potato_UTM** | **Modelling mask**
+**lg_Kebele_UTM.shp** | **Sub-divisions (kebeles/tabia)**
+**prec_m_lg_agg.tif** | **monthly precipitation sum (mm) geotif (any CRS)**
+**tavg_m_lg_agg** | **monthly mean temperature (degC) geotif (any CRS)**
+**tran_inthv_hour_potato_agg** | **walking/vehicle time to zonal centre (hour)**
+**tran_intwv_hour_potato_agg** | **walking/vehicle time to woreda centre (hour)**
+**walk_market_potato_agg** | **walking time to local group - kebele market - FTC (hour)**
+rast_onset_lg_potato.tif | Spatially variable season onset (Julian day)
+
+
 *** 
 Files in **bold** are obligatory
  
@@ -106,11 +101,11 @@ The directory of spatial data produced as an **output** from IRM.
 
 File             | Description
 -----------------|----------------------------------
-apt_arsi_hawassa09.geojson | point file of all inputs and results (WGS84 CRS)
-ba_nuance_subdiv_area_arsi_hawassa09.geojson |  polygon file of biophysical aptitude nuanced results in hectares per subdivision (WGS84 CRS)
-ba_nuance_subdiv_pc_arsi_hawassa09.geojson |  polygon file of biophysical aptitude nuanced results in percentage of the area per subdivision (WGS84 CRS)
-ba_subdiv_area_arsi_hawassa09.geojson | polygon file of biophysical aptitude results in hectares per subdivision (WGS84 CRS)
-ba_subdiv_pc_arsi_hawassa09.geojson | polygon file of biophysical aptitude results in percentage of the area per subdivision (WGS84 CRS)
+x | point file of all inputs and results (WGS84 CRS)
+x |  polygon file of biophysical aptitude nuanced results in hectares per subdivision (WGS84 CRS)
+x |  polygon file of biophysical aptitude nuanced results in percentage of the area per subdivision (WGS84 CRS)
+x | polygon file of biophysical aptitude results in hectares per subdivision (WGS84 CRS)
+x | polygon file of biophysical aptitude results in percentage of the area per subdivision (WGS84 CRS)
  
  
 ##	Project_dir/raise_fs/tab_data	
@@ -123,9 +118,12 @@ The directory of tabular data used as an **input** in IRM.
 
 File             | Description
 -----------------|----------------------------------
-growth_stages_arsi_hawassa09.csv | definition of growth stage lengths, and sowing/planting date [full details...](#growth_stages-link)
-**priorities_arsi_hawassa09.csv** | definition of all criteria, rule base structure, weights, thresholds, data file prefixes, rule propositions and conclusions and contribution to yield estimation [full details...](#priorities-link)
-usda_texture_arsi_hawassa09.csv | table for classifying soil texture in IRM from USDA# to value [full details...](#texture-link)
+growth_stages_lg_potato.csv | definition of growth stage lengths, and sowing/planting date [full details...](#growth_stages-link)
+**priorities_lg_potato.csv** | definition of all criteria, rule base structure, weights, thresholds, data file prefixes, rule propositions and conclusions and contribution to yield estimation [full details...](#priorities-link)
+**usda_texture_lg_potato.csv** | table for classifying soil texture in IRM from USDA# to value [full details...](#texture-link)
+**yield_lg_potato** | potential yield (YP) Actual Yield	(YA) Irrigated Yield	(YI) used in yield calculations
+470	322	NA
+
 *** 
 Files in **bold** are obligatory
  
@@ -135,15 +133,15 @@ The directory of tabular data produced as an **output** from IRM.
 
 File             | Description
 -----------------|----------------------------------
-ba_nuance_subdiv_area_arsi_hawassa09.csv | table of biophysical aptitude nuanced results in hectares per subdivision (WGS84 CRS)
-ba_nuance_subdiv_pc_arsi_hawassa09.csv | table of biophysical aptitude nuanced results in percentage of the area per subdivision (WGS84 CRS)
-ba_subdiv_area_arsi_hawassa09.csv | table of biophysical aptitude results in hectares per subdivision (WGS84 CRS)
-ba_subdiv_pc_arsi_hawassa09.csv | table of biophysical aptitude results in percentage of the area per subdivision (WGS84 CRS)
+x.csv | table of biophysical aptitude nuanced results in hectares per subdivision (WGS84 CRS)
+x.csv | table of biophysical aptitude nuanced results in percentage of the area per subdivision (WGS84 CRS)
+x.csv | table of biophysical aptitude results in hectares per subdivision (WGS84 CRS)
+x.csv | table of biophysical aptitude results in percentage of the area per subdivision (WGS84 CRS)
 
 
 # Important files
 
-## priorities_arsi_hawassa09.csv {#priorities-link}
+## priorities_lg_potato.csv {#priorities-link}
 
 Column name / Variable | Description  | No data
 -----------------|----------------------------------|-----------------
@@ -169,19 +167,20 @@ conclusion_1 | conclusion level 1 | Use 'NA' to denote no data
 conclusion_2 | conclusion level 2 | Use 'NA' to denote no data
 conclusion_3 | conclusion level 3 | Use 'NA' to denote no data
 yield |  1 if criterion or rule base stack contributes to yield estimation |Leave blank to denote no data
+temp_resolution | temporal resolution of climate data - m = monthly, d = dekad |Leave blank to denote no data
 
-
-## growth_stages_arsi_hawassa09.csv {#growth_stages-link}
+## growth_stages_lg_potato.csv {#growth_stages-link}
 
 Column name / Variable | Description  | No data
 -----------------|----------------------------------|----------------------------------
-name| short name of phenological stage consistent with 'phen_stage' in priorities csv. First value always sowing date |	Always has a value
+name| short name of phenological stage consistent with 'phen_stage' in priorities csv. First value always sowing date. Last value always \'total'\ |	Always has a value
 day	| sowing date julian day number between 0 and 365 | First value always sowing date. Leave other rows blank
-length	| length in days of each phenological stage. Always include total length even if not used as a criterion | First value always blank. Other rows always have a value
-criteria | is this phenological stage a criterion for IRM  | First value always 0. Other rows 0 for not a criterion
+length	| length in days of each phenological stage. Always include total length even if not used as a criterion | first value always blank all other rows must have a value
+prec_criteria | is this phenological stage a precipitation criterion for IRM | First value always 0. Other rows have a value of 1 if there are precipitation criteria for this growth stage or 0 if no criteria
+temp_criteria | is this phenological stage a temperature criterion for IRM | First value always 0. Other rows have a value of 1 if there are temperature criteria for this growth stage or 0 if no criteria
 
 
-## usda_texture_arsi_hawassa09.csv {#texture-link}
+## usda_texture_lg_potato.csv {#texture-link}
 
 Column name / Variable | Description  | No data
 -----------------|----------------------------------|----------------------------------
