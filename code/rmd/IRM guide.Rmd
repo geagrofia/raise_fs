@@ -20,7 +20,9 @@ output:
  
 ```
 
-# Project_dir/raise_fs
+# Directories/folders
+
+## Project_dir/raise_fs
 
 The raise_fs root directory. We use the 'here' package which always refers to this directory. All other paths are relative to this directory.
 
@@ -121,8 +123,8 @@ File             | Description
 growth_stages_lg_potato.csv | definition of growth stage lengths, and sowing/planting date [full details...](#growth_stages-link)
 **priorities_lg_potato.csv** | definition of all criteria, rule base structure, weights, thresholds, data file prefixes, rule propositions and conclusions and contribution to yield estimation [full details...](#priorities-link)
 **usda_texture_lg_potato.csv** | table for classifying soil texture in IRM from USDA# to value [full details...](#texture-link)
-**yield_lg_potato** | potential yield (YP) Actual Yield	(YA) Irrigated Yield	(YI) used in yield calculations
-470	322	NA
+**yield_lg_potato** | potential yield (YP) Water limited potential Yield	(YW) Intercrop Yield	(YI) used in yield calculations
+
 
 *** 
 Files in **bold** are obligatory
