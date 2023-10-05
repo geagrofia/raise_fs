@@ -198,7 +198,40 @@ dekad <- function(x, type = c("month", "year"), ...) {
   
 }
 
+# developed in 'sowing_date_test_4_CRASA.rmd'
+# takes a data frame with fields for day_begin and day_end
+# num_years is predefined
+# day_months removed because causing function to be very slow
+# produces a matrix of proportion of each month in growing period for each cell
+# afterwards needs to be transposed and binded to original data frame, 
 
+
+.growth_period_long_tbl_short <- function(x, day_begin, day_end, num_years) {
+  
+  days <- round(x[day_begin]):round(x[day_end])
+  tabulate(bin = months[days], nbins = 12L)* num_years/tabulate(bin = months, 
+                                                                nbins = 12L)
+  
+}
+
+# developed in 'sowing_date_test_4_CRASA.rmd'
+# takes a data frame with fields for day_begin and day_end
+# num_years is predefined
+# day_dekads removed because causing function to be very slow
+# produces a matrix of proportion of each dekad in growing period for each cell
+# afterwards needs to be transposed and binded to original data frame, 
+
+
+
+.growth_period_long_dekad_tbl <- function (x, day_begin, day_end, num_years) {
+  days <- 1:365
+  day_dekads <- days %>% as.character %>% as.Date("%j") %>% 
+    dekad(type = "year") %>% as.integer 
+  dekads <- rep.int(day_dekads, num_years)
+  days <- round(x[day_begin]):round(x[day_end])
+  tabulate(bin = dekads[days], nbins = 36L)* num_years/tabulate(bin = dekads, 
+                                                                nbins = 36L)
+}
 
 # developed in 'sowing_date_test_4_CRASA.rmd'
 # takes a data frame with fields for day_begin and day_end
@@ -208,11 +241,8 @@ dekad <- function(x, type = c("month", "year"), ...) {
 # converted to sf point object and rasterized
 
 
-.growth_period_long_dekad_tbl <- function (x, day_begin, day_end, num_years) {
-  days <- 1:365
-  day_dekads <- days %>% as.character %>% as.Date("%j") %>% 
-    dekad(type = "year") %>% as.integer 
-  dekads <- rep.int(day_dekads, num_years)
+.growth_period_long_dekad_tbl_short <- function (x, day_begin, day_end, num_years) {
+  
   days <- round(x[day_begin]):round(x[day_end])
   tabulate(bin = dekads[days], nbins = 36L)* num_years/tabulate(bin = dekads, 
                                                                 nbins = 36L)
@@ -670,7 +700,9 @@ rasterize_plot_fpm <- function(n, fpm_conc_var, fpm_conc_name, df_data) {
   
   # plot dB using title
   
-  dB %>% plot(main = fpm_plot_title)
+  dB %>% plot(breaks = c(0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1), axes = F)
+
+  
 }
 
 # temporary function to write output to geojson
@@ -832,12 +864,53 @@ plot_subdiv_maps <- function(n, fill_var_list, pal_col) {
         }
       )  +
       geom_spatvector(data = d_vect_ba_tri, aes(colour = ifelse(baclass == "optimal" , "green", "red")),
-                      size = 2) +
-      geom_spatvector_text(data = d_vect_ba_tri, aes(label = ifelse(type == "b", "b", "b/s"))) +
+                      size = 1) +
+      #geom_spatvector_text(data = d_vect_ba_tri, aes(label = ifelse(type == "b", "b", "b/s"))) +
       scale_colour_identity()
   }
   return(subdiv_map_list)
 }  
+
+# temporary function to create subdivision level maps of % with terra
+
+# where: n is the number of maps to produce (the number of values for the suitability)
+#        fill_var_list is a vector of the possible values for suitability
+#        pal_col is a vector of the names of the colour palette
+
+plot_subdiv_maps_pc <- function(n, fill_var_list, pal_col) {
+  subdiv_map_pc_list <- list()
+  
+  for (i in 1:n)   {
+    fillvar <- fill_var_list[[i]]
+    subdiv_map_pc_list[[i]] <-
+      ggplot() +
+      geom_spatvector(data = vect_subdiv, aes(group = "id", fill = !!sym(fillvar))) +
+      scale_fill_distiller(
+        type = "seq",
+        palette = pal_col[i],
+        direction = 1,
+        limits = c(0, 100),
+        guide = "legend"
+        ) +
+          scale_x_continuous(
+            name = "",
+            labels = function(x) {
+              1.0e-3 * x
+            }
+          ) +
+          scale_y_continuous(
+            name = "",
+            labels = function(x) {
+              1.0e-3 * x
+            }
+          )  +
+          geom_spatvector(data = d_vect_ba_tri, aes(colour = ifelse(baclass == "optimal" , "green", "red")),
+                          size = 1) +
+          #geom_spatvector_text(data = d_vect_ba_tri, aes(label = ifelse(type == "b", "b", "b/s"))) +
+          scale_colour_identity()
+  }
+  return(subdiv_map_pc_list)
+} 
 
 # temporary function to create kebele level maps with sf
 
@@ -1051,11 +1124,45 @@ add_triangulation_plot <- function(map1) {
          
 }
 
+add_triangulation_plot_no_labels <- function(map1) {
+  addtriangulation_map <-       map1 +
+    geom_spatvector(
+      data = vect_triangulation,
+      aes(fill = tri_label),
+      colour = "black",
+      shape = 21,
+      size = 2, 
+      show.legend = FALSE
+    ) +
+    #geom_spatvector_text(
+    #  data = vect_triangulation,
+    #  aes(label = id),
+    #  colour = "black",
+    #  size = 2,
+    #  nudge_x = nudge_xvaltri,
+    #  nudge_y = nudge_yvaltri
+    #) +
+    
+    scale_fill_manual(values = 1:nlevels(vect_triangulation$tri_label)) +
+    #labs(fill = "Comment") +
+    theme(#legend.direction = "vertical",
+      #legend.box = "horizontal",
+      axis.title.x = element_blank(),
+      axis.title.y = element_blank()) #+
+    #guides(#alpha = guide_legend(order = 2),
+      #shape = guide_legend(order = 3),
+      #colour = guide_legend(order = 1)
+     #fill = NA)#guide_legend(order = 1))
+  
+  return(addtriangulation_map)
+  
+}
+
 base_raster_plot <- function(raster_data, fillvar, low_col, high_col, plot_title) {
   baseraster_map <-       
   ggplot() +
-  geom_spatraster(data = rast_mask_proj, aes(fill = !!sym(fillvar))) +
-  scale_fill_gradient(low = low_col, high = high_col) +
+  geom_spatraster(data = raster_data, aes(fill = !!sym(fillvar))) +
+  scale_fill_gradient(low = low_col, high = high_col,  na.value = "transparent") +
   labs(title = plot_title)
   
   #return(paste(fillvar))  
