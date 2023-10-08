@@ -851,21 +851,21 @@ plot_subdiv_maps <- function(n, fill_var_list, pal_col) {
         direction = 1,
         guide = "legend"
       ) +
-      scale_x_continuous(
-        name = "",
-        labels = function(x) {
-          1.0e-3 * x
-        }
-      ) +
-      scale_y_continuous(
-        name = "",
-        labels = function(x) {
-          1.0e-3 * x
-        }
-      )  +
-      geom_spatvector(data = d_vect_ba_tri, aes(colour = ifelse(baclass == "optimal" , "green", "red")),
+      #   scale_x_continuous(
+      #      name = "",
+      #      labels = function(x) {
+      #        1.0e-3 * x
+      #      }
+      #    ) +
+      #    scale_y_continuous(
+      #      name = "",
+      #      labels = function(x) {
+      #        1.0e-3 * x
+      #      }
+    #   )  +
+      geom_spatvector(data = vect_ba_tri, aes(colour = ifelse(baclass == "optimal" , "green", "red")),
                       size = 1) +
-      #geom_spatvector_text(data = d_vect_ba_tri, aes(label = ifelse(type == "b", "b", "b/s"))) +
+      #geom_spatvector_text(data = vect_ba_tri, aes(label = ifelse(type == "b", "b", "b/s"))) +
       scale_colour_identity()
   }
   return(subdiv_map_list)
@@ -892,21 +892,21 @@ plot_subdiv_maps_pc <- function(n, fill_var_list, pal_col) {
         limits = c(0, 100),
         guide = "legend"
         ) +
-          scale_x_continuous(
-            name = "",
-            labels = function(x) {
-              1.0e-3 * x
-            }
-          ) +
-          scale_y_continuous(
-            name = "",
-            labels = function(x) {
-              1.0e-3 * x
-            }
-          )  +
-          geom_spatvector(data = d_vect_ba_tri, aes(colour = ifelse(baclass == "optimal" , "green", "red")),
+       #   scale_x_continuous(
+      #      name = "",
+      #      labels = function(x) {
+      #        1.0e-3 * x
+      #      }
+      #    ) +
+      #    scale_y_continuous(
+      #      name = "",
+      #      labels = function(x) {
+      #        1.0e-3 * x
+      #      }
+      #   )  +
+          geom_spatvector(data = vect_ba_tri, aes(colour = ifelse(baclass == "optimal" , "green", "red")),
                           size = 1) +
-          #geom_spatvector_text(data = d_vect_ba_tri, aes(label = ifelse(type == "b", "b", "b/s"))) +
+          #geom_spatvector_text(data = vect_ba_tri, aes(label = ifelse(type == "b", "b", "b/s"))) +
           scale_colour_identity()
   }
   return(subdiv_map_pc_list)
@@ -935,18 +935,18 @@ plot_subdiv_maps_sf <- function(n, fill_var_list, pal_col) {
         direction = 1,
         guide = "legend"
       ) +
-      scale_x_continuous(
-        name = "",
-        labels = function(x) {
-          1.0e-3 * x
-        }
-      ) +
-      scale_y_continuous(
-        name = "",
-        labels = function(x) {
-          1.0e-3 * x
-        }
-      )  +
+      #   scale_x_continuous(
+      #      name = "",
+      #      labels = function(x) {
+      #        1.0e-3 * x
+      #      }
+      #    ) +
+      #    scale_y_continuous(
+      #      name = "",
+      #      labels = function(x) {
+      #        1.0e-3 * x
+      #      }
+    #   )  +
       geom_point(
         data = d_v_ba_tri,
         mapping = aes(
