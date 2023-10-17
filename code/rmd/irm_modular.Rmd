@@ -15,17 +15,21 @@ params:
   INT: NA
   SYS: comparison
   Agg: 1
-  MASK: 1000
+  MASK: 5000
   INN1: lg_potato
   RES1: 3
   SOS1: 1
   SUBDIV1: Kebelle
-  TRI1: Aptitude
+  TRIAD1: Adoption
+  TRIBA1: Aptitude
+  TRISE1: Feasibility
   INN2: lg_superpotato
   RES2: 3
   SOS2: 1
   SUBDIV2: Kebelle
-  TRI2: Aptitude
+  TRIAD2: Adoption
+  TRIBA2: Aptitude
+  TRISE2: Feasibility
 
 ---
 
@@ -69,7 +73,11 @@ div.Agg { background-color:#e6f0ff; border-radius: 5px; padding: 10px; font-size
 # RES defines whether 3-class adoption (2 class aptitude), or FAO style 5-class adoption (5-class aptitude with added maps on the limitations) or both classes are computed. Computing both classes will increase the time to run the script!
 #A value of 1 will only compute the 3-class suitability maps. A value of 2 will only compute the 5-class suitability map. A value of 3 will compute both suitability class maps. Other classified maps will be shown but only require a re-classification of the other results.
 
-# TRI is the field name used for the triangulation points
+# TRIAD is the field name used for the triangulation points for Adoption
+
+# TRIBA is the field name used for the triangulation points for Biophysical Aptitude
+
+# TRISE is the field name used for the triangulation points for Socio-economic Feasibility
 
 # SUBDIV is the field name used to identify the subdivision polygons
 
@@ -258,6 +266,8 @@ rbnumberlist2 <- rbnumberlist2[! rbnumberlist2 %in% c('adop_0')]
 edges1 <- paste(rbnumberlist2,rbstacklist2, sep="->")  
 edges2 <- paste(edges1, collapse=" ")
 
+# get the labels for the nodes
+
 rbnumberlabellist1 <- df_rbnumber1[,"id_label"]  
 rbnumberlabellist2 <- rbnumberlabellist1[!is.na(rbnumberlist1)] 
 rbnumberlabellist3 <- unique(rbnumberlabellist2)
@@ -266,7 +276,7 @@ rbnumberlabellist5 <- paste(rbnumberlabellist4, collapse=";")
 
 rbstacklabellist1 <- df_rbnumber1[,"id_label"]
 rbstacklabellist2 <- rbstacklabellist1[!is.na(rbstacklist1)] 
-rbstacklabellist3 <- rbstacklabellist2[rbnumberlist3 %in% rbstacklist3]
+rbstacklabellist3 <- rbnumberlabellist3[rbnumberlist3 %in% rbstacklist3]
 rbstacklabellist4 <- paste(rbstacklabellist3, collapse=";")
 
 rulebasegraph_name <- paste("digraph simple_rule_base")
@@ -452,15 +462,42 @@ nudge_yvaltri <-
   ((vect_triangulation_extent[4] - vect_triangulation_extent[3]) /  (nrow(vect_triangulation) * 2.5))
 #cat("nudge_yvaltri =", nudge_yvaltri)
 
-expr <- paste0("vect_triangulation$", params$TRI1)
-vect_triangulation$tri_label <- paste(vect_triangulation$id, "=", eval(parse(text=(expr))))
-vect_triangulation$tri_label <- factor(vect_triangulation$tri_label)
 
-g <- ggplot()
-gtriangulation <- add_triangulation_plot_no_labels(g)
+if (adop_crit) {
+  expr <- paste0("vect_triangulation$", params$TRIAD1)
+  vect_triangulation$tri_label_ad <-
+    paste(vect_triangulation$id, "=", eval(parse(text = (expr))))
+  vect_triangulation$tri_label_ad <-
+    factor(vect_triangulation$tri_label_ad)
+  g_ad <- ggplot()
+  gtriangulation_ad <- add_triangulation_plot_no_labels_ad(g_ad)
+  gtriangulation_ad <- add_subdiv_simple_plot(gtriangulation_ad)
+  gtriangulation_ad
+}
 
-gtriangulation <- add_subdiv_simple_plot(gtriangulation)
-gtriangulation
+if (ba_crit) {
+  expr <- paste0("vect_triangulation$", params$TRIBA1)
+  vect_triangulation$tri_label_ba <-
+    paste(vect_triangulation$id, "=", eval(parse(text = (expr))))
+  vect_triangulation$tri_label_ba <-
+    factor(vect_triangulation$tri_label_ba)
+  g_ba <- ggplot()
+  gtriangulation_ba <- add_triangulation_plot_no_labels_ba(g_ba)
+  gtriangulation_ba <- add_subdiv_simple_plot(gtriangulation_ba)
+  gtriangulation_ba
+}
+
+if (sef_crit) {
+  expr <- paste0("vect_triangulation$", params$TRISE1)
+  vect_triangulation$tri_label_se <-
+    paste(vect_triangulation$id, "=", eval(parse(text = (expr))))
+  vect_triangulation$tri_label_se <-
+    factor(vect_triangulation$tri_label_se)
+  g_se <- ggplot()
+  gtriangulation_se <- add_triangulation_plot_no_labels_se(g_se)
+  gtriangulation_se <- add_subdiv_simple_plot(gtriangulation_se)
+  gtriangulation_se
+}
 
 ```
 </div>
@@ -581,8 +618,7 @@ The properties of this map are given below:
 ```{r i1_i1_mask01, cache = TRUE, cache.whatever=params$Agg, out.width="100%", warning=FALSE}
 
 if (params$Agg == 1){rast_mask_proj <- rast_subdiv_mask_proj} else {
-  rast_mask_proj <- aggregate(rast_subdiv_mask_proj, fact = params$Agg, expand = TRUE)}
-
+  rast_mask_proj <- aggregate(rast_subdiv_mask_proj, fact = params$Agg, na.rm=TRUE)}
 
 g <- base_raster_plot(rast_mask_proj, "layer", 'red', 'blue', paste0("Aggregated mask - Resolution = ", res(rast_mask_proj), "m"))
 
@@ -616,7 +652,7 @@ x <-  pull(df_irm, x)
 y <-  pull(df_irm, y)
 xy <- cbind(x, y)
 
-str(df_irm)
+#str(df_irm)
 
 if (params$INT == 1)
   shiny::setProgress(0.17, message = "Resampling data 1st Innovation")  # set progress to 17%
@@ -788,7 +824,7 @@ df_criteria_ba3 <-
 n_cba3 <- nrow(df_criteria_ba3)
 print(paste(n_cba3, "Climatic criteria: "))
 
-for (i in 1:n_cba3) {
+  for (i in seq_len(nrow(df_criteria_ba3))) {
   print(paste(df_criteria_ba3[i, 4]))
   rast_clim_mask <- get(paste0("rast_",df_criteria_ba3[i, 11], "_rsmp"))
   if (paste(df_criteria_ba3[i, 23]) == "m") {
@@ -805,7 +841,7 @@ df_rulebases_ba3 <-
 n_rbba3 <- nrow(df_rulebases_ba3)
 
 print(paste(n_rbba3, "Climatic rule bases:"))
-for (i in 1:n_rbba3) {
+  for (i in seq_len(nrow(df_rulebases_ba3))) {
   print(paste(df_rulebases_ba3[i, 2]))
   
   if (paste(df_rulebases_ba3[i, 2]) == "ba_3a") {
@@ -894,7 +930,7 @@ df_growth_stages_req_temp <-
 
 # for each of the growth stages for which there are requirements create a new raster brick
 
-cat("### Spatially Static Growing Seasons")
+cat("#### Spatially Static Growing Seasons")
 
   # get the number of variables in growth_stages (excluding sowing/planting date and total length)
   
@@ -902,7 +938,7 @@ cat("### Spatially Static Growing Seasons")
 
 
 phen_tmp <- list()
-for (i in 1:(nrow(df_growth_stages) - 2)) {
+for (i in seq_len(nrow(df_growth_stages) - 2)) {
   phen_tmp[[as.character(df_growth_stages[i + 1, 1])]] <-
     df_growth_stages[i + 1, 3]
 }
@@ -933,7 +969,7 @@ cat(paste("Growth Stages span", num_years, "calendar years"))
 
 # monthly distribution
 if (exists('rast_clim_mask_m')) {
-  for (i in 1:(nrow(df_growth_stages_req))) {
+  for (i in seq_len(nrow(df_growth_stages_req))) {
     period_name <- as.character(df_growth_stages_req[i, 1])
     v_m <-
       .growth_period_long(phen_stages_beg[period_name], phen_stages_end[period_name], num_years)
@@ -956,7 +992,7 @@ if (exists('rast_clim_mask_m')) {
 }
 # dekadal distribution
 if (exists('rast_clim_mask_d')) {
-  for (i in 1:(nrow(df_growth_stages_req))) {
+  for (i in seq_len(nrow(df_growth_stages_req))) {
     period_name <- as.character(df_growth_stages_req[i, 1])
     v_d <-
       .growth_period_long_dekad(phen_stages_beg[period_name], phen_stages_end[period_name], num_years)
@@ -983,7 +1019,7 @@ if (exists('rast_clim_mask_d')) {
 
 ```{r i1_i1_requirements_sowing_dates_title, echo=FALSE, results='asis', eval=clim_crit,  eval=sos_crit}
 
-cat("### Spatially Dynamic Growing Seasons")
+cat("#### Spatially Dynamic Growing Seasons")
 
 ```
 
@@ -1107,7 +1143,7 @@ df_growth_stages_lengths3 %>%
 ```{r i1_sowing_dates_sos_onsetdata_06, cache = TRUE, cache.whatever=params$Agg,  out.width="100%", warning=FALSE, eval=clim_crit, eval=sos_crit}
 
 # add the growth stage lengths to the df
-for (i in 1:(nrow(df_growth_stages_lengths))) {
+for (i in seq_len(nrow(df_growth_stages_lengths))) {
   period_name <- as.character(df_growth_stages_lengths[i, 1])
 #  cat(paste(period_name))
 #  cat(eval(parse(text = paste0("df_growth_stages_lengths3$", period_name))))
@@ -1127,7 +1163,7 @@ df_onset <-
 
 # add the start days for each of the growth stages (excluding the first which is the onset)
 
-for (i in 1:(nrow(df_growth_stages_lengths)- 2) ) {
+for (i in seq_len(nrow(df_growth_stages_lengths)- 2) ) {
   
 #  cat(paste(i))
       
@@ -1153,7 +1189,7 @@ eval_expr_1 <- eval(parse(text =paste0("df_onset$", previous_period_name, "_s + 
 
 # add the end days for each of the growth stages
 
-for (i in 1:(nrow(df_growth_stages_lengths) - 1) ) {
+for (i in seq_len(nrow(df_growth_stages_lengths) - 1) ) {
   
 #  cat(paste(i))
       
@@ -1227,7 +1263,7 @@ if (exists('rast_clim_mask_m')) {
   months <- rep.int(day_months, num_years)
   
   
-  for (i in 1:(nrow(df_growth_stages_lengths))) {
+  for (i in seq_len(nrow(df_growth_stages_lengths))) {
     period_name <- as.character(df_growth_stages_lengths[i, 1])
     cat(paste("\nCurrent growth stage = ", period_name))
     
@@ -1440,7 +1476,7 @@ if (exists('rast_clim_mask_d')) {
   dekads <- rep.int(day_dekads, num_years)
   
   
-  for (i in 1:(nrow(df_growth_stages_lengths))) {
+  for (i in seq_len(nrow(df_growth_stages_lengths))) {
     period_name <- as.character(df_growth_stages_lengths[i, 1])
     cat(paste("\nCurrent growth stage = ", period_name))
     
@@ -1612,7 +1648,7 @@ if (exists('rast_clim_mask_d')) {
 ##-- monthly distribution --
 
 if (exists('rast_clim_mask_m')) {
-  for (i in 1:(nrow(df_growth_stages_req))) {
+  for (i in seq_len(nrow(df_growth_stages_req))) {
     period_name <- as.character(df_growth_stages_req[i, 1])
     cat("period_name = ", period_name, "\n")
     
@@ -1727,7 +1763,7 @@ if (exists('rast_clim_mask_m')) {
 
 
 if (exists('rast_clim_mask_d')) {
-  for (i in 1:(nrow(df_growth_stages_req))) {
+  for (i in seq_len(nrow(df_growth_stages_req))) {
     period_name <- as.character(df_growth_stages_req[i, 1])
     cat("period_name = ", period_name, "\n")
     
@@ -1847,8 +1883,8 @@ By combining precipitation in each month and the phenological stages above, we c
 
 df_criteria_ba3a <-
     dplyr::filter(df_criteria_ba3, grepl("^ba_3a", rulebase_stack) & temp_resolution == "m") # filter precipitation criteria
-  
-  for (i in 1:nrow(df_growth_stages_req_prec)) {
+
+    for (i in seq_len(nrow(df_growth_stages_req_prec))) {
         period_name <- as.character(df_growth_stages_req_prec[i, 1])
 #      print(period_name)
       if (sum(df_criteria_ba3a[i, 'phen_stage'] == period_name, na.rm = TRUE) == 1) {
@@ -1883,14 +1919,14 @@ df_criteria_ba3a <-
         
         
       } else {
-        print(sum(df_criteria_ba3a[, 'phen_stage'] == period_name, na.rm = TRUE))
+    #    print(sum(df_criteria_ba3a[, 'phen_stage'] == period_name, na.rm = TRUE))
       }
     }
 
 df_criteria_ba3a <-
     dplyr::filter(df_criteria_ba3, grepl("^ba_3a", rulebase_stack) & temp_resolution == "d") # filter precipitation criteria
   
-  for (i in 1:nrow(df_growth_stages_req_prec)) {
+    for (i in seq_len(nrow(df_growth_stages_req_prec))) {
         period_name <- as.character(df_growth_stages_req_prec[i, 1])
 #      print(period_name)
       if (sum(df_criteria_ba3a[i, 'phen_stage'] == period_name, na.rm = TRUE) == 1) {
@@ -1925,7 +1961,7 @@ df_criteria_ba3a <-
         
         
       } else {
-        print(sum(df_criteria_ba3a[, 'phen_stage'] == period_name, na.rm = TRUE))
+     #   print(sum(df_criteria_ba3a[, 'phen_stage'] == period_name, na.rm = TRUE))
       }
     }
 
@@ -1944,7 +1980,7 @@ We used the requirements to construct fuzzy partitions and the rulebases.")
 <div class="fold o">   
 ```{r i1_requirements_prec04, cache = TRUE, cache.whatever=params$Agg, out.width="100%", fig.show="hold", warning=FALSE, eval=prec_crit, eval=clim_crit}
 
-for (i in 1:(nrow(df_criteria_ba3a))) {
+for (i in seq_len(nrow(df_criteria_ba3a))) {
   if (!is.na(df_criteria_ba3a[i, 18])) {
     # for those criteria with three proposition values
     # get  the 3 proposition levels
@@ -2090,7 +2126,7 @@ for (i in 1:(nrow(df_criteria_ba3a))) {
     "Precipitation growth\nstages optimality\nmembership"
   
   plot_fpm <- rasterize_plot_fpm(n, fpm_conc_var, fpm_conc_name, df_irm)
-  print(plot_fpm)
+ # print(plot_fpm)
   
   
 }
@@ -2121,7 +2157,7 @@ df_criteria_ba3b_m <-
 
 
 if (nrow(df_criteria_ba3b_m) > 0) {
-  for (i in 1:nrow(df_growth_stages_req_temp)) {
+    for (i in seq_len(nrow(df_growth_stages_req_temp))) {
       period_name <- as.character(df_growth_stages_req_temp[i, 1])
      # print(paste0("m period_name = ", as.character(period_name)))
      # print(df_criteria_ba3b_m[i, 'phen_stage'])
@@ -2174,7 +2210,7 @@ if (nrow(df_criteria_ba3b_m) > 0) {
         
         } 
       } else {
-        print(paste0("else m ", period_name, sum(df_criteria_ba3b_m[, 'phen_stage'] == period_name, na.rm = TRUE)))
+   #     print(paste0("else m ", period_name, sum(df_criteria_ba3b_m[, 'phen_stage'] == period_name, na.rm = TRUE)))
       }
     }
 }
@@ -2184,7 +2220,7 @@ df_criteria_ba3b_d <-
     dplyr::filter(df_criteria_ba3, grepl("^ba_3b", rulebase_stack) & temp_resolution == "d") # filter temperature criteria
 
 if (nrow(df_criteria_ba3b_d) > 0) {  
-  for (i in 1:nrow(df_growth_stages_req_temp)) {
+    for (i in seq_len(nrow(df_growth_stages_req_temp))) {
         period_name <- as.character(df_growth_stages_req_temp[i, 1])
 #      print(period_name)
       if (sum(df_criteria_ba3b_d[i, 'phen_stage'] == period_name, na.rm = TRUE) == 1) {
@@ -2223,7 +2259,7 @@ if (nrow(df_criteria_ba3b_d) > 0) {
         
         
       } else {
-        print(sum(df_criteria_ba3b_d[, 'phen_stage'] == period_name, na.rm = TRUE))
+  #      print(sum(df_criteria_ba3b_d[, 'phen_stage'] == period_name, na.rm = TRUE))
       }
     }
 }
@@ -2247,7 +2283,7 @@ We used the requirements to construct fuzzy partitions and the rulebases.")
 
 
 
-for (i in 1:(nrow(df_criteria_ba3b))) {
+for (i in seq_len(nrow(df_criteria_ba3b))) {
   if (!is.na(df_criteria_ba3b[i, 18])) {
     # for those criteria with three proposition values
     # get  the 3 proposition levels
@@ -2395,7 +2431,7 @@ for (i in 1:(nrow(df_criteria_ba3b))) {
     "Temperature growth\nstages optimality\nmembership"
   
   plot_fpm <- rasterize_plot_fpm(n, fpm_conc_var, fpm_conc_name, df_irm)
-  print(plot_fpm)
+   # print(plot_fpm)
   
   
 }
@@ -2446,7 +2482,7 @@ cat(paste(n_cba2c, "Soil physical properties criteria:\n\n"))
 
 # then determine and print the names of the rule bases in the soil physical properties theme
 cat(paste(n_cba2c, "Soil physical properties rule bases:\n\n"))
-for (i in 1:n_cba2c) {
+    for (i in seq_len(nrow(df_criteria_ba2c))) {
   cat(paste(df_criteria_ba2c[i, 3],"\n", df_criteria_ba2c[i, 4],"\n"))
   
   if (paste(df_criteria_ba2c[i, 4]) == "Soil texture") {
@@ -2516,7 +2552,7 @@ cat("The reclassified classes are averaged over the entire soil profile from 0 t
 <div class="fold o">   
 ```{r i1_requirements_soilp04, cache = TRUE, cache.whatever=params$Agg,  out.width="100%", fig.show="hold", warning=FALSE, eval=soil_p_crit}
 
-for (i in 1:n_cba2c) {
+    for (i in seq_len(nrow(df_criteria_ba2c))) {
   new_col <-
     get(paste0("rast_", df_criteria_ba2c[i, 11], "_rsmp")) %>% terra::extract(xy) # extract the raster values using xy points
           
@@ -2542,7 +2578,7 @@ We used the requirements to construct fuzzy partitions and the rulebases.")
 <div class="fold o">   
 ```{r i1_requirements_soilp06, cache = TRUE, cache.whatever=params$Agg,  out.width="100%", fig.show="hold", warning=FALSE, eval=soil_p_crit}
 
-for (i in 1:(nrow(df_criteria_ba2c))) {
+for (i in seq_len(nrow(df_criteria_ba2c))) {
   if (!is.na(df_criteria_ba2c[i, 18])) {
     # for those criteria with three proposition values
     # get  the 3 proposition levels
@@ -2691,7 +2727,7 @@ for (i in 1:(nrow(df_criteria_ba2c))) {
     "Soil physical properties optimality membership"
   
   plot_fpm <- rasterize_plot_fpm(n, fpm_conc_var, fpm_conc_name, df_irm)
-  print(plot_fpm)
+   # print(plot_fpm)
   
   
 }
@@ -2727,7 +2763,7 @@ cat(paste(n_cba2d, "Soil fertility rule bases:\n\n"))
 <div class="fold o">   
 ```{r i1_requirements_soilf03, cache = TRUE, cache.whatever=params$Agg,  out.width="100%", fig.show="hold", warning=FALSE, eval=soil_f_crit}
 
-for (i in 1:n_cba2d) {
+    for (i in seq_len(nrow(df_criteria_ba2d))) {
   new_col <-
     get(paste0("rast_", df_criteria_ba2d[i, 11], "_rsmp")) %>% terra::extract(xy) # extract the raster values using xy points
   
@@ -2752,7 +2788,7 @@ We used the requirements to construct fuzzy partitions and the rulebases.")
 <div class="fold o">   
 ```{r i1_requirements_soilf05, cache = TRUE, cache.whatever=params$Agg,  out.width="100%", fig.show="hold", warning=FALSE, eval=soil_f_crit}
 
-for (i in 1:(nrow(df_criteria_ba2d))) {
+for (i in seq_len(nrow(df_criteria_ba2d))) {
   if (!is.na(df_criteria_ba2d[i, 18])) {
     # for those criteria with three proposition values
     # get  the 3 proposition levels
@@ -2901,7 +2937,7 @@ for (i in 1:(nrow(df_criteria_ba2d))) {
     "Soil fertility optimality membership"
   
   plot_fpm <- rasterize_plot_fpm(n, fpm_conc_var, fpm_conc_name, df_irm)
-  print(plot_fpm)
+   # print(plot_fpm)
 
 }
 
@@ -2944,7 +2980,7 @@ cat(paste(n_cba2e, "Landscape criteria:\n\n"))
 # then determine and print the names of the rule bases in the landscape theme
 
 cat(paste(n_cba2e, "Landscape rule bases:\n\n"))
-for (i in 1:n_cba2e) {
+    for (i in seq_len(nrow(df_criteria_ba2e))) {
   cat(paste(df_criteria_ba2e[i, 3], "\n", df_criteria_ba2e[i, 4], "\n"))
 }
 
@@ -2953,7 +2989,7 @@ for (i in 1:n_cba2e) {
 <div class="fold o">   
 ```{r i1_requirements_lscape03, cache = TRUE, cache.whatever=params$Agg,  out.width="100%", fig.show="hold", warning=FALSE, eval=lscape_crit}
 
-for (i in 1:n_cba2e) {
+    for (i in seq_len(nrow(df_criteria_ba2e))) {
   new_col <-
     get(paste0("rast_", df_criteria_ba2e[i, 11], "_rsmp")) %>% terra::extract(xy) # extract the raster values using xy points
           
@@ -2980,7 +3016,7 @@ We used the requirements to construct fuzzy partitions and the rulebases.")
 <div class="fold o">   
 ```{r i1_requirements_lscape05, cache = TRUE, cache.whatever=params$Agg,  out.width="100%", fig.show="hold", warning=FALSE, eval=lscape_crit}
 
-for (i in 1:(nrow(df_criteria_ba2e))) {
+for (i in seq_len(nrow(df_criteria_ba2e))) {
   if (!is.na(df_criteria_ba2e[i, 18])) {
     # for those criteria with three proposition values
     # get  the 3 proposition levels
@@ -3129,7 +3165,7 @@ for (i in 1:(nrow(df_criteria_ba2e))) {
     "Landscape optimality membership"
   
   plot_fpm <- rasterize_plot_fpm(n, fpm_conc_var, fpm_conc_name, df_irm)
-  print(plot_fpm)
+   # print(plot_fpm)
 
 }
 
@@ -3160,10 +3196,10 @@ cat(paste(n_cba2a, "Agricultural Land criteria: \n\n"))
 data_rulebase <- !is.na(df_criteria_ba2a$data_file_prefix)
 df_criteria_ba2a <- df_criteria_ba2a[data_rulebase,]
 
-n_cse3b <- nrow(df_criteria_ba2a)
+n_cba2a <- nrow(df_criteria_ba2a)
 
 cat(paste(n_cba2a, "Agricultural Land rule bases:\n\n"))
-for (i in 1:n_cba2a) {
+    for (i in seq_len(nrow(df_criteria_ba2a))) {
   cat(paste(df_criteria_ba2a[i, 3],"\n", df_criteria_ba2a[i, 4],"\n"))
 }
 
@@ -3172,7 +3208,7 @@ for (i in 1:n_cba2a) {
 <div class="fold o">   
 ```{r i1_requirements_agland03, cache = TRUE, cache.whatever=params$Agg,  out.width="100%", fig.show="hold", warning=FALSE, eval=land_crit}
 
-for (i in 1:n_cba2a) {
+    for (i in seq_len(nrow(df_criteria_ba2a))) {
   new_col <-
     get(paste0("rast_", df_criteria_ba2a[i, 11], "_rsmp")) %>% terra::extract(xy) # extract the raster values using xy points
           
@@ -3197,7 +3233,7 @@ We used the requirements to construct fuzzy partitions and the rulebases.")
 <div class="fold o">   
 ```{r i1_requirements_agland05, cache = TRUE, cache.whatever=params$Agg,  out.width="100%", fig.show="hold", warning=FALSE, eval=land_crit}
 
-for (i in 1:(nrow(df_criteria_ba2a))) {
+    for (i in seq_len(nrow(df_criteria_ba2a))) {
   if (!is.na(df_criteria_ba2a[i, 18])) {
     # for those criteria with three proposition values
     # get  the 3 proposition levels
@@ -3348,7 +3384,7 @@ for (i in 1:(nrow(df_criteria_ba2a))) {
     "Agricultural\nLand\noptimality\nmembership"
   
   plot_fpm <- rasterize_plot_fpm(n, fpm_conc_var, fpm_conc_name, df_irm)
-  print(plot_fpm)
+   # print(plot_fpm)
   
   
 }
@@ -3383,7 +3419,7 @@ cat(paste(n_cse2b, "Market Access criteria: \n\n"))
 # then determine and print the names of the rule bases in the Market Access theme
 
 cat(paste(n_cse2b, "Market Access rule bases: \n\n"))
-for (i in 1:n_cse2b) {
+    for (i in seq_len(nrow(df_criteria_se2b))) {
   cat(paste(df_criteria_se2b[i, 3], "\n", df_criteria_se2b[i, 4], "\n"))
 }
 
@@ -3392,7 +3428,7 @@ for (i in 1:n_cse2b) {
 <div class="fold o">   
 ```{r i1_requirements_market_access03, cache = TRUE, cache.whatever=params$Agg,  out.width="100%", fig.show="hold", warning=FALSE, eval=mktaccess_crit}
 
-for (i in 1:n_cse2b) {
+    for (i in seq_len(nrow(df_criteria_se2b))) {
   new_col <-
     get(paste0("rast_", df_criteria_se2b[i, 11], "_rsmp")) %>% terra::extract(xy) # extract the raster values using xy points
         
@@ -3417,7 +3453,7 @@ We used the requirements to construct fuzzy partitions and the rulebases.")
 <div class="fold o">   
 ```{r i1_requirements_market_access05, cache = TRUE, cache.whatever=params$Agg,  out.width="100%", fig.show="hold", warning=FALSE, eval=mktaccess_crit}
 
-for (i in 1:(nrow(df_criteria_se2b))) {
+for (i in seq_len(nrow(df_criteria_se2b))) {
   if (!is.na(df_criteria_se2b[i, 18])) {
     # for those criteria with three proposition values
     # get  the 3 proposition levels
@@ -3566,7 +3602,7 @@ for (i in 1:(nrow(df_criteria_se2b))) {
     "Market Access\noptimality\nmembership"
   
   plot_fpm <- rasterize_plot_fpm(n, fpm_conc_var, fpm_conc_name, df_irm)
-  print(plot_fpm)
+   # print(plot_fpm)
   
   
 }
@@ -3600,7 +3636,7 @@ df_criteria_se3b <- df_criteria_se3b[data_rulebase,]
 n_cse3b <- nrow(df_criteria_se3b)
 
 cat(paste(n_cse3b, "Inputs Access data rule bases:\n\n"))
-for (i in 1:n_cse3b) {
+for (i in seq_len(nrow(df_criteria_se3b))) {
   cat(paste(df_criteria_se3b[i, 3], "\n", df_criteria_se3b[i, 4], "\n"))
 }
 
@@ -3609,7 +3645,7 @@ for (i in 1:n_cse3b) {
 <div class="fold o">   
 ```{r i1_requirements_inputs_access03, cache = TRUE, cache.whatever=params$Agg,  out.width="100%", fig.show="hold", warning=FALSE, eval=inpaccess_crit}
 
-for (i in 1:n_cse3b) {
+for (i in seq_len(nrow(df_criteria_se3b))) {
   new_col <-
     get(paste0("rast_", df_criteria_se3b[i, 11], "_rsmp")) %>% terra::extract(xy) # extract the raster values using xy points
         
@@ -3634,7 +3670,7 @@ We used the requirements to construct fuzzy partitions and the data rule bases."
 <div class="fold o">   
 ```{r i1_requirements_inputs_access05, cache = TRUE, cache.whatever=params$Agg,  out.width="100%", fig.show="hold", warning=FALSE, eval=inpaccess_crit}
 
-for (i in 1:(nrow(df_criteria_se3b))) {
+    for (i in seq_len(nrow(df_criteria_se3b))) {
   if (!is.na(df_criteria_se3b[i, 18])) {
     # for those criteria with three proposition values
     # get  the 3 proposition levels
@@ -3783,7 +3819,7 @@ for (i in 1:(nrow(df_criteria_se3b))) {
     "Inputs Access\noptimality\nmembership"
   
   plot_fpm <- rasterize_plot_fpm(n, fpm_conc_var, fpm_conc_name, df_irm)
-  print(plot_fpm)
+   # print(plot_fpm)
   
   
 }
@@ -3818,7 +3854,7 @@ df_criteria_se4a <- df_criteria_se4a[data_rulebase,]
 n_cse4a <- nrow(df_criteria_se4a)
 
 cat(paste(n_cse4a, "Extension Access data rule bases:\n\n"))
-for (i in 1:n_cse4a) {
+for (i in seq_len(nrow(df_criteria_se4a))) {
   cat(paste(df_criteria_se4a[i, 3], "\n", df_criteria_se4a[i, 4],"\n"))
 }
 
@@ -3827,7 +3863,7 @@ for (i in 1:n_cse4a) {
 <div class="fold o">   
 ```{r i1_requirements_extension_access03, cache = TRUE, cache.whatever=params$Agg,  out.width="100%", fig.show="hold", warning=FALSE, eval=extaccess_crit}
 
-for (i in 1:n_cse4a) {
+for (i in seq_len(nrow(df_criteria_se4a))) {
   new_col <-
     get(paste0("rast_", df_criteria_se4a[i, 11], "_rsmp")) %>% terra::extract(xy) # extract the raster values using xy points
   
@@ -3852,7 +3888,7 @@ We used the requirements to construct fuzzy partitions and the data rule bases."
 <div class="fold o">   
 ```{r i1_requirements_extension_access05, cache = TRUE, cache.whatever=params$Agg,  out.width="100%", fig.show="hold", warning=FALSE, eval=extaccess_crit}
 
-for (i in 1:(nrow(df_criteria_se4a))) {
+for (i in seq_len(nrow(df_criteria_se4a))) {
   if (!is.na(df_criteria_se4a[i, 18])) {
     # for those criteria with three proposition values
     # get  the 3 proposition levels
@@ -4001,7 +4037,7 @@ for (i in 1:(nrow(df_criteria_se4a))) {
     "Extension\nAccess\noptimality\nmembership"
   
   plot_fpm <- rasterize_plot_fpm(n, fpm_conc_var, fpm_conc_name, df_irm)
-  print(plot_fpm)
+   # print(plot_fpm)
   
   
 }
@@ -4036,7 +4072,7 @@ df_criteria_se4b <- df_criteria_se4b[data_rulebase,]
 n_cse4b <- nrow(df_criteria_se4b)
 
 cat(paste(n_cse4b, "Labour data rule bases:\n\n"))
-for (i in 1:n_cse4b) {
+for (i in seq_len(nrow(df_criteria_se4b))) {
   cat(paste(df_criteria_se4b[i, 3], "\n", df_criteria_se4b[i, 4],"\n"))
 }
 
@@ -4045,7 +4081,7 @@ for (i in 1:n_cse4b) {
 <div class="fold o">   
 ```{r i1_requirements_labour_access03, cache = TRUE, cache.whatever=params$Agg,  out.width="100%", fig.show="hold", warning=FALSE, eval=lab_crit}
 
-for (i in 1:n_cse4b) {
+for (i in seq_len(nrow(df_criteria_se4b))) {
   new_col <-
     get(paste0("rast_", df_criteria_se4b[i, 11], "_rsmp")) %>% terra::extract(xy) # extract the raster values using xy points
   
@@ -4073,7 +4109,7 @@ We used the requirements to construct fuzzy partitions and the data rule bases."
 <div class="fold o">   
 ```{r i1_requirements_labour_access05, cache = TRUE, cache.whatever=params$Agg,  out.width="100%", fig.show="hold", warning=FALSE, eval=lab_crit}
 
-for (i in 1:(nrow(df_criteria_se4b))) {
+for (i in seq_len(nrow(df_criteria_se4b))) {
   if (!is.na(df_criteria_se4b[i, 18])) {
     # for those criteria with three proposition values
     # get  the 3 proposition levels
@@ -4222,7 +4258,7 @@ for (i in 1:(nrow(df_criteria_se4b))) {
     "Labour\noptimality\nmembership"
   
   plot_fpm <- rasterize_plot_fpm(n, fpm_conc_var, fpm_conc_name, df_irm)
-  print(plot_fpm)
+   # print(plot_fpm)
   
   
 }
@@ -4257,7 +4293,7 @@ df_criteria_se4c <- df_criteria_se4c[data_rulebase,]
 n_cse4c <- nrow(df_criteria_se4c)
 
 cat(paste(n_cse4c, "Fertilisers and Pesticides data rule bases:\n\n"))
-for (i in 1:n_cse4c) {
+for (i in seq_len(nrow(df_criteria_se4c))) {
   cat(paste(df_criteria_se4c[i, 3], "\n", df_criteria_se4c[i, 4],"\n"))
 }
 
@@ -4266,7 +4302,7 @@ for (i in 1:n_cse4c) {
 <div class="fold o">   
 ```{r i1_requirements_fp_access03, cache = TRUE, cache.whatever=params$Agg,  out.width="100%", fig.show="hold", warning=FALSE, eval=fp_crit}
 
-for (i in 1:n_cse4c) {
+for (i in seq_len(nrow(df_criteria_se4c))) {
   new_col <-
     get(paste0("rast_", df_criteria_se4c[i, 11], "_rsmp")) %>% terra::extract(xy) # extract the raster values using xy points
   
@@ -4294,7 +4330,7 @@ We used the requirements to construct fuzzy partitions and the data rule bases."
 <div class="fold o">   
 ```{r i1_requirements_fp_access05, cache = TRUE, cache.whatever=params$Agg,  out.width="100%", fig.show="hold", warning=FALSE, eval=fp_crit}
 
-for (i in 1:(nrow(df_criteria_se4c))) {
+for (i in seq_len(nrow(df_criteria_se4c))) {
   if (!is.na(df_criteria_se4c[i, 18])) {
     # for those criteria with three proposition values
     # get  the 3 proposition levels
@@ -4443,7 +4479,7 @@ for (i in 1:(nrow(df_criteria_se4c))) {
     "Fertilisers\nand Pesticides\noptimality\nmembership"
   
   plot_fpm <- rasterize_plot_fpm(n, fpm_conc_var, fpm_conc_name, df_irm)
-  print(plot_fpm)
+   # print(plot_fpm)
   
   
 }
@@ -4529,7 +4565,7 @@ rm(df_prop) # remove previous instances of df_prop
 rm(df_conc) # remove previous instances of df_prop
 rm(prop)
 rm(conc)
-for (i in 1:(nrow(df_criteria_ba3a))) {
+for (i in seq_len(nrow(df_criteria_ba3a))) {
   if (!is.na(df_criteria_ba3a[i, 18])) {
     # set the proposition name
     Prop_name <-
@@ -4753,7 +4789,7 @@ fpm_plot_title <-
   "Precipitation optimality membership"
 
 plot_fpm <- rasterize_plot_fpm(n, fpm_conc_var, fpm_conc_name, df_irm)
-print(plot_fpm)
+ # print(plot_fpm)
 
 ```
 </div>
@@ -4781,7 +4817,7 @@ rm(df_prop) # remove previous instances of df_prop
 rm(df_conc) # remove previous instances of df_prop
 rm(prop)
 rm(conc)
-for (i in 1:(nrow(df_criteria_ba3b))) {
+for (i in seq_len(nrow(df_criteria_ba3b))) {
   if (!is.na(df_criteria_ba3b[i, 18])) {
     # set the proposition name
     Prop_name <-
@@ -4903,7 +4939,7 @@ fpm_plot_title <-
   "Temperature\noptimality\nmembership"
 
 plot_fpm <- rasterize_plot_fpm(n, fpm_conc_var, fpm_conc_name, df_irm)
-print(plot_fpm)
+ # print(plot_fpm)
 
 
 ```
@@ -4941,7 +4977,7 @@ rm(df_conc) # remove previous instances of df_prop
 rm(prop)
 rm(conc)
 
-for (i in 1:n_cba2b) {
+for (i in seq_len(nrow(df_criteria_ba2b))) {
   assign(paste0("rbs_", df_criteria_ba2b[1, 2], "_list"),
          append(get(
            paste0("rbs_", df_criteria_ba2b[1, 2], "_list")
@@ -5059,7 +5095,7 @@ fpm_plot_title <-
   "Climatic Aptitude membership"
 
 plot_fpm <- rasterize_plot_fpm(n, fpm_conc_var, fpm_conc_name, df_irm)
-print(plot_fpm)
+ # print(plot_fpm)
 
 
 ```
@@ -5090,7 +5126,7 @@ rm(df_prop) # remove previous instances of df_prop
 rm(df_conc) # remove previous instances of df_prop
 rm(prop)
 rm(conc)
-for (i in 1:(nrow(df_criteria_ba2c))) {
+for (i in seq_len(nrow(df_criteria_ba2c))) {
   if (!is.na(df_criteria_ba2c[i, 18])) {
     # set the proposition name
     Prop_name <-
@@ -5244,7 +5280,7 @@ fpm_plot_title <-
   "Soil Physical Properties optimality membership"
 
 plot_fpm <- rasterize_plot_fpm(n, fpm_conc_var, fpm_conc_name, df_irm)
-print(plot_fpm)
+ # print(plot_fpm)
 
 
 ```
@@ -5274,7 +5310,7 @@ rm(df_prop) # remove previous instances of df_prop
 rm(df_conc) # remove previous instances of df_prop
 rm(prop)
 rm(conc)
-for (i in 1:(nrow(df_criteria_ba2d))) {
+for (i in seq_len(nrow(df_criteria_ba2d))) {
   if (!is.na(df_criteria_ba2d[i, 18])) {
     # set the proposition name
     Prop_name <-
@@ -5428,7 +5464,7 @@ fpm_plot_title <-
   "Soil Fertility optimality membership"
 
 plot_fpm <- rasterize_plot_fpm(n, fpm_conc_var, fpm_conc_name, df_irm)
-print(plot_fpm)
+ # print(plot_fpm)
 
 
 ```
@@ -5458,7 +5494,7 @@ rm(df_prop) # remove previous instances of df_prop
 rm(df_conc) # remove previous instances of df_prop
 rm(prop)
 rm(conc)
-for (i in 1:(nrow(df_criteria_ba2e))) {
+for (i in seq_len(nrow(df_criteria_ba2e))) {
   if (!is.na(df_criteria_ba2e[i, 18])) {
     # set the proposition name
     Prop_name <-
@@ -5612,7 +5648,7 @@ fpm_plot_title <-
   "Landscape optimality membership"
 
 plot_fpm <- rasterize_plot_fpm(n, fpm_conc_var, fpm_conc_name, df_irm)
-print(plot_fpm)
+ # print(plot_fpm)
 
 
 ```
@@ -5650,7 +5686,7 @@ cat("### Combined Biophysical Aptitude - two class rule bases
   rm(prop)
   rm(conc)
   
-  for (i in 1:n_cba1) {
+for (i in seq_len(nrow(df_criteria_ba1))) {
     assign(paste0("rbs_", df_criteria_ba1[1, 2], "_list"),
            append(get(
              paste0("rbs_", df_criteria_ba1[1, 2], "_list")
@@ -5771,7 +5807,7 @@ assign(paste0("rb_", df_criteria_ba1[1, 2]), RuleBase(prop, conc)) %>% print()
       "Biophysical Aptitude membership"
     
     plot_fpm <- rasterize_plot_fpm(n, fpm_conc_var, fpm_conc_name, df_irm)
-    print(plot_fpm)
+     # print(plot_fpm)
      
 
 ```
@@ -5821,7 +5857,7 @@ cat("
 
 ```{r i1_rulebases_extension_access03, cache = TRUE, cache.whatever=params$Agg, cache.whatever=params$Agg, results='asis', eval=extaccess_crit}
 
-for (i in 1:(nrow(df_criteria_se4a))) {
+for (i in seq_len(nrow(df_criteria_se4a))) {
   print(paste0(
     df_criteria_se4a[i, 3],
     " (",
@@ -5925,7 +5961,7 @@ rm(df_prop) # remove previous instances of df_prop
 
 rm(prop)
 rm(conc)
-for (i in 1:(nrow(df_criteria_se4a))) {
+for (i in seq_len(nrow(df_criteria_se4a))) {
   # set the proposition name
   Prop_name <-
     paste0(as.character(df_criteria_se4a[i, 3]), "_o")
@@ -6053,7 +6089,7 @@ fpm_plot_title <-
   "Extension\nAccess\noptimality\nmembership"
 
 plot_fpm <- rasterize_plot_fpm(n, fpm_conc_var, fpm_conc_name, df_irm)
-print(plot_fpm)
+ # print(plot_fpm)
 
 ``` 
 </div>
@@ -6075,7 +6111,7 @@ cat("[1] '(1) se_5c is good' or '(1) se_5c is poor'
 
 ```{r i1_rulebases_labour_access03, cache = TRUE, cache.whatever=params$Agg, cache.whatever=params$Agg, results='asis', eval=lab_crit}
 
-for (i in 1:(nrow(df_criteria_se4b))) {
+for (i in seq_len(nrow(df_criteria_se4b))) {
   print(paste0(
     df_criteria_se4b[i, 3],
     " (",
@@ -6180,7 +6216,7 @@ rm(df_prop) # remove previous instances of df_prop
 
 rm(prop)
 rm(conc)
-for (i in 1:(nrow(df_criteria_se4b))) {
+for (i in seq_len(nrow(df_criteria_se4b))) {
   # set the proposition name
   Prop_name <-
     paste0(as.character(df_criteria_se4b[i, 3]), "_o")
@@ -6308,7 +6344,7 @@ fpm_plot_title <-
   "Labour\nAvailability\noptimality\nmembership"
 
 plot_fpm <- rasterize_plot_fpm(n, fpm_conc_var, fpm_conc_name, df_irm)
-print(plot_fpm)
+ # print(plot_fpm)
 
 
 ``` 
@@ -6331,7 +6367,7 @@ cat("[1] '(1) se_5e is good' or '(1) se_5e is poor'
 
 ```{r i1_rulebases_fp_access03, cache = TRUE, cache.whatever=params$Agg, cache.whatever=params$Agg, results='asis', eval=fp_crit}
 
-for (i in 1:(nrow(df_criteria_se4c))) {
+for (i in seq_len(nrow(df_criteria_se4c))) {
   print(paste0(
     df_criteria_se4c[i, 3],
     " (",
@@ -6386,11 +6422,11 @@ df_conc <- tibble(se_4c = fp_conclusion1)
 
 #Rule 2: then fp access is poor, moderate or good
 if (rule2 >= 0.33)  {
-  fp_conclusion2 = "good"
+  fp_conclusion2 = "poor"
 }     else if (rule2 > -0.33) {
   fp_conclusion2 = "moderate"
 } else {
-  fp_conclusion2 = "poor"
+  fp_conclusion2 = "good"
 }
 cat(paste("rule 2 = ", fp_conclusion2))
 cat("\n")
@@ -6398,11 +6434,11 @@ df_conc <- add_row(df_conc, se_4c = fp_conclusion2)
 
 #Rule 3: then fp access is poor, moderate or good
 if (rule3 >= 0.33)  {
-  fp_conclusion3 = "good"
+  fp_conclusion3 = "poor"
 }     else if (rule3 > -0.33) {
   fp_conclusion3 = "moderate"
 } else {
-  fp_conclusion3 = "poor"
+  fp_conclusion3 = "good"
 }
 cat(paste("rule 3 = ", fp_conclusion3))
 cat("\n")
@@ -6438,7 +6474,7 @@ if (fp_crit == 1) {
   
   rm(prop)
   rm(conc)
-  for (i in 1:(nrow(df_criteria_se4c))) {
+  for (i in seq_len(nrow(df_criteria_se4c))) {
     # set the proposition name
     Prop_name <-
       paste0(as.character(df_criteria_se4c[i, 3]), "_o")
@@ -6566,7 +6602,7 @@ if (fp_crit == 1) {
     "Fertiliser\n& Pesticide\nAccess\noptimality\nmembership"
   
   plot_fpm <- rasterize_plot_fpm(n, fpm_conc_var, fpm_conc_name, df_irm)
-  print(plot_fpm)
+   # print(plot_fpm)
   
 }
 
@@ -6606,7 +6642,7 @@ df_criteria_se3b <-
 n_cse3b <- nrow(df_criteria_se3b)
 print(paste(n_cse3b, "Inputs Access criteria: "))
 
-for (i in 1:(nrow(df_criteria_se3b))) {
+for (i in seq_len(nrow(df_criteria_se3b))) {
   print(paste0(
     df_criteria_se3b[i, 3],
     " (",
@@ -7076,7 +7112,7 @@ if  (inp_rb == "gmp" ){
       "Farm Inputs\nAccess\noptimality\nmembership"
      
     plot_fpm <- rasterize_plot_fpm(n, fpm_conc_var, fpm_conc_name, df_irm)
-    print(plot_fpm)
+     # print(plot_fpm)
      
   
   
@@ -7104,7 +7140,7 @@ n_cse3a <- nrow(df_criteria_se3a)
 # then determine and print the names of the rule bases in the Crop and Farm Management theme
 
 cat(paste(n_cse3a, "Crop and Farm Management rule bases:"))
-for (i in 1:n_cse3a) {
+for (i in seq_len(nrow(df_criteria_se3a))) {
   cat(
     paste0(
       "\n",
@@ -7562,7 +7598,7 @@ fpm_plot_title <-
   "Management\noptimality\nmembership"
 
 plot_fpm <- rasterize_plot_fpm(n, fpm_conc_var, fpm_conc_name, df_irm)
-print(plot_fpm)
+ # print(plot_fpm)
      
 ``` 
 </div>
@@ -7591,7 +7627,7 @@ n_cse2a <- nrow(df_criteria_se2a)
 # then determine and print the names of the rule bases in the Farm Production Feasibility theme
 
 cat(paste("\n\n", n_cse2a, "Farm Production Feasibility rule bases:"))
-for (i in 1:n_cse2a) {
+for (i in seq_len(nrow(df_criteria_se2a))) {
   cat(
     paste0(
       "\n",
@@ -8049,7 +8085,7 @@ if (mgt_rb == "gmp") {
         mutate(df_irm,!!as.character(paste0(df_criteria_se1_2a[1, 3], "_m")) := m_col, .keep = c("all"))
       
       fpf_rb <- "hml"
-    }
+    } else {fpf_rb <- "hl"}
     
   } else {
     # there is a no moderate conclusion to labour giving  six rules and conclusions
@@ -8066,7 +8102,7 @@ if (mgt_rb == "gmp") {
         mutate(df_irm,!!as.character(paste0(df_criteria_se1_2a[1, 3], "_m")) := m_col, .keep = c("all"))
       
       fpf_rb <- "hml"
-    }
+    } else {fpf_rb <- "hl"}
   }
 } else {
   # there is a no moderate conclusion to extension giving  six rules and conclusions
@@ -8086,7 +8122,7 @@ if (mgt_rb == "gmp") {
         mutate(df_irm,!!as.character(paste0(df_criteria_se1_2a[1, 3], "_m")) := m_col, .keep = c("all"))
       
       fpf_rb <- "hml"
-    }
+    } else {fpf_rb <- "hl"}
   } else {
     #there is no moderate conclusion to extension or labour giving four rules and conclusions
     
@@ -8100,7 +8136,7 @@ if (mgt_rb == "gmp") {
         mutate(df_irm,!!as.character(paste0(df_criteria_se1_2a[1, 3], "_m")) := m_col, .keep = c("all"))
       
       fpf_rb <- "hml"
-    }
+    } else {fpf_rb <- "hl"}
   }
 }
 
@@ -8134,7 +8170,7 @@ fpm_plot_title <-
   "Farm Production\nFeasibility\noptimality\nmembership"
 
 plot_fpm <- rasterize_plot_fpm(n, fpm_conc_var, fpm_conc_name, df_irm)
-print(plot_fpm)
+ # print(plot_fpm)
   
 ``` 
 </div>
@@ -8156,7 +8192,7 @@ Rule base se_2b has the following propositions:
 
 ```{r i1_rulebases_market_access02, cache = TRUE, cache.whatever=params$Agg, results='asis', eval=mktaccess_crit}
 
-for (i in 1:(nrow(df_criteria_se2b))) {
+for (i in seq_len(nrow(df_criteria_se2b))) {
   print(paste0(
     df_criteria_se2b[i, 3],
     " (",
@@ -8339,7 +8375,7 @@ rm(df_prop) # remove previous instances of df_prop
 
 rm(prop)
 rm(conc)
-for (i in 1:(nrow(df_criteria_se2b))) {
+for (i in seq_len(nrow(df_criteria_se2b))) {
   # set the proposition name
   Prop_name <-
     paste0(as.character(df_criteria_se2b[i, 3]), "_o")
@@ -8472,7 +8508,7 @@ fpm_plot_title <-
   "Market\nAccess\noptimality\nmembership"
 
 plot_fpm <- rasterize_plot_fpm(n, fpm_conc_var, fpm_conc_name, df_irm)
-print(plot_fpm)
+ # print(plot_fpm)
 
 ``` 
 </div>
@@ -8502,7 +8538,7 @@ n_cse1 <- nrow(df_criteria_se1)
 # then determine and print the names of the rule bases in the Socio-Economic Feasibility theme
 
 cat(paste("\n\n", n_cse1, "Socio-Economic Feasibility rule bases:"))
-for (i in 1:n_cse1) {
+for (i in seq_len(nrow(df_criteria_se1))) {
   cat(
     paste0(
       "\n",
@@ -8946,7 +8982,7 @@ if (fpf_rb == "hml") {
         mutate(df_irm,!!as.character(paste0(df_criteria_se1[1, 3], "_m")) := m_col, .keep = c("all"))
       
       sef_rb <- "hml"
-    }
+    } else {sef_rb <- "hl"}
     
   } else {
     # there is a no moderate conclusion to market access giving  six rules and conclusions
@@ -8963,7 +8999,7 @@ if (fpf_rb == "hml") {
         mutate(df_irm,!!as.character(paste0(df_criteria_se1[1, 3], "_m")) := m_col, .keep = c("all"))
       
       sef_rb <- "hml"
-    }
+    } else {sef_rb <- "hl"}
   }
 } else {
   # there is a no moderate conclusion to fp feasibility giving  six rules and conclusions
@@ -8983,7 +9019,7 @@ if (fpf_rb == "hml") {
         mutate(df_irm,!!as.character(paste0(df_criteria_se1[1, 3], "_m")) := m_col, .keep = c("all"))
       
       sef_rb <- "hml"
-    }
+    } else {sef_rb <- "hl"}
   }  else {
     #there is no moderate conclusion to fp feasibility or market access giving four rules and conclusions
     
@@ -8997,7 +9033,7 @@ if (fpf_rb == "hml") {
         mutate(df_irm,!!as.character(paste0(df_criteria_se1[1, 3], "_m")) := m_col, .keep = c("all"))
       
       sef_rb <- "hml"
-    }
+    } else {sef_rb <- "hl"}
   }
 }
 
@@ -9031,7 +9067,7 @@ fpm_plot_title <-
   "Socio-Economic\nFeasibility\noptimality\nmembership"
 
 plot_fpm <- rasterize_plot_fpm(n, fpm_conc_var, fpm_conc_name, df_irm)
-print(plot_fpm)
+ # print(plot_fpm)
 
 ``` 
 </div>
@@ -9126,7 +9162,7 @@ n_c0 <- nrow(df_criteria_0)
 # then determine and print the names of the rule bases in the Likelihood of Adoption theme
 
 cat(paste("\n\n", n_c0, "Likelihood of Adoption rule bases:"))
-for (i in 1:n_c0) {
+for (i in seq_len(nrow(df_criteria_0))) {
   cat(paste0(
     "\n",
     df_criteria_0[i, 3],
@@ -9492,7 +9528,7 @@ if (sef_rb == "hml") {
     }
     
     adop_rb <- "hml"
-  }
+  } 
   
 } else {
   # there is a no moderate conclusion to se feasibility access giving four rules and conclusions
@@ -9500,7 +9536,7 @@ if (sef_rb == "hml") {
   adop_rule_num <- 4
   
   if (adop_conclusion2 == "moderate" |
-      adop_conclusion3 == "moderate") {
+      adop_conclusion5 == "moderate") {
     m_col <- getMembership(fpm_adop_0$moderate)
     
     # add column only if column doesn't already exist in df_irm
@@ -9513,7 +9549,7 @@ if (sef_rb == "hml") {
     }
     
     adop_rb <- "hml"
-  }
+  } 
 }
 
 l_col <- getMembership(fpm_adop_0$low)
@@ -9527,7 +9563,7 @@ if ("adop_0_l" %in% colnames(df_irm)) {
   df_irm <- mutate(df_irm, adop_0_l := l_col, .keep = c("all"))
 }
 
-adop_rb <- "hml"
+#adop_rb <- "hml"
 
 
 if (adop_rb == "hml") {
@@ -9562,7 +9598,7 @@ fpm_plot_title <-
   "Adoption\nLikelihood\n3-class\nmembership"
 
 plot_fpm <- rasterize_plot_fpm(n, fpm_conc_var, fpm_conc_name, df_irm)
-print(plot_fpm)
+ # print(plot_fpm)
 
 ``` 
 </div>
@@ -9605,27 +9641,27 @@ The first map is _without_, the second map  _with_ triangulation points. These p
 
 vect_adop_tri <- vect_triangulation %>%
     mutate(
-        adopclass = ifelse(grepl(pattern = "high", x = Adoption, ignore.case = TRUE), "high", ifelse(grepl(pattern = "moderate", x = Adoption, ignore.case = TRUE), "moderate", "low")),
+        adopclass = ifelse(grepl(pattern = "high", x = eval(parse(text = params$TRIAD1)), ignore.case = TRUE), "high", ifelse(grepl(pattern = "moderate", x = eval(parse(text = params$TRIAD1)), ignore.case = TRUE), "moderate", "low")),
         type = NA
     ) %>%
-    dplyr::filter(!is.na(Adoption))
+    dplyr::filter(!is.na(params$TRIAD1))
 
 
-vect_adop_tri$type[grepl(pattern = " AE", x = vect_adop_tri$Adoption, ignore.case = TRUE)] <- "b"
-vect_adop_tri$type[grepl(pattern = " EA", x = vect_adop_tri$Adoption, ignore.case = TRUE)] <- "b"
-vect_adop_tri$type[grepl(pattern = "bio", x = vect_adop_tri$Adoption, ignore.case = TRUE)] <- "b"
-vect_adop_tri$type[grepl(pattern = "SE", x = vect_adop_tri$Adoption, ignore.case = TRUE)] <- "s"
-vect_adop_tri$type[grepl(pattern = "soil", x = vect_adop_tri$Adoption, ignore.case = TRUE)] <- "b"
-vect_adop_tri$type[grepl(pattern = "lowland", x = vect_adop_tri$Adoption, ignore.case = TRUE)] <- "b"
-vect_adop_tri$type[grepl(pattern = " temp", x = vect_adop_tri$Adoption, ignore.case = TRUE)] <- "b"
-vect_adop_tri$type[grepl(pattern = " elevation", x = vect_adop_tri$Adoption, ignore.case = TRUE)] <- "b"
-vect_adop_tri$type[grepl(pattern = "market", x = vect_adop_tri$Adoption, ignore.case = TRUE)] <- "s"
-vect_adop_tri$type[grepl(pattern = "rain", x = vect_adop_tri$Adoption, ignore.case = TRUE)] <- "b"
-vect_adop_tri$type[grepl(pattern = "SPAM presence", x = vect_adop_tri$Adoption, ignore.case = TRUE)] <- "b"
+vect_adop_tri$type[grepl(pattern = " AE", x = paste0("vect_adop_tri$",params$TRIAD1), ignore.case = TRUE)] <- "b"
+vect_adop_tri$type[grepl(pattern = " EA", x = paste0("vect_adop_tri$",params$TRIAD1), ignore.case = TRUE)] <- "b"
+vect_adop_tri$type[grepl(pattern = "bio", x = paste0("vect_adop_tri$",params$TRIAD1), ignore.case = TRUE)] <- "b"
+vect_adop_tri$type[grepl(pattern = "SE", x = paste0("vect_adop_tri$",params$TRIAD1), ignore.case = TRUE)] <- "s"
+vect_adop_tri$type[grepl(pattern = "soil", x = paste0("vect_adop_tri$",params$TRIAD1), ignore.case = TRUE)] <- "b"
+vect_adop_tri$type[grepl(pattern = "lowland", x = paste0("vect_adop_tri$",params$TRIAD1), ignore.case = TRUE)] <- "b"
+vect_adop_tri$type[grepl(pattern = " temp", x = paste0("vect_adop_tri$",params$TRIAD1), ignore.case = TRUE)] <- "b"
+vect_adop_tri$type[grepl(pattern = " elevation", x = paste0("vect_adop_tri$",params$TRIAD1), ignore.case = TRUE)] <- "b"
+vect_adop_tri$type[grepl(pattern = "market", x = paste0("vect_adop_tri$",params$TRIAD1), ignore.case = TRUE)] <- "s"
+vect_adop_tri$type[grepl(pattern = "rain", x = paste0("vect_adop_tri$",params$TRIAD1), ignore.case = TRUE)] <- "b"
+vect_adop_tri$type[grepl(pattern = "SPAM presence", x = paste0("vect_adop_tri$",params$TRIAD1), ignore.case = TRUE)] <- "b"
 
 
 vect_adop_tri %>%
-    dplyr::select(Adoption, adopclass, type) %>%
+    dplyr::select(params$TRIAD1, adopclass, type) %>%
     (knitr::kable) %>% kable_styling("striped", full_width = F) %>% scroll_box(height = "300px")
 ``` 
 </div>
@@ -9724,18 +9760,17 @@ g2
 
 if (params$RES1 != 2) {
   
-g2 + 
+  g2 +
     geom_spatvector(
-        data = vect_adop_tri, 
-        mapping = aes(colour = ifelse(adopclass == "high" , "green", "red")), 
-        size = 2
+      data = vect_adop_tri,
+      mapping = aes(colour = ifelse(adopclass == "high" , "green", "red")),
+      size = 1,
+      shape = 21
     ) +
-    geom_spatvector_text(
-        data = vect_adop_tri, 
-        mapping = aes(label = ifelse(type == "b", "b", "b/s"))
-    ) + 
-  scale_colour_identity() 
-
+    #geom_spatvector_text(data = vect_adop_tri,
+    #                     mapping = aes(label = ifelse(type == "b", "b", "b/s"))) +
+    scale_colour_identity()
+  
 } # end RES if statement 08/12/2019
 
 ``` 
@@ -9870,7 +9905,7 @@ if (params$RES1 != 2) {
   # then determine and print the names of the rule bases in the Likelihood of Adoption theme
   
   cat(paste("\n\n", n_c0, "Likelihood of Adoption rule bases:"))
-  for (i in 1:n_c0) {
+for (i in seq_len(nrow(df_criteria_0))) {
     cat(paste0(
       "\n",
       df_criteria_0[i, 3],
@@ -9892,7 +9927,6 @@ if (params$RES1 != 2) {
   
   vect_adop_fao <-
     mutate(df_adop_fao, adop_0_o := eval(expr_adop_fao), .keep = c("all"))  %>% vect(geom = c("x", "y"))
-  
   
   rast_adop_fao <- rasterize(vect_adop_fao, rast_mask_proj, field = "adop_0_o")
   names(rast_adop_fao) <- c('FAO')
@@ -9948,14 +9982,15 @@ if (params$RES1 != 2) {
 
 if (params$RES1 != 2) {
   
-g2 + 
+  g2 +
     geom_spatvector(
-        data = vect_adop_tri, 
-        mapping = aes(colour = ifelse(adopclass == "high" , "green", "red")), 
-        size = 2
+      data = vect_adop_tri,
+      mapping = aes(colour = ifelse(adopclass == "high" , "green", "red")),
+      size = 1,
+      shape = 21
     ) +
-  scale_colour_identity() 
-
+    scale_colour_identity()
+  
 } # end RES if statement 08/12/2019
 
 ``` 
@@ -10219,14 +10254,15 @@ if (params$RES1 != 2) {
 
 if (params$RES1 != 2) {
   
-g2 + 
+  g2 +
     geom_spatvector(
-        data = vect_adop_tri, 
-        mapping = aes(colour = ifelse(adopclass == "high" , "green", "red")), 
-        size = 2
+      data = vect_adop_tri,
+      mapping = aes(colour = ifelse(adopclass == "high" , "green", "red")),
+      size = 1,
+      shape = 21
     ) +
-  scale_colour_identity() 
-
+    scale_colour_identity()
+  
 } # end RES if statement 08/12/2019
 
 ``` 
@@ -10365,29 +10401,25 @@ The first map is _without_, the second map  _with_ triangulation points. These p
 
 vect_ba_tri <- vect_triangulation %>%
     mutate(
-        baclass = ifelse(grepl(pattern = "suboptimal", x = eval(parse(text = params$TRI1)), ignore.case = TRUE), "suboptimal", ifelse(grepl(pattern = "optimal", x = eval(parse(text = params$TRI1)), ignore.case = TRUE), "optimal", "other"))#,
+        baclass = ifelse(grepl(pattern = "suboptimal", x = eval(parse(text = params$TRIBA1)), ignore.case = TRUE), "suboptimal", ifelse(grepl(pattern = "optimal", x = eval(parse(text = params$TRIBA1)), ignore.case = TRUE), "optimal", "other"))#,
         #type = NA  #a Farrow commented out 26/09/2023
     ) %>%
-    dplyr::filter(!is.na(params$TRI1))
+    dplyr::filter(!is.na(params$TRIBA1))
 
-
-mutate(df_onset, !!as.character(paste0(period_name,"_l")) :=  eval(parse(text = paste0("df_growth_stages_lengths3$", period_name))), .keep = c("all"))
-
-
-vect_ba_tri$type[grepl(pattern = " AE", x = paste0("vect_ba_tri$",params$TRI1), ignore.case = TRUE)] <- "b"
-vect_ba_tri$type[grepl(pattern = " EA", x = paste0("vect_ba_tri$",params$TRI1), ignore.case = TRUE)] <- "b"
-vect_ba_tri$type[grepl(pattern = "bio", x = paste0("vect_ba_tri$",params$TRI1), ignore.case = TRUE)] <- "b"
-vect_ba_tri$type[grepl(pattern = "SE", x = paste0("vect_ba_tri$",params$TRI1), ignore.case = TRUE)] <- "s"
-vect_ba_tri$type[grepl(pattern = "soil", x = paste0("vect_ba_tri$",params$TRI1), ignore.case = TRUE)] <- "b"
-vect_ba_tri$type[grepl(pattern = "lowland", x = paste0("vect_ba_tri$",params$TRI1), ignore.case = TRUE)] <- "b"
-vect_ba_tri$type[grepl(pattern = " temp", x = paste0("vect_ba_tri$",params$TRI1), ignore.case = TRUE)] <- "b"
-vect_ba_tri$type[grepl(pattern = " elevation", x = paste0("vect_ba_tri$",params$TRI1), ignore.case = TRUE)] <- "b"
-vect_ba_tri$type[grepl(pattern = "market", x = paste0("vect_ba_tri$",params$TRI1), ignore.case = TRUE)] <- "s"
-vect_ba_tri$type[grepl(pattern = "rain", x = paste0("vect_ba_tri$",params$TRI1), ignore.case = TRUE)] <- "b"
-vect_ba_tri$type[grepl(pattern = "SPAM presence", x = paste0("vect_ba_tri$",params$TRI1), ignore.case = TRUE)] <- "b"
+vect_ba_tri$type[grepl(pattern = " AE", x = paste0("vect_ba_tri$",params$TRIBA1), ignore.case = TRUE)] <- "b"
+vect_ba_tri$type[grepl(pattern = " EA", x = paste0("vect_ba_tri$",params$TRIBA1), ignore.case = TRUE)] <- "b"
+vect_ba_tri$type[grepl(pattern = "bio", x = paste0("vect_ba_tri$",params$TRIBA1), ignore.case = TRUE)] <- "b"
+vect_ba_tri$type[grepl(pattern = "SE", x = paste0("vect_ba_tri$",params$TRIBA1), ignore.case = TRUE)] <- "s"
+vect_ba_tri$type[grepl(pattern = "soil", x = paste0("vect_ba_tri$",params$TRIBA1), ignore.case = TRUE)] <- "b"
+vect_ba_tri$type[grepl(pattern = "lowland", x = paste0("vect_ba_tri$",params$TRIBA1), ignore.case = TRUE)] <- "b"
+vect_ba_tri$type[grepl(pattern = " temp", x = paste0("vect_ba_tri$",params$TRIBA1), ignore.case = TRUE)] <- "b"
+vect_ba_tri$type[grepl(pattern = " elevation", x = paste0("vect_ba_tri$",params$TRIBA1), ignore.case = TRUE)] <- "b"
+vect_ba_tri$type[grepl(pattern = "market", x = paste0("vect_ba_tri$",params$TRIBA1), ignore.case = TRUE)] <- "s"
+vect_ba_tri$type[grepl(pattern = "rain", x = paste0("vect_ba_tri$",params$TRIBA1), ignore.case = TRUE)] <- "b"
+vect_ba_tri$type[grepl(pattern = "SPAM presence", x = paste0("vect_ba_tri$",params$TRIBA1), ignore.case = TRUE)] <- "b"
 
 vect_ba_tri %>%
-    dplyr::select(params$TRI1, baclass, type) %>%
+    dplyr::select(params$TRIBA1, baclass, type) %>%
     (knitr::kable) %>% kable_styling("striped", full_width = F) %>% scroll_box(height = "300px")
 
 ```
@@ -10636,13 +10668,13 @@ g2 +
     geom_spatvector(
         data = vect_ba_tri, 
         mapping = aes(colour = ifelse(baclass == "optimal" , "green", "red")), 
-        size = 2
+        size = 1, shape = 21
     ) +
-    geom_spatvector_text(
-        data = vect_ba_tri, 
-        mapping = aes(label = ifelse(type == "b", "b", "b/s"))
-    ) + 
-  scale_colour_identity() 
+    #geom_spatvector_text(
+    #    data = vect_ba_tri, 
+    #    mapping = aes(label = ifelse(type == "b", "b", "b/s"))
+    #) + 
+  scale_colour_identity()  
 
 } # end RES if statement 08/12/2019
 
@@ -10929,7 +10961,7 @@ cat("### Biophysical Aptitude - FAO limitations classes")
 if (params$RES1 != 2) {
   # new method because of df_irm dropped no data
   
-  df_df_irm_ba_fao <-
+  df_irm_ba_fao <-
     df_irm %>% dplyr::select(x, y, ba_1_o) %>% na.omit %>% mutate(FAO = cut(
       ba_1_o,
       breaks = c(-Inf, 0.25, 0.4, 0.6, 0.8, Inf),
@@ -10937,27 +10969,27 @@ if (params$RES1 != 2) {
       include.lowest = TRUE
     ))
 
-  df_faolimits <-
+  df_irm_faolimits <-
     df_irm %>% dplyr::select(ba_2b_s, ba_2c_s, ba_2d_s, ba_2e_s) %>% na.omit
-  df_faolimits$limit <- names(df_faolimits)[][max.col(df_faolimits[])]
+  df_irm_faolimits$limit <- names(df_irm_faolimits)[][max.col(df_irm_faolimits[])]
   
-  df_ba_faolimits <- cbind(df_df_irm_ba_fao, df_faolimits)
+  df_irm_ba_faolimits <- cbind(df_irm_ba_fao, df_irm_faolimits)
 
-  df_ba_faolimits <- df_ba_faolimits %>% 
+  df_irm_ba_faolimits <- df_irm_ba_faolimits %>% 
       mutate(FAO_limit = case_match(limit, "ba_2b_s" ~ "Cl", "ba_2c_s" ~ "SP", "ba_2d_s" ~ "SF", "ba_2e_s" ~ "Ls",
   .default = "missing"), .keep = "all")
   
-    df_ba_faolimits <- df_ba_faolimits %>% 
+    df_irm_ba_faolimits <- df_irm_ba_faolimits %>% 
       mutate(FAO_limit2 = case_when(FAO == "S1" ~ "S1", .default = paste0(FAO,"_",FAO_limit)))
     
-  df_faolimits_values  <-  df_ba_faolimits %>% select(FAO_limit2) %>% unique()
-  df_faolimits_values  <- df_faolimits_values[order(df_faolimits_values$FAO_limit2), ] %>% data.frame
-  names(df_faolimits_values) <- c('FAO_limit_code')
+  df_irm_faolimits_values  <-  df_irm_ba_faolimits %>% select(FAO_limit2) %>% unique()
+  df_irm_faolimits_values  <- df_irm_faolimits_values[order(df_irm_faolimits_values$FAO_limit2), ] %>% data.frame
+  names(df_irm_faolimits_values) <- c('FAO_limit_code')
   
-  df_faolimits_values  <- mutate(df_faolimits_values, ID = row_number()-1)
-  df_faolimits_values  <- df_faolimits_values[, c(2,1)] # re-order for later use as raster categories
+  df_irm_faolimits_values  <- mutate(df_irm_faolimits_values, ID = row_number()-1)
+  df_irm_faolimits_values  <- df_irm_faolimits_values[, c(2,1)] # re-order for later use as raster categories
   
-  df_faolimits_code <-
+  df_irm_faolimits_code <-
     data.frame(
       "FAO_code_num" = c(1:17),
       "FAO_code_char" = c(
@@ -10981,15 +11013,15 @@ if (params$RES1 != 2) {
       )
     )
   
-  vect_ba_faolimits  <- vect(df_ba_faolimits, geom = c("x", "y"))
+  vect_ba_faolimits  <- vect(df_irm_ba_faolimits, geom = c("x", "y"))
     
   rast_ba_faolimits <- rasterize(vect_ba_faolimits, rast_mask_proj, field = "FAO_limit2")
   names(rast_ba_faolimits) <- c('FAO_limit_code')
-  levels(rast_ba_faolimits) <- df_faolimits_values
+  levels(rast_ba_faolimits) <- df_irm_faolimits_values
   
   vect_ba_faolimits <-    merge(
     x = vect_ba_faolimits,
-    y = df_faolimits_code,
+    y = df_irm_faolimits_code,
     by.x = "FAO_limit2",
     by.y = "FAO_code_char",
     all.x = TRUE
@@ -11014,7 +11046,7 @@ if (params$RES1 != 2) {
   g <- ggplot() +
     geom_spatraster(data = rast_ba_faolimits, na.rm = TRUE, aes(fill = FAO_limit_code)) +
     scale_fill_manual(
-    name = "FAO\nlimitations\nrice",  
+    name = paste0("FAO\nlimitations\n", params$INN1),  
     breaks = c('S1','S2_Cl','S2_Ls','S2_SF','S2_SP','S3_Cl','S3_Ls','S3_SF',
       'S3_SP','N1_Cl','N1_Ls','N1_SF','N1_SP','N2_Cl','N2_Ls','N2_SF','N2_SP'),
     na.value = "transparent",
@@ -11054,9 +11086,9 @@ if (params$RES1 != 2) {
   
 g2 + 
     geom_spatvector(
-        data = vect_triangulation, 
-        mapping = aes(colour = ifelse(Adoption == "high" , "green", "red")), 
-        size = 2
+        data = vect_ba_tri, 
+        mapping = aes(colour = ifelse(baclass == "optimal" , "green", "red")), 
+        size = 1, shape = 21
     ) +
   scale_colour_identity() 
 
@@ -11084,11 +11116,11 @@ if (params$RES1 != 2) {
   # join the polygons (vect_ba_faolimits_cat2) with the likelihood points (vect_ba_faolimits)
   
   vect_ba_faolimits_cat2[["id"]] <- 1:nrow(vect_ba_faolimits_cat2) # need an id field for p-in-p matrix
-  vect_adop[["id"]] <- 1:nrow(vect_adop) # need an id field for p-in-p matrix
-  pinp_m <- relate(vect_ba_faolimits_cat2, vect_adop, "contains", pairs=TRUE) # point in polygon matrix
+  vect_apt[["id"]] <- 1:nrow(vect_apt) # need an id field for p-in-p matrix
+  pinp_m <- relate(vect_ba_faolimits_cat2, vect_apt, "contains", pairs=TRUE) # point in polygon matrix
   df_pinp <- dplyr::as_tibble(pinp_m) # point in polygon tibble
   vect_ba_faolimits_cat3 <- merge(x = vect_ba_faolimits_cat2, y = df_pinp, by.x = "id", by.y = "id.x", all.x = TRUE)
-  vect_ba_faolimits_cat4 <- merge(x = vect_ba_faolimits_cat3, y = vect_adop, by.x = "id.y", by.y = "id", all.x = TRUE)
+  vect_ba_faolimits_cat4 <- merge(x = vect_ba_faolimits_cat3, y = vect_apt, by.x = "id.y", by.y = "id", all.x = TRUE)
   
      # project to geo for display in leaflet
   vect_ba_faolimits_cat4_geo <- project(vect_ba_faolimits_cat4, "epsg:4326")
@@ -11188,26 +11220,27 @@ cat("## Classified Map of Socioeconomic Feasibility")
 #vect_se_tri <- sfc_as_cols(vect_triangulation) %>%
   vect_se_tri <- vect_triangulation %>%
     mutate(
-        seclass = ifelse(grepl(pattern = "high", x = Feasibility, ignore.case = TRUE), "high", ifelse(grepl(pattern = "moderate", x = Feasibility, ignore.case = TRUE), "moderate", "low")),
+        seclass = ifelse(grepl(pattern = "high", x = eval(parse(text = params$TRISE1)), ignore.case = TRUE), "high", ifelse(grepl(pattern = "moderate", x = eval(parse(text = params$TRISE1)), ignore.case = TRUE), "moderate", "low")),
         type = NA
     ) %>%
-    dplyr::filter(!is.na(Feasibility))
+    dplyr::filter(!is.na(params$TRISE1))
 
 
-vect_se_tri$type[grepl(pattern = " AE", x = vect_se_tri$Feasibility, ignore.case = TRUE)] <- "b"
-vect_se_tri$type[grepl(pattern = " EA", x = vect_se_tri$Feasibility, ignore.case = TRUE)] <- "b"
-vect_se_tri$type[grepl(pattern = "bio", x = vect_se_tri$Feasibility, ignore.case = TRUE)] <- "b"
-vect_se_tri$type[grepl(pattern = "SE", x = vect_se_tri$Feasibility, ignore.case = TRUE)] <- "s"
-vect_se_tri$type[grepl(pattern = "soil", x = vect_se_tri$Feasibility, ignore.case = TRUE)] <- "b"
-vect_se_tri$type[grepl(pattern = "lowland", x = vect_se_tri$Feasibility, ignore.case = TRUE)] <- "b"
-vect_se_tri$type[grepl(pattern = " temp", x = vect_se_tri$Feasibility, ignore.case = TRUE)] <- "b"
-vect_se_tri$type[grepl(pattern = " elevation", x = vect_se_tri$Feasibility, ignore.case = TRUE)] <- "b"
-vect_se_tri$type[grepl(pattern = "market", x = vect_se_tri$Feasibility, ignore.case = TRUE)] <- "s"
-vect_se_tri$type[grepl(pattern = "rain", x = vect_se_tri$Feasibility, ignore.case = TRUE)] <- "b"
+vect_se_tri$type[grepl(pattern = " AE", x = paste0("vect_adop_tri$",params$TRISE1), ignore.case = TRUE)] <- "b"
+vect_se_tri$type[grepl(pattern = " EA", x = paste0("vect_adop_tri$",params$TRISE1), ignore.case = TRUE)] <- "b"
+vect_se_tri$type[grepl(pattern = "bio", x = paste0("vect_adop_tri$",params$TRISE1), ignore.case = TRUE)] <- "b"
+vect_se_tri$type[grepl(pattern = "SE", x = paste0("vect_adop_tri$",params$TRISE1), ignore.case = TRUE)] <- "s"
+vect_se_tri$type[grepl(pattern = "soil", x = paste0("vect_adop_tri$",params$TRISE1), ignore.case = TRUE)] <- "b"
+vect_se_tri$type[grepl(pattern = "lowland", x = paste0("vect_adop_tri$",params$TRISE1), ignore.case = TRUE)] <- "b"
+vect_se_tri$type[grepl(pattern = " temp", x = paste0("vect_adop_tri$",params$TRISE1), ignore.case = TRUE)] <- "b"
+vect_se_tri$type[grepl(pattern = " elevation", x = paste0("vect_adop_tri$",params$TRISE1), ignore.case = TRUE)] <- "b"
+vect_se_tri$type[grepl(pattern = "market", x = paste0("vect_adop_tri$",params$TRISE1), ignore.case = TRUE)] <- "s"
+vect_se_tri$type[grepl(pattern = "rain", x = paste0("vect_adop_tri$",params$TRISE1), ignore.case = TRUE)] <- "b"
 
 vect_se_tri %>%
-    dplyr::select(Feasibility, seclass, type) %>%
+    dplyr::select(params$TRISE1, seclass, type) %>%
     (knitr::kable) %>% kable_styling("striped", full_width = F) %>% scroll_box(height = "300px")
+
 ``` 
 </div>
 
@@ -11243,7 +11276,7 @@ if (sef_rb == "hml") {
     df_irm %>% dplyr::select(se_1_h, se_1_l, x , y) %>% na.omit %>% vect(geom = c("x", "y"))
   rast_se_3class_h <- rasterize(vect_se_3class, rast_mask_proj, field = "se_1_h")
   rast_se_3class_l <- rasterize(vect_se_3class, rast_mask_proj, field = "se_1_l")
-  rast_se_3class <- rast(list(d1, d2))
+  rast_se_3class <- rast(list(rast_se_3class_h, rast_se_3class_l))
   names(rast_se_3class) <- c('high', 'low')
 
   # get max value and export
@@ -11305,13 +11338,13 @@ if (params$RES1 != 2) {
 g2 + 
     geom_spatvector(
         data = vect_se_tri, 
-        mapping = aes(colour = ifelse(seclass == "optimal" , "green", "red")), 
-        size = 2
+        mapping = aes(colour = ifelse(seclass == "high" , "green", "red")), 
+        size = 1, shape = 21
     ) +
-    geom_spatvector_text(
-        data = vect_se_tri, 
-        mapping = aes(label = ifelse(type == "s", "s", "s/b"))
-    ) + 
+#    geom_spatvector_text(
+#        data = vect_se_tri, 
+#        mapping = aes(label = ifelse(type == "s", "s", "s/b"))
+#    ) + 
   scale_colour_identity() 
 
 } # end RES if statement 08/12/2019
@@ -11504,8 +11537,9 @@ if (params$RES1 != 1) {
 }
 
 ```
+</div>
 
-```{r i1_statistics_adop_faolimits_01, echo=FALSE, results='asis', eval=ba_crit}
+```{r i1_statistics_adop_faolimits_01, echo=FALSE, results='asis', eval=adop_crit}
 
 cat("### Likelihood for Adoption - FAO twenty-one classes - total area (ha)
 
@@ -11514,7 +11548,7 @@ The table and maps shows the area in hectares within each subdivision of each FA
 ```
 
 <div class="fold o"> 
-```{r i1_statistics_adop_faolimits_02, cache = TRUE, cache.whatever=params$Agg,  out.width="100%", warning=FALSE, eval=ba_crit}
+```{r i1_statistics_adop_faolimits_02, cache = TRUE, cache.whatever=params$Agg,  out.width="100%", warning=FALSE, eval=adop_crit}
 # create subdiv level statistics
 # 03/03/2019 A FARROW adde
 
@@ -11597,10 +11631,7 @@ if (params$RES1 != 1) {
 }
 
 ```
-
 </div>
-
-
 
 ```{r i1_statistics_adop_05, echo=FALSE, results='asis', eval=adop_crit}
 
@@ -11681,9 +11712,7 @@ if (params$RES1 != 1) {
 }
 
 ``` 
-
 </div>
-
 
 ```{r i1_statistics_ba_01, echo=FALSE, results='asis', eval=ba_crit}
 
@@ -11780,6 +11809,7 @@ if (params$RES1 != 1) {
 }
 
 ``` 
+</div>
 
 ```{r i1_statistics_ba_faolimits_01, echo=FALSE, results='asis', eval=ba_crit}
 
@@ -11865,6 +11895,7 @@ if (params$RES1 != 1) {
 }
 
 ```
+</div>
 
 ```{r i1_statistics_ba_03, echo=FALSE, results='asis', eval=ba_crit}
 
@@ -11906,7 +11937,6 @@ if (params$RES1 != 2) {
 ``` 
 </div>
 
-
 ```{r i1_statistics_ba_faolimits_03, echo=FALSE, results='asis', eval=ba_crit}
 
 cat("### Biophysical Aptitude - seventeen classes - (%)
@@ -11946,7 +11976,6 @@ if (params$RES1 != 1) {
 }
 
 ``` 
-
 </div>
 
 ```{r i1_statistics_se_01, echo=FALSE, results='asis', eval=sef_crit}
@@ -11991,7 +12020,6 @@ if (params$RES1 != 2) {
 
 ``` 
 </div>
-
 
 ```{r i1_statistics_se_03, echo=FALSE, results='asis', eval=sef_crit}
 
@@ -12041,7 +12069,7 @@ The IRM script already calculates the optimality of the individual criteria as w
 
 The first method of calculating yield will calculate the product of the optimality of selected criteria.
 
-
+<div class="fold o"> 
 ```{r i1_calc_yield_1, cache = TRUE, cache.whatever=params$Agg,  out.width="100%", include = TRUE, echo=FALSE, message=FALSE, warning=FALSE, eval=ba_crit}
 
 # get the criteria that contribute to yield
@@ -12064,7 +12092,7 @@ yield_expr
 
 # evaluate the expression
 eval(str2expression(yield_expr))
-str(df_irm$yieldpc)
+# str(df_irm$yieldpc)
 if (summarise(df_irm, Average = mean(yieldpc, na.rm = T)) > 0) {
 
 # df_irm <- dplyr::select(df_irm,-yield)
@@ -12109,12 +12137,13 @@ output_geotiff(rast_yieldpc, paste0("yieldpc_", params$INN1))
 gy2
 }
 ```
+</div>
 
 ## Calculate yield
 
 The IRM script converts yield proportion to yield using the yield values for sole crop or intercrop.
 
-
+<div class="fold o"> 
 ```{r i1_calc_yield_2, cache = TRUE, cache.whatever=params$Agg, out.width="100%", include = TRUE, echo=FALSE, message=FALSE, warning=FALSE, eval=ba_crit}
 
 # get the criteria that contribute to yield
@@ -12127,11 +12156,11 @@ df_yield_values %>% kable(digits = 3) %>% kable_styling("striped", full_width = 
 
 
 if (params$INN2 == "NA") {
-  df_irm$yield <- df_irm$yieldpc / 100 * df_yield_values$YA
+  df_irm$yield <- df_irm$yieldpc / 100 * df_yield_values$YW
   cat("Sole crop yield")
 } else {
   if (params$SYS == "comparison") {
-    df_irm$yield <- df_irm$yieldpc / 100 * df_yield_values$YA
+    df_irm$yield <- df_irm$yieldpc / 100 * df_yield_values$YW
     cat("Sole crop 1 yield (comparison)")
   } else {
     if (params$SYS == "intercrop") {
@@ -12139,7 +12168,7 @@ if (params$INN2 == "NA") {
       cat("Intercrop 1 yield")
     } else {
       if (params$SYS == "rotation") {
-        df_irm$yield <- df_irm$yieldpc / 100 * df_yield_values$YA
+        df_irm$yield <- df_irm$yieldpc / 100 * df_yield_values$YW
         cat("Rotation crop 1 yield")
       }
     }
@@ -12189,12 +12218,13 @@ gyd <- ggplot() +
 gyd2
 }
 ```
+</div>
 
 ## Calculate production
 
 The IRM script converts yield proportion to production using the yield values for sole crop or intercrop.
 
-
+<div class="fold o">
 ```{r i1_calc_yield_3, cache = TRUE, cache.whatever=params$Agg, out.width="100%", include = TRUE, echo=FALSE, message=FALSE, warning=FALSE, eval=ba_crit}
 
 # get the criteria that contribute to yield
@@ -12250,6 +12280,7 @@ if (summarise(df_irm, Average = mean(production, na.rm = T)) > 0) {
   gp2
 }
 ```
+</div>
 
 ```{r i1_innovation_name_i2_check01, echo=FALSE, message=FALSE, warning=FALSE, results='asis'}
 
@@ -12260,9 +12291,11 @@ if (params$INN2 == "NA") {
   si_1 <- sessionInfo()
   si_1
   
+knit_exit()  
+
 }  
 
-knit_exit()
+
 
 ```
 
@@ -12409,7 +12442,7 @@ rbnumberlabellist5 <- paste(rbnumberlabellist4, collapse=";")
 
 rbstacklabellist1 <- df_rbnumber1[,"id_label"]
 rbstacklabellist2 <- rbstacklabellist1[!is.na(rbstacklist1)] 
-rbstacklabellist3 <- rbstacklabellist2[rbnumberlist3 %in% rbstacklist3]
+rbstacklabellist3 <- rbnumberlabellist3[rbnumberlist3 %in% rbstacklist3]
 rbstacklabellist4 <- paste(rbstacklabellist3, collapse=";")
 
 rulebasegraph_name <- paste("digraph simple_rule_base")
@@ -12595,15 +12628,41 @@ nudge_yvaltri <-
   ((vect_triangulation_extent[4] - vect_triangulation_extent[3]) /  (nrow(vect_triangulation) * 2.5))
 #cat("nudge_yvaltri =", nudge_yvaltri)
 
-expr <- paste0("vect_triangulation$", params$TRI2)
-vect_triangulation$tri_label <- paste(vect_triangulation$id, "=", eval(parse(text=(expr))))
-vect_triangulation$tri_label <- factor(vect_triangulation$tri_label)
+if (adop_crit) {
+  expr <- paste0("vect_triangulation$", params$TRIAD2)
+  vect_triangulation$tri_label_ad <-
+    paste(vect_triangulation$id, "=", eval(parse(text = (expr))))
+  vect_triangulation$tri_label_ad <-
+    factor(vect_triangulation$tri_label_ad)
+  g_ad <- ggplot()
+  gtriangulation_ad <- add_triangulation_plot_no_labels_ad(g_ad)
+  gtriangulation_ad <- add_subdiv_simple_plot(gtriangulation_ad)
+  gtriangulation_ad
+}
 
-g <- ggplot()
-gtriangulation <- add_triangulation_plot_no_labels(g)
+if (ba_crit) {
+  expr <- paste0("vect_triangulation$", params$TRIBA2)
+  vect_triangulation$tri_label_ba <-
+    paste(vect_triangulation$id, "=", eval(parse(text = (expr))))
+  vect_triangulation$tri_label_ba <-
+    factor(vect_triangulation$tri_label_ba)
+  g_ba <- ggplot()
+  gtriangulation_ba <- add_triangulation_plot_no_labels_ba(g_ba)
+  gtriangulation_ba <- add_subdiv_simple_plot(gtriangulation_ba)
+  gtriangulation_ba
+}
 
-gtriangulation <- add_subdiv_simple_plot(gtriangulation)
-gtriangulation
+if (sef_crit) {
+  expr <- paste0("vect_triangulation$", params$TRISE2)
+  vect_triangulation$tri_label_se <-
+    paste(vect_triangulation$id, "=", eval(parse(text = (expr))))
+  vect_triangulation$tri_label_se <-
+    factor(vect_triangulation$tri_label_se)
+  g_se <- ggplot()
+  gtriangulation_se <- add_triangulation_plot_no_labels_se(g_se)
+  gtriangulation_se <- add_subdiv_simple_plot(gtriangulation_se)
+  gtriangulation_se
+}
 
 ```
 </div>
@@ -12724,8 +12783,12 @@ The properties of this map are given below:
 ```{r i2_i1_mask01, cache = TRUE, cache.whatever=params$Agg, out.width="100%", warning=FALSE}
 
 if (params$Agg == 1){rast_mask_proj <- rast_subdiv_mask_proj} else {
-  rast_mask_proj <- aggregate(rast_subdiv_mask_proj, fact = params$Agg, expand = TRUE)}
+  rast_mask_proj <- aggregate(rast_subdiv_mask_proj, fact = params$Agg, na.rm=TRUE)}
 
+g <- base_raster_plot(rast_mask_proj, "layer", 'red', 'blue', paste0("Aggregated mask - Resolution = ", res(rast_mask_proj), "m"))
+
+gsubdivsimple <- add_subdiv_simple_plot(g)
+gsubdivsimple
 
 g <- base_raster_plot(rast_mask_proj, "layer", 'red', 'blue', paste0("Aggregated mask - Resolution = ", res(rast_mask_proj), "m"))
 
@@ -12759,7 +12822,7 @@ x <-  pull(df_irm_i2, x)
 y <-  pull(df_irm_i2, y)
 xy <- cbind(x, y)
 
-str(df_irm_i2)
+#str(df_irm_i2)
 
 if (params$INT == 1)
   shiny::setProgress(0.17, message = "Resampling data 1st Innovation")  # set progress to 17%
@@ -12931,7 +12994,7 @@ df_criteria_ba3 <-
 n_cba3 <- nrow(df_criteria_ba3)
 print(paste(n_cba3, "Climatic criteria: "))
 
-for (i in 1:n_cba3) {
+for (i in seq_len(nrow(df_criteria_ba3))) {
   print(paste(df_criteria_ba3[i, 4]))
   rast_clim_mask <- get(paste0("rast_",df_criteria_ba3[i, 11], "_rsmp"))
   if (paste(df_criteria_ba3[i, 23]) == "m") {
@@ -12948,7 +13011,7 @@ df_rulebases_ba3 <-
 n_rbba3 <- nrow(df_rulebases_ba3)
 
 print(paste(n_rbba3, "Climatic rule bases:"))
-for (i in 1:n_rbba3) {
+for (i in seq_len(nrow(df_rulebases_ba3))) {
   print(paste(df_rulebases_ba3[i, 2]))
   
   if (paste(df_rulebases_ba3[i, 2]) == "ba_3a") {
@@ -13045,7 +13108,7 @@ cat("### Spatially Static Growing Seasons")
 
 
 phen_tmp <- list()
-for (i in 1:(nrow(df_growth_stages) - 2)) {
+for (i in seq_len(nrow(df_growth_stages) - 2)) {
   phen_tmp[[as.character(df_growth_stages[i + 1, 1])]] <-
     df_growth_stages[i + 1, 3]
 }
@@ -13076,7 +13139,7 @@ cat(paste("Growth Stages span", num_years, "calendar years"))
 
 # monthly distribution
 if (exists('rast_clim_mask_m')) {
-  for (i in 1:(nrow(df_growth_stages_req))) {
+  for (i in seq_len(nrow(df_growth_stages_req))) {
     period_name <- as.character(df_growth_stages_req[i, 1])
     v_m <-
       .growth_period_long(phen_stages_beg[period_name], phen_stages_end[period_name], num_years)
@@ -13099,7 +13162,7 @@ if (exists('rast_clim_mask_m')) {
 }
 # dekadal distribution
 if (exists('rast_clim_mask_d')) {
-  for (i in 1:(nrow(df_growth_stages_req))) {
+  for (i in seq_len(nrow(df_growth_stages_req))) {
     period_name <- as.character(df_growth_stages_req[i, 1])
     v_d <-
       .growth_period_long_dekad(phen_stages_beg[period_name], phen_stages_end[period_name], num_years)
@@ -13250,7 +13313,7 @@ df_growth_stages_lengths3 %>%
 ```{r i2_sowing_dates_sos_onsetdata_06, cache = TRUE, cache.whatever=params$Agg,  out.width="100%", warning=FALSE, eval=clim_crit, eval=sos_crit}
 
 # add the growth stage lengths to the df
-for (i in 1:(nrow(df_growth_stages_lengths))) {
+for (i in seq_len(nrow(df_growth_stages_lengths))) {
   period_name <- as.character(df_growth_stages_lengths[i, 1])
 #  cat(paste(period_name))
 #  cat(eval(parse(text = paste0("df_growth_stages_lengths3$", period_name))))
@@ -13270,7 +13333,7 @@ df_onset <-
 
 # add the start days for each of the growth stages (excluding the first which is the onset)
 
-for (i in 1:(nrow(df_growth_stages_lengths)- 2) ) {
+for (i in seq_len(nrow(df_growth_stages_lengths)- 2) ) {
   
 #  cat(paste(i))
       
@@ -13296,7 +13359,7 @@ eval_expr_1 <- eval(parse(text =paste0("df_onset$", previous_period_name, "_s + 
 
 # add the end days for each of the growth stages
 
-for (i in 1:(nrow(df_growth_stages_lengths) - 1) ) {
+for (i in seq_len(nrow(df_growth_stages_lengths) - 1) ) {
   
 #  cat(paste(i))
       
@@ -13370,7 +13433,7 @@ if (exists('rast_clim_mask_m')) {
   months <- rep.int(day_months, num_years)
   
   
-  for (i in 1:(nrow(df_growth_stages_lengths))) {
+  for (i in seq_len(nrow(df_growth_stages_lengths))) {
     period_name <- as.character(df_growth_stages_lengths[i, 1])
     cat(paste("\nCurrent growth stage = ", period_name))
     
@@ -13583,7 +13646,7 @@ if (exists('rast_clim_mask_d')) {
   dekads <- rep.int(day_dekads, num_years)
   
   
-  for (i in 1:(nrow(df_growth_stages_lengths))) {
+  for (i in seq_len(nrow(df_growth_stages_lengths))) {
     period_name <- as.character(df_growth_stages_lengths[i, 1])
     cat(paste("\nCurrent growth stage = ", period_name))
     
@@ -13755,7 +13818,7 @@ if (exists('rast_clim_mask_d')) {
 ##-- monthly distribution --
 
 if (exists('rast_clim_mask_m')) {
-  for (i in 1:(nrow(df_growth_stages_req))) {
+  for (i in seq_len(nrow(df_growth_stages_req))) {
     period_name <- as.character(df_growth_stages_req[i, 1])
     cat("period_name = ", period_name, "\n")
     
@@ -13870,7 +13933,7 @@ if (exists('rast_clim_mask_m')) {
 
 
 if (exists('rast_clim_mask_d')) {
-  for (i in 1:(nrow(df_growth_stages_req))) {
+  for (i in seq_len(nrow(df_growth_stages_req))) {
     period_name <- as.character(df_growth_stages_req[i, 1])
     cat("period_name = ", period_name, "\n")
     
@@ -13990,8 +14053,8 @@ By combining precipitation in each month and the phenological stages above, we c
 
 df_criteria_ba3a <-
     dplyr::filter(df_criteria_ba3, grepl("^ba_3a", rulebase_stack) & temp_resolution == "m") # filter precipitation criteria
-  
-  for (i in 1:nrow(df_growth_stages_req_prec)) {
+
+  for (i in seq_len(nrow(df_growth_stages_req_prec))) {
         period_name <- as.character(df_growth_stages_req_prec[i, 1])
 #      print(period_name)
       if (sum(df_criteria_ba3a[i, 'phen_stage'] == period_name, na.rm = TRUE) == 1) {
@@ -14026,14 +14089,14 @@ df_criteria_ba3a <-
         
         
       } else {
-        print(sum(df_criteria_ba3a[, 'phen_stage'] == period_name, na.rm = TRUE))
+ #       print(sum(df_criteria_ba3a[, 'phen_stage'] == period_name, na.rm = TRUE))
       }
     }
 
 df_criteria_ba3a <-
     dplyr::filter(df_criteria_ba3, grepl("^ba_3a", rulebase_stack) & temp_resolution == "d") # filter precipitation criteria
-  
-  for (i in 1:nrow(df_growth_stages_req_prec)) {
+
+    for (i in seq_len(nrow(df_growth_stages_req_prec))) {
         period_name <- as.character(df_growth_stages_req_prec[i, 1])
 #      print(period_name)
       if (sum(df_criteria_ba3a[i, 'phen_stage'] == period_name, na.rm = TRUE) == 1) {
@@ -14068,7 +14131,7 @@ df_criteria_ba3a <-
         
         
       } else {
-        print(sum(df_criteria_ba3a[, 'phen_stage'] == period_name, na.rm = TRUE))
+  #      print(sum(df_criteria_ba3a[, 'phen_stage'] == period_name, na.rm = TRUE))
       }
     }
 
@@ -14087,7 +14150,7 @@ We used the requirements to construct fuzzy partitions and the rulebases.")
 <div class="fold o">   
 ```{r i2_requirements_prec04, cache = TRUE, cache.whatever=params$Agg, out.width="100%", fig.show="hold", warning=FALSE, eval=prec_crit, eval=clim_crit}
 
-for (i in 1:(nrow(df_criteria_ba3a))) {
+for (i in seq_len(nrow(df_criteria_ba3a))) {
   if (!is.na(df_criteria_ba3a[i, 18])) {
     # for those criteria with three proposition values
     # get  the 3 proposition levels
@@ -14233,7 +14296,7 @@ for (i in 1:(nrow(df_criteria_ba3a))) {
     "Precipitation growth\nstages optimality\nmembership"
   
   plot_fpm <- rasterize_plot_fpm(n, fpm_conc_var, fpm_conc_name, df_irm_i2)
-  print(plot_fpm)
+   # print(plot_fpm)
   
   
 }
@@ -14264,7 +14327,8 @@ df_criteria_ba3b_m <-
 
 
 if (nrow(df_criteria_ba3b_m) > 0) {
-  for (i in 1:nrow(df_growth_stages_req_temp)) {
+  
+    for (i in seq_len(nrow(df_growth_stages_req_temp))) {
       period_name <- as.character(df_growth_stages_req_temp[i, 1])
      # print(paste0("m period_name = ", as.character(period_name)))
      # print(df_criteria_ba3b_m[i, 'phen_stage'])
@@ -14317,7 +14381,7 @@ if (nrow(df_criteria_ba3b_m) > 0) {
         
         } 
       } else {
-        print(paste0("else m ", period_name, sum(df_criteria_ba3b_m[, 'phen_stage'] == period_name, na.rm = TRUE)))
+  #      print(paste0("else m ", period_name, sum(df_criteria_ba3b_m[, 'phen_stage'] == period_name, na.rm = TRUE)))
       }
     }
 }
@@ -14326,8 +14390,9 @@ if (nrow(df_criteria_ba3b_m) > 0) {
 df_criteria_ba3b_d <-
     dplyr::filter(df_criteria_ba3, grepl("^ba_3b", rulebase_stack) & temp_resolution == "d") # filter temperature criteria
 
-if (nrow(df_criteria_ba3b_d) > 0) {  
-  for (i in 1:nrow(df_growth_stages_req_temp)) {
+if (nrow(df_criteria_ba3b_d) > 0) {
+  
+  for (i in seq_len(nrow(df_growth_stages_req_temp))) {
         period_name <- as.character(df_growth_stages_req_temp[i, 1])
 #      print(period_name)
       if (sum(df_criteria_ba3b_d[i, 'phen_stage'] == period_name, na.rm = TRUE) == 1) {
@@ -14366,7 +14431,7 @@ if (nrow(df_criteria_ba3b_d) > 0) {
         
         
       } else {
-        print(sum(df_criteria_ba3b_d[, 'phen_stage'] == period_name, na.rm = TRUE))
+ #       print(sum(df_criteria_ba3b_d[, 'phen_stage'] == period_name, na.rm = TRUE))
       }
     }
 }
@@ -14390,7 +14455,7 @@ We used the requirements to construct fuzzy partitions and the rulebases.")
 
 
 
-for (i in 1:(nrow(df_criteria_ba3b))) {
+for (i in seq_len(nrow(df_criteria_ba3b))) {
   if (!is.na(df_criteria_ba3b[i, 18])) {
     # for those criteria with three proposition values
     # get  the 3 proposition levels
@@ -14538,7 +14603,7 @@ for (i in 1:(nrow(df_criteria_ba3b))) {
     "Temperature growth\nstages optimality\nmembership"
   
   plot_fpm <- rasterize_plot_fpm(n, fpm_conc_var, fpm_conc_name, df_irm_i2)
-  print(plot_fpm)
+   # print(plot_fpm)
   
   
 }
@@ -14589,7 +14654,7 @@ cat(paste(n_cba2c, "Soil physical properties criteria:\n\n"))
 
 # then determine and print the names of the rule bases in the soil physical properties theme
 cat(paste(n_cba2c, "Soil physical properties rule bases:\n\n"))
-for (i in 1:n_cba2c) {
+  for (i in seq_len(nrow(df_criteria_ba2c))) {
   cat(paste(df_criteria_ba2c[i, 3],"\n", df_criteria_ba2c[i, 4],"\n"))
   
   if (paste(df_criteria_ba2c[i, 4]) == "Soil texture") {
@@ -14659,7 +14724,7 @@ cat("The reclassified classes are averaged over the entire soil profile from 0 t
 <div class="fold o">   
 ```{r i2_requirements_soilp04, cache = TRUE, cache.whatever=params$Agg,  out.width="100%", fig.show="hold", warning=FALSE, eval=soil_p_crit}
 
-for (i in 1:n_cba2c) {
+  for (i in seq_len(nrow(df_criteria_ba2c))) {
   new_col <-
     get(paste0("rast_", df_criteria_ba2c[i, 11], "_rsmp")) %>% terra::extract(xy) # extract the raster values using xy points
           
@@ -14685,7 +14750,7 @@ We used the requirements to construct fuzzy partitions and the rulebases.")
 <div class="fold o">   
 ```{r i2_requirements_soilp06, cache = TRUE, cache.whatever=params$Agg,  out.width="100%", fig.show="hold", warning=FALSE, eval=soil_p_crit}
 
-for (i in 1:(nrow(df_criteria_ba2c))) {
+for (i in seq_len(nrow(df_criteria_ba2c))) {
   if (!is.na(df_criteria_ba2c[i, 18])) {
     # for those criteria with three proposition values
     # get  the 3 proposition levels
@@ -14834,7 +14899,7 @@ for (i in 1:(nrow(df_criteria_ba2c))) {
     "Soil physical properties optimality membership"
   
   plot_fpm <- rasterize_plot_fpm(n, fpm_conc_var, fpm_conc_name, df_irm_i2)
-  print(plot_fpm)
+   # print(plot_fpm)
   
   
 }
@@ -14870,7 +14935,7 @@ cat(paste(n_cba2d, "Soil fertility rule bases:\n\n"))
 <div class="fold o">   
 ```{r i2_requirements_soilf03, cache = TRUE, cache.whatever=params$Agg,  out.width="100%", fig.show="hold", warning=FALSE, eval=soil_f_crit}
 
-for (i in 1:n_cba2d) {
+  for (i in seq_len(nrow(df_criteria_ba2d))) {
   new_col <-
     get(paste0("rast_", df_criteria_ba2d[i, 11], "_rsmp")) %>% terra::extract(xy) # extract the raster values using xy points
   
@@ -14895,7 +14960,7 @@ We used the requirements to construct fuzzy partitions and the rulebases.")
 <div class="fold o">   
 ```{r i2_requirements_soilf05, cache = TRUE, cache.whatever=params$Agg,  out.width="100%", fig.show="hold", warning=FALSE, eval=soil_f_crit}
 
-for (i in 1:(nrow(df_criteria_ba2d))) {
+for (i in seq_len(nrow(df_criteria_ba2d))) {
   if (!is.na(df_criteria_ba2d[i, 18])) {
     # for those criteria with three proposition values
     # get  the 3 proposition levels
@@ -15044,7 +15109,7 @@ for (i in 1:(nrow(df_criteria_ba2d))) {
     "Soil fertility optimality membership"
   
   plot_fpm <- rasterize_plot_fpm(n, fpm_conc_var, fpm_conc_name, df_irm_i2)
-  print(plot_fpm)
+   # print(plot_fpm)
 
 }
 
@@ -15087,7 +15152,7 @@ cat(paste(n_cba2e, "Landscape criteria:\n\n"))
 # then determine and print the names of the rule bases in the landscape theme
 
 cat(paste(n_cba2e, "Landscape rule bases:\n\n"))
-for (i in 1:n_cba2e) {
+  for (i in seq_len(nrow(df_criteria_ba2e))) {
   cat(paste(df_criteria_ba2e[i, 3], "\n", df_criteria_ba2e[i, 4], "\n"))
 }
 
@@ -15096,7 +15161,7 @@ for (i in 1:n_cba2e) {
 <div class="fold o">   
 ```{r i2_requirements_lscape03, cache = TRUE, cache.whatever=params$Agg,  out.width="100%", fig.show="hold", warning=FALSE, eval=lscape_crit}
 
-for (i in 1:n_cba2e) {
+  for (i in seq_len(nrow(df_criteria_ba2e))) {
   new_col <-
     get(paste0("rast_", df_criteria_ba2e[i, 11], "_rsmp")) %>% terra::extract(xy) # extract the raster values using xy points
           
@@ -15123,7 +15188,7 @@ We used the requirements to construct fuzzy partitions and the rulebases.")
 <div class="fold o">   
 ```{r i2_requirements_lscape05, cache = TRUE, cache.whatever=params$Agg,  out.width="100%", fig.show="hold", warning=FALSE, eval=lscape_crit}
 
-for (i in 1:(nrow(df_criteria_ba2e))) {
+for (i in seq_len(nrow(df_criteria_ba2e))) {
   if (!is.na(df_criteria_ba2e[i, 18])) {
     # for those criteria with three proposition values
     # get  the 3 proposition levels
@@ -15272,7 +15337,7 @@ for (i in 1:(nrow(df_criteria_ba2e))) {
     "Landscape optimality membership"
   
   plot_fpm <- rasterize_plot_fpm(n, fpm_conc_var, fpm_conc_name, df_irm_i2)
-  print(plot_fpm)
+   # print(plot_fpm)
 
 }
 
@@ -15306,7 +15371,7 @@ df_criteria_ba2a <- df_criteria_ba2a[data_rulebase,]
 n_cse3b <- nrow(df_criteria_ba2a)
 
 cat(paste(n_cba2a, "Agricultural Land rule bases:\n\n"))
-for (i in 1:n_cba2a) {
+  for (i in seq_len(nrow(df_criteria_ba2a))) {
   cat(paste(df_criteria_ba2a[i, 3],"\n", df_criteria_ba2a[i, 4],"\n"))
 }
 
@@ -15315,7 +15380,7 @@ for (i in 1:n_cba2a) {
 <div class="fold o">   
 ```{r i2_requirements_agland03, cache = TRUE, cache.whatever=params$Agg,  out.width="100%", fig.show="hold", warning=FALSE, eval=land_crit}
 
-for (i in 1:n_cba2a) {
+  for (i in seq_len(nrow(df_criteria_ba2a))) {
   new_col <-
     get(paste0("rast_", df_criteria_ba2a[i, 11], "_rsmp")) %>% terra::extract(xy) # extract the raster values using xy points
           
@@ -15340,7 +15405,7 @@ We used the requirements to construct fuzzy partitions and the rulebases.")
 <div class="fold o">   
 ```{r i2_requirements_agland05, cache = TRUE, cache.whatever=params$Agg,  out.width="100%", fig.show="hold", warning=FALSE, eval=land_crit}
 
-for (i in 1:(nrow(df_criteria_ba2a))) {
+for (i in seq_len(nrow(df_criteria_ba2a))) {
   if (!is.na(df_criteria_ba2a[i, 18])) {
     # for those criteria with three proposition values
     # get  the 3 proposition levels
@@ -15491,7 +15556,7 @@ for (i in 1:(nrow(df_criteria_ba2a))) {
     "Agricultural\nLand\noptimality\nmembership"
   
   plot_fpm <- rasterize_plot_fpm(n, fpm_conc_var, fpm_conc_name, df_irm_i2)
-  print(plot_fpm)
+   # print(plot_fpm)
   
   
 }
@@ -15526,7 +15591,7 @@ cat(paste(n_cse2b, "Market Access criteria: \n\n"))
 # then determine and print the names of the rule bases in the Market Access theme
 
 cat(paste(n_cse2b, "Market Access rule bases: \n\n"))
-for (i in 1:n_cse2b) {
+  for (i in seq_len(nrow(df_criteria_se2b))) {
   cat(paste(df_criteria_se2b[i, 3], "\n", df_criteria_se2b[i, 4], "\n"))
 }
 
@@ -15535,7 +15600,7 @@ for (i in 1:n_cse2b) {
 <div class="fold o">   
 ```{r i2_requirements_market_access03, cache = TRUE, cache.whatever=params$Agg,  out.width="100%", fig.show="hold", warning=FALSE, eval=mktaccess_crit}
 
-for (i in 1:n_cse2b) {
+  for (i in seq_len(nrow(df_criteria_se2b))) {
   new_col <-
     get(paste0("rast_", df_criteria_se2b[i, 11], "_rsmp")) %>% terra::extract(xy) # extract the raster values using xy points
         
@@ -15560,7 +15625,7 @@ We used the requirements to construct fuzzy partitions and the rulebases.")
 <div class="fold o">   
 ```{r i2_requirements_market_access05, cache = TRUE, cache.whatever=params$Agg,  out.width="100%", fig.show="hold", warning=FALSE, eval=mktaccess_crit}
 
-for (i in 1:(nrow(df_criteria_se2b))) {
+for (i in seq_len(nrow(df_criteria_se2b))) {
   if (!is.na(df_criteria_se2b[i, 18])) {
     # for those criteria with three proposition values
     # get  the 3 proposition levels
@@ -15709,7 +15774,7 @@ for (i in 1:(nrow(df_criteria_se2b))) {
     "Market Access\noptimality\nmembership"
   
   plot_fpm <- rasterize_plot_fpm(n, fpm_conc_var, fpm_conc_name, df_irm_i2)
-  print(plot_fpm)
+   # print(plot_fpm)
   
   
 }
@@ -15743,7 +15808,7 @@ df_criteria_se3b <- df_criteria_se3b[data_rulebase,]
 n_cse3b <- nrow(df_criteria_se3b)
 
 cat(paste(n_cse3b, "Inputs Access data rule bases:\n\n"))
-for (i in 1:n_cse3b) {
+  for (i in seq_len(nrow(df_criteria_se3b))) {
   cat(paste(df_criteria_se3b[i, 3], "\n", df_criteria_se3b[i, 4], "\n"))
 }
 
@@ -15752,7 +15817,7 @@ for (i in 1:n_cse3b) {
 <div class="fold o">   
 ```{r i2_requirements_inputs_access03, cache = TRUE, cache.whatever=params$Agg,  out.width="100%", fig.show="hold", warning=FALSE, eval=inpaccess_crit}
 
-for (i in 1:n_cse3b) {
+  for (i in seq_len(nrow(df_criteria_se3b))) {
   new_col <-
     get(paste0("rast_", df_criteria_se3b[i, 11], "_rsmp")) %>% terra::extract(xy) # extract the raster values using xy points
         
@@ -15777,7 +15842,7 @@ We used the requirements to construct fuzzy partitions and the data rule bases."
 <div class="fold o">   
 ```{r i2_requirements_inputs_access05, cache = TRUE, cache.whatever=params$Agg,  out.width="100%", fig.show="hold", warning=FALSE, eval=inpaccess_crit}
 
-for (i in 1:(nrow(df_criteria_se3b))) {
+for (i in seq_len(nrow(df_criteria_se3b))) {
   if (!is.na(df_criteria_se3b[i, 18])) {
     # for those criteria with three proposition values
     # get  the 3 proposition levels
@@ -15926,7 +15991,7 @@ for (i in 1:(nrow(df_criteria_se3b))) {
     "Inputs Access\noptimality\nmembership"
   
   plot_fpm <- rasterize_plot_fpm(n, fpm_conc_var, fpm_conc_name, df_irm_i2)
-  print(plot_fpm)
+   # print(plot_fpm)
   
   
 }
@@ -15961,7 +16026,7 @@ df_criteria_se4a <- df_criteria_se4a[data_rulebase,]
 n_cse4a <- nrow(df_criteria_se4a)
 
 cat(paste(n_cse4a, "Extension Access data rule bases:\n\n"))
-for (i in 1:n_cse4a) {
+  for (i in seq_len(nrow(df_criteria_se4a))) {
   cat(paste(df_criteria_se4a[i, 3], "\n", df_criteria_se4a[i, 4],"\n"))
 }
 
@@ -15970,7 +16035,7 @@ for (i in 1:n_cse4a) {
 <div class="fold o">   
 ```{r i2_requirements_extension_access03, cache = TRUE, cache.whatever=params$Agg,  out.width="100%", fig.show="hold", warning=FALSE, eval=extaccess_crit}
 
-for (i in 1:n_cse4a) {
+  for (i in seq_len(nrow(df_criteria_se4a))) {
   new_col <-
     get(paste0("rast_", df_criteria_se4a[i, 11], "_rsmp")) %>% terra::extract(xy) # extract the raster values using xy points
   
@@ -15995,7 +16060,7 @@ We used the requirements to construct fuzzy partitions and the data rule bases."
 <div class="fold o">   
 ```{r i2_requirements_extension_access05, cache = TRUE, cache.whatever=params$Agg,  out.width="100%", fig.show="hold", warning=FALSE, eval=extaccess_crit}
 
-for (i in 1:(nrow(df_criteria_se4a))) {
+for (i in seq_len(nrow(df_criteria_se4a))) {
   if (!is.na(df_criteria_se4a[i, 18])) {
     # for those criteria with three proposition values
     # get  the 3 proposition levels
@@ -16144,7 +16209,7 @@ for (i in 1:(nrow(df_criteria_se4a))) {
     "Extension\nAccess\noptimality\nmembership"
   
   plot_fpm <- rasterize_plot_fpm(n, fpm_conc_var, fpm_conc_name, df_irm_i2)
-  print(plot_fpm)
+   # print(plot_fpm)
   
   
 }
@@ -16179,7 +16244,7 @@ df_criteria_se4b <- df_criteria_se4b[data_rulebase,]
 n_cse4b <- nrow(df_criteria_se4b)
 
 cat(paste(n_cse4b, "Labour data rule bases:\n\n"))
-for (i in 1:n_cse4b) {
+  for (i in seq_len(nrow(df_criteria_se4b))) {
   cat(paste(df_criteria_se4b[i, 3], "\n", df_criteria_se4b[i, 4],"\n"))
 }
 
@@ -16188,7 +16253,7 @@ for (i in 1:n_cse4b) {
 <div class="fold o">   
 ```{r i2_requirements_labour_access03, cache = TRUE, cache.whatever=params$Agg,  out.width="100%", fig.show="hold", warning=FALSE, eval=lab_crit}
 
-for (i in 1:n_cse4b) {
+  for (i in seq_len(nrow(df_criteria_se4b))) {
   new_col <-
     get(paste0("rast_", df_criteria_se4b[i, 11], "_rsmp")) %>% terra::extract(xy) # extract the raster values using xy points
   
@@ -16216,7 +16281,7 @@ We used the requirements to construct fuzzy partitions and the data rule bases."
 <div class="fold o">   
 ```{r i2_requirements_labour_access05, cache = TRUE, cache.whatever=params$Agg,  out.width="100%", fig.show="hold", warning=FALSE, eval=lab_crit}
 
-for (i in 1:(nrow(df_criteria_se4b))) {
+for (i in seq_len(nrow(df_criteria_se4b))) {
   if (!is.na(df_criteria_se4b[i, 18])) {
     # for those criteria with three proposition values
     # get  the 3 proposition levels
@@ -16365,7 +16430,7 @@ for (i in 1:(nrow(df_criteria_se4b))) {
     "Labour\noptimality\nmembership"
   
   plot_fpm <- rasterize_plot_fpm(n, fpm_conc_var, fpm_conc_name, df_irm_i2)
-  print(plot_fpm)
+   # print(plot_fpm)
   
   
 }
@@ -16400,7 +16465,7 @@ df_criteria_se4c <- df_criteria_se4c[data_rulebase,]
 n_cse4c <- nrow(df_criteria_se4c)
 
 cat(paste(n_cse4c, "Fertilisers and Pesticides data rule bases:\n\n"))
-for (i in 1:n_cse4c) {
+  for (i in seq_len(nrow(df_criteria_se4c))) {
   cat(paste(df_criteria_se4c[i, 3], "\n", df_criteria_se4c[i, 4],"\n"))
 }
 
@@ -16409,7 +16474,7 @@ for (i in 1:n_cse4c) {
 <div class="fold o">   
 ```{r i2_requirements_fp_access03, cache = TRUE, cache.whatever=params$Agg,  out.width="100%", fig.show="hold", warning=FALSE, eval=fp_crit}
 
-for (i in 1:n_cse4c) {
+  for (i in seq_len(nrow(df_criteria_se4c))) {
   new_col <-
     get(paste0("rast_", df_criteria_se4c[i, 11], "_rsmp")) %>% terra::extract(xy) # extract the raster values using xy points
   
@@ -16437,7 +16502,7 @@ We used the requirements to construct fuzzy partitions and the data rule bases."
 <div class="fold o">   
 ```{r i2_requirements_fp_access05, cache = TRUE, cache.whatever=params$Agg,  out.width="100%", fig.show="hold", warning=FALSE, eval=fp_crit}
 
-for (i in 1:(nrow(df_criteria_se4c))) {
+for (i in seq_len(nrow(df_criteria_se4c))) {
   if (!is.na(df_criteria_se4c[i, 18])) {
     # for those criteria with three proposition values
     # get  the 3 proposition levels
@@ -16586,7 +16651,7 @@ for (i in 1:(nrow(df_criteria_se4c))) {
     "Fertilisers\nand Pesticides\noptimality\nmembership"
   
   plot_fpm <- rasterize_plot_fpm(n, fpm_conc_var, fpm_conc_name, df_irm_i2)
-  print(plot_fpm)
+   # print(plot_fpm)
   
   
 }
@@ -16672,7 +16737,7 @@ rm(df_prop) # remove previous instances of df_prop
 rm(df_conc) # remove previous instances of df_prop
 rm(prop)
 rm(conc)
-for (i in 1:(nrow(df_criteria_ba3a))) {
+for (i in seq_len(nrow(df_criteria_ba3a))) {
   if (!is.na(df_criteria_ba3a[i, 18])) {
     # set the proposition name
     Prop_name <-
@@ -16896,7 +16961,7 @@ fpm_plot_title <-
   "Precipitation optimality membership"
 
 plot_fpm <- rasterize_plot_fpm(n, fpm_conc_var, fpm_conc_name, df_irm_i2)
-print(plot_fpm)
+ # print(plot_fpm)
 
 ```
 </div>
@@ -16924,7 +16989,7 @@ rm(df_prop) # remove previous instances of df_prop
 rm(df_conc) # remove previous instances of df_prop
 rm(prop)
 rm(conc)
-for (i in 1:(nrow(df_criteria_ba3b))) {
+for (i in seq_len(nrow(df_criteria_ba3b))) {
   if (!is.na(df_criteria_ba3b[i, 18])) {
     # set the proposition name
     Prop_name <-
@@ -17046,7 +17111,7 @@ fpm_plot_title <-
   "Temperature\noptimality\nmembership"
 
 plot_fpm <- rasterize_plot_fpm(n, fpm_conc_var, fpm_conc_name, df_irm_i2)
-print(plot_fpm)
+ # print(plot_fpm)
 
 
 ```
@@ -17084,7 +17149,7 @@ rm(df_conc) # remove previous instances of df_prop
 rm(prop)
 rm(conc)
 
-for (i in 1:n_cba2b) {
+  for (i in seq_len(nrow(df_criteria_ba2b))) {
   assign(paste0("rbs_", df_criteria_ba2b[1, 2], "_list"),
          append(get(
            paste0("rbs_", df_criteria_ba2b[1, 2], "_list")
@@ -17202,7 +17267,7 @@ fpm_plot_title <-
   "Climatic Aptitude membership"
 
 plot_fpm <- rasterize_plot_fpm(n, fpm_conc_var, fpm_conc_name, df_irm_i2)
-print(plot_fpm)
+ # print(plot_fpm)
 
 
 ```
@@ -17233,7 +17298,7 @@ rm(df_prop) # remove previous instances of df_prop
 rm(df_conc) # remove previous instances of df_prop
 rm(prop)
 rm(conc)
-for (i in 1:(nrow(df_criteria_ba2c))) {
+for (i in seq_len(nrow(df_criteria_ba2c))) {
   if (!is.na(df_criteria_ba2c[i, 18])) {
     # set the proposition name
     Prop_name <-
@@ -17387,7 +17452,7 @@ fpm_plot_title <-
   "Soil Physical Properties optimality membership"
 
 plot_fpm <- rasterize_plot_fpm(n, fpm_conc_var, fpm_conc_name, df_irm_i2)
-print(plot_fpm)
+ # print(plot_fpm)
 
 
 ```
@@ -17417,7 +17482,7 @@ rm(df_prop) # remove previous instances of df_prop
 rm(df_conc) # remove previous instances of df_prop
 rm(prop)
 rm(conc)
-for (i in 1:(nrow(df_criteria_ba2d))) {
+for (i in seq_len(nrow(df_criteria_ba2d))) {
   if (!is.na(df_criteria_ba2d[i, 18])) {
     # set the proposition name
     Prop_name <-
@@ -17571,7 +17636,7 @@ fpm_plot_title <-
   "Soil Fertility optimality membership"
 
 plot_fpm <- rasterize_plot_fpm(n, fpm_conc_var, fpm_conc_name, df_irm_i2)
-print(plot_fpm)
+ # print(plot_fpm)
 
 
 ```
@@ -17601,7 +17666,7 @@ rm(df_prop) # remove previous instances of df_prop
 rm(df_conc) # remove previous instances of df_prop
 rm(prop)
 rm(conc)
-for (i in 1:(nrow(df_criteria_ba2e))) {
+for (i in seq_len(nrow(df_criteria_ba2e))) {
   if (!is.na(df_criteria_ba2e[i, 18])) {
     # set the proposition name
     Prop_name <-
@@ -17755,7 +17820,7 @@ fpm_plot_title <-
   "Landscape optimality membership"
 
 plot_fpm <- rasterize_plot_fpm(n, fpm_conc_var, fpm_conc_name, df_irm_i2)
-print(plot_fpm)
+ # print(plot_fpm)
 
 
 ```
@@ -17793,7 +17858,7 @@ cat("### Combined Biophysical Aptitude - two class rule bases
   rm(prop)
   rm(conc)
   
-  for (i in 1:n_cba1) {
+  for (i in seq_len(nrow(df_criteria_ba1))) {
     assign(paste0("rbs_", df_criteria_ba1[1, 2], "_list"),
            append(get(
              paste0("rbs_", df_criteria_ba1[1, 2], "_list")
@@ -17914,7 +17979,7 @@ assign(paste0("rb_", df_criteria_ba1[1, 2]), RuleBase(prop, conc)) %>% print()
       "Biophysical Aptitude membership"
     
     plot_fpm <- rasterize_plot_fpm(n, fpm_conc_var, fpm_conc_name, df_irm_i2)
-    print(plot_fpm)
+     # print(plot_fpm)
      
 
 ```
@@ -17964,7 +18029,7 @@ cat("
 
 ```{r i2_rulebases_extension_access03, cache = TRUE, cache.whatever=params$Agg, cache.whatever=params$Agg, results='asis', eval=extaccess_crit}
 
-for (i in 1:(nrow(df_criteria_se4a))) {
+for (i in seq_len(nrow(df_criteria_se4a))) {
   print(paste0(
     df_criteria_se4a[i, 3],
     " (",
@@ -18068,7 +18133,7 @@ rm(df_prop) # remove previous instances of df_prop
 
 rm(prop)
 rm(conc)
-for (i in 1:(nrow(df_criteria_se4a))) {
+for (i in seq_len(nrow(df_criteria_se4a))) {
   # set the proposition name
   Prop_name <-
     paste0(as.character(df_criteria_se4a[i, 3]), "_o")
@@ -18196,7 +18261,7 @@ fpm_plot_title <-
   "Extension\nAccess\noptimality\nmembership"
 
 plot_fpm <- rasterize_plot_fpm(n, fpm_conc_var, fpm_conc_name, df_irm_i2)
-print(plot_fpm)
+ # print(plot_fpm)
 
 ``` 
 </div>
@@ -18218,7 +18283,7 @@ cat("[1] '(1) se_5c is good' or '(1) se_5c is poor'
 
 ```{r i2_rulebases_labour_access03, cache = TRUE, cache.whatever=params$Agg, cache.whatever=params$Agg, results='asis', eval=lab_crit}
 
-for (i in 1:(nrow(df_criteria_se4b))) {
+for (i in seq_len(nrow(df_criteria_se4b))) {
   print(paste0(
     df_criteria_se4b[i, 3],
     " (",
@@ -18323,7 +18388,7 @@ rm(df_prop) # remove previous instances of df_prop
 
 rm(prop)
 rm(conc)
-for (i in 1:(nrow(df_criteria_se4b))) {
+for (i in seq_len(nrow(df_criteria_se4b))) {
   # set the proposition name
   Prop_name <-
     paste0(as.character(df_criteria_se4b[i, 3]), "_o")
@@ -18451,7 +18516,7 @@ fpm_plot_title <-
   "Labour\nAvailability\noptimality\nmembership"
 
 plot_fpm <- rasterize_plot_fpm(n, fpm_conc_var, fpm_conc_name, df_irm_i2)
-print(plot_fpm)
+ # print(plot_fpm)
 
 
 ``` 
@@ -18474,7 +18539,7 @@ cat("[1] '(1) se_5e is good' or '(1) se_5e is poor'
 
 ```{r i2_rulebases_fp_access03, cache = TRUE, cache.whatever=params$Agg, cache.whatever=params$Agg, results='asis', eval=fp_crit}
 
-for (i in 1:(nrow(df_criteria_se4c))) {
+for (i in seq_len(nrow(df_criteria_se4c))) {
   print(paste0(
     df_criteria_se4c[i, 3],
     " (",
@@ -18511,10 +18576,10 @@ df_criteria_se5f <-
 n_cse5f <- nrow(df_criteria_se5f)
 
 
-#Rule 2: If  F/P Access at Local Farmer Group is good and F/P Access at woreda is poor
+#Rule 2: If  F/P Access at Local Farmer Group is poor and F/P Access at woreda is good
 rule2 <-   df_criteria_se5e$weight[1] - df_criteria_se5f$weight[1]
 
-#Rule 3: If F/P Access at Local Farmer Group is poor and F/P Access at woreda is good
+#Rule 3: If F/P Access at Local Farmer Group is good and F/P Access at woreda is poor
 rule3 <-   -df_criteria_se5e$weight[1] + df_criteria_se5f$weight[1]
 
 
@@ -18528,30 +18593,30 @@ cat("\n")
 df_conc <- tibble(se_4c = fp_conclusion1)
 
 #Rule 2: then fp access is poor, moderate or good
-if (rule2 >= 0.33)  {
-  fp_conclusion2 = "good"
-}     else if (rule2 > -0.33) {
-  fp_conclusion2 = "moderate"
-} else {
+if (rule2 >= 0.33)  {   # when local F/P has a higher weight
   fp_conclusion2 = "poor"
+}     else if (rule2 > -0.33) { # when weights are similar
+  fp_conclusion2 = "moderate"
+} else {                # when woreda F/P has a higher weight
+  fp_conclusion2 = "good"
 }
 cat(paste("rule 2 = ", fp_conclusion2))
 cat("\n")
 df_conc <- add_row(df_conc, se_4c = fp_conclusion2)
 
 #Rule 3: then fp access is poor, moderate or good
-if (rule3 >= 0.33)  {
-  fp_conclusion3 = "good"
-}     else if (rule3 > -0.33) {
+if (rule3 >= 0.33)  { # when woreda F/P has a higher weight
+  fp_conclusion3 = "poor"
+}     else if (rule3 > -0.33) { # when weights are similar
   fp_conclusion3 = "moderate"
 } else {
-  fp_conclusion3 = "poor"
+  fp_conclusion3 = "good" # when local F/P has a higher weight
 }
 cat(paste("rule 3 = ", fp_conclusion3))
 cat("\n")
 df_conc <- add_row(df_conc, se_4c = fp_conclusion3)
 
-#Rule 8: then fp access is always poor
+#Rule 4: then fp access is always poor
 fp_conclusion4 = "poor"
 cat(paste("rule 4 = ", fp_conclusion4))
 df_conc <- add_row(df_conc, se_4c = fp_conclusion4)
@@ -18581,7 +18646,7 @@ if (fp_crit == 1) {
   
   rm(prop)
   rm(conc)
-  for (i in 1:(nrow(df_criteria_se4c))) {
+  for (i in seq_len(nrow(df_criteria_se4c))) {
     # set the proposition name
     Prop_name <-
       paste0(as.character(df_criteria_se4c[i, 3]), "_o")
@@ -18709,7 +18774,7 @@ if (fp_crit == 1) {
     "Fertiliser\n& Pesticide\nAccess\noptimality\nmembership"
   
   plot_fpm <- rasterize_plot_fpm(n, fpm_conc_var, fpm_conc_name, df_irm_i2)
-  print(plot_fpm)
+   # print(plot_fpm)
   
 }
 
@@ -18749,7 +18814,7 @@ df_criteria_se3b <-
 n_cse3b <- nrow(df_criteria_se3b)
 print(paste(n_cse3b, "Inputs Access criteria: "))
 
-for (i in 1:(nrow(df_criteria_se3b))) {
+for (i in seq_len(nrow(df_criteria_se3b))) {
   print(paste0(
     df_criteria_se3b[i, 3],
     " (",
@@ -19219,7 +19284,7 @@ if  (inp_rb == "gmp" ){
       "Farm Inputs\nAccess\noptimality\nmembership"
      
     plot_fpm <- rasterize_plot_fpm(n, fpm_conc_var, fpm_conc_name, df_irm_i2)
-    print(plot_fpm)
+     # print(plot_fpm)
      
   
   
@@ -19247,7 +19312,7 @@ n_cse3a <- nrow(df_criteria_se3a)
 # then determine and print the names of the rule bases in the Crop and Farm Management theme
 
 cat(paste(n_cse3a, "Crop and Farm Management rule bases:"))
-for (i in 1:n_cse3a) {
+  for (i in seq_len(nrow(df_criteria_se3a))) {
   cat(
     paste0(
       "\n",
@@ -19705,7 +19770,7 @@ fpm_plot_title <-
   "Management\noptimality\nmembership"
 
 plot_fpm <- rasterize_plot_fpm(n, fpm_conc_var, fpm_conc_name, df_irm_i2)
-print(plot_fpm)
+ # print(plot_fpm)
      
 ``` 
 </div>
@@ -19734,7 +19799,7 @@ n_cse2a <- nrow(df_criteria_se2a)
 # then determine and print the names of the rule bases in the Farm Production Feasibility theme
 
 cat(paste("\n\n", n_cse2a, "Farm Production Feasibility rule bases:"))
-for (i in 1:n_cse2a) {
+  for (i in seq_len(nrow(df_criteria_se2a))) {
   cat(
     paste0(
       "\n",
@@ -20195,7 +20260,7 @@ if (mgt_rb == "gmp") {
     }
     
   } else {
-    # there is a no moderate conclusion to labour giving  six rules and conclusions
+    # there is a no moderate conclusion to inputs giving  six rules and conclusions
     
     fpf_rule_num <- 6
     
@@ -20209,7 +20274,7 @@ if (mgt_rb == "gmp") {
         mutate(df_irm_i2,!!as.character(paste0(df_criteria_se1_2a[1, 3], "_m")) := m_col, .keep = c("all"))
       
       fpf_rb <- "hml"
-    }
+    } else {fpf_rb <- "hl"}
   }
 } else {
   # there is a no moderate conclusion to extension giving  six rules and conclusions
@@ -20229,7 +20294,7 @@ if (mgt_rb == "gmp") {
         mutate(df_irm_i2,!!as.character(paste0(df_criteria_se1_2a[1, 3], "_m")) := m_col, .keep = c("all"))
       
       fpf_rb <- "hml"
-    }
+    } else {fpf_rb <- "hl"}
   } else {
     #there is no moderate conclusion to extension or labour giving four rules and conclusions
     
@@ -20243,7 +20308,7 @@ if (mgt_rb == "gmp") {
         mutate(df_irm_i2,!!as.character(paste0(df_criteria_se1_2a[1, 3], "_m")) := m_col, .keep = c("all"))
       
       fpf_rb <- "hml"
-    }
+    } else {fpf_rb <- "hl"}
   }
 }
 
@@ -20277,7 +20342,7 @@ fpm_plot_title <-
   "Farm Production\nFeasibility\noptimality\nmembership"
 
 plot_fpm <- rasterize_plot_fpm(n, fpm_conc_var, fpm_conc_name, df_irm_i2)
-print(plot_fpm)
+ # print(plot_fpm)
   
 ``` 
 </div>
@@ -20299,7 +20364,7 @@ Rule base se_2b has the following propositions:
 
 ```{r i2_rulebases_market_access02, cache = TRUE, cache.whatever=params$Agg, results='asis', eval=mktaccess_crit}
 
-for (i in 1:(nrow(df_criteria_se2b))) {
+for (i in seq_len(nrow(df_criteria_se2b))) {
   print(paste0(
     df_criteria_se2b[i, 3],
     " (",
@@ -20482,7 +20547,7 @@ rm(df_prop) # remove previous instances of df_prop
 
 rm(prop)
 rm(conc)
-for (i in 1:(nrow(df_criteria_se2b))) {
+for (i in seq_len(nrow(df_criteria_se2b))) {
   # set the proposition name
   Prop_name <-
     paste0(as.character(df_criteria_se2b[i, 3]), "_o")
@@ -20615,7 +20680,7 @@ fpm_plot_title <-
   "Market\nAccess\noptimality\nmembership"
 
 plot_fpm <- rasterize_plot_fpm(n, fpm_conc_var, fpm_conc_name, df_irm_i2)
-print(plot_fpm)
+ # print(plot_fpm)
 
 ``` 
 </div>
@@ -20645,7 +20710,7 @@ n_cse1 <- nrow(df_criteria_se1)
 # then determine and print the names of the rule bases in the Socio-Economic Feasibility theme
 
 cat(paste("\n\n", n_cse1, "Socio-Economic Feasibility rule bases:"))
-for (i in 1:n_cse1) {
+  for (i in seq_len(nrow(df_criteria_se1))) {
   cat(
     paste0(
       "\n",
@@ -21174,7 +21239,7 @@ fpm_plot_title <-
   "Socio-Economic\nFeasibility\noptimality\nmembership"
 
 plot_fpm <- rasterize_plot_fpm(n, fpm_conc_var, fpm_conc_name, df_irm_i2)
-print(plot_fpm)
+ # print(plot_fpm)
 
 ``` 
 </div>
@@ -21269,7 +21334,7 @@ n_c0 <- nrow(df_criteria_0)
 # then determine and print the names of the rule bases in the Likelihood of Adoption theme
 
 cat(paste("\n\n", n_c0, "Likelihood of Adoption rule bases:"))
-for (i in 1:n_c0) {
+  for (i in seq_len(nrow(df_criteria_0))) {
   cat(paste0(
     "\n",
     df_criteria_0[i, 3],
@@ -21705,7 +21770,7 @@ fpm_plot_title <-
   "Adoption\nLikelihood\n3-class\nmembership"
 
 plot_fpm <- rasterize_plot_fpm(n, fpm_conc_var, fpm_conc_name, df_irm_i2)
-print(plot_fpm)
+ # print(plot_fpm)
 
 ``` 
 </div>
@@ -21748,27 +21813,27 @@ The first map is _without_, the second map  _with_ triangulation points. These p
 
 vect_adop_tri <- vect_triangulation %>%
     mutate(
-        adopclass = ifelse(grepl(pattern = "high", x = Adoption, ignore.case = TRUE), "high", ifelse(grepl(pattern = "moderate", x = Adoption, ignore.case = TRUE), "moderate", "low")),
+        adopclass = ifelse(grepl(pattern = "high", x = eval(parse(text = params$TRIAD2)), ignore.case = TRUE), "high", ifelse(grepl(pattern = "moderate", x = eval(parse(text = params$TRIAD2)), ignore.case = TRUE), "moderate", "low")),
         type = NA
     ) %>%
-    dplyr::filter(!is.na(Adoption))
+    dplyr::filter(!is.na(params$TRIAD2))
 
 
-vect_adop_tri$type[grepl(pattern = " AE", x = vect_adop_tri$Adoption, ignore.case = TRUE)] <- "b"
-vect_adop_tri$type[grepl(pattern = " EA", x = vect_adop_tri$Adoption, ignore.case = TRUE)] <- "b"
-vect_adop_tri$type[grepl(pattern = "bio", x = vect_adop_tri$Adoption, ignore.case = TRUE)] <- "b"
-vect_adop_tri$type[grepl(pattern = "SE", x = vect_adop_tri$Adoption, ignore.case = TRUE)] <- "s"
-vect_adop_tri$type[grepl(pattern = "soil", x = vect_adop_tri$Adoption, ignore.case = TRUE)] <- "b"
-vect_adop_tri$type[grepl(pattern = "lowland", x = vect_adop_tri$Adoption, ignore.case = TRUE)] <- "b"
-vect_adop_tri$type[grepl(pattern = " temp", x = vect_adop_tri$Adoption, ignore.case = TRUE)] <- "b"
-vect_adop_tri$type[grepl(pattern = " elevation", x = vect_adop_tri$Adoption, ignore.case = TRUE)] <- "b"
-vect_adop_tri$type[grepl(pattern = "market", x = vect_adop_tri$Adoption, ignore.case = TRUE)] <- "s"
-vect_adop_tri$type[grepl(pattern = "rain", x = vect_adop_tri$Adoption, ignore.case = TRUE)] <- "b"
-vect_adop_tri$type[grepl(pattern = "SPAM presence", x = vect_adop_tri$Adoption, ignore.case = TRUE)] <- "b"
+vect_adop_tri$type[grepl(pattern = " AE", x = paste0("vect_adop_tri$",params$TRIAD2), ignore.case = TRUE)] <- "b"
+vect_adop_tri$type[grepl(pattern = " EA", x = paste0("vect_adop_tri$",params$TRIAD2), ignore.case = TRUE)] <- "b"
+vect_adop_tri$type[grepl(pattern = "bio", x = paste0("vect_adop_tri$",params$TRIAD2), ignore.case = TRUE)] <- "b"
+vect_adop_tri$type[grepl(pattern = "SE", x = paste0("vect_adop_tri$",params$TRIAD2), ignore.case = TRUE)] <- "s"
+vect_adop_tri$type[grepl(pattern = "soil", x = paste0("vect_adop_tri$",params$TRIAD2), ignore.case = TRUE)] <- "b"
+vect_adop_tri$type[grepl(pattern = "lowland", x = paste0("vect_adop_tri$",params$TRIAD2), ignore.case = TRUE)] <- "b"
+vect_adop_tri$type[grepl(pattern = " temp", x = paste0("vect_adop_tri$",params$TRIAD2), ignore.case = TRUE)] <- "b"
+vect_adop_tri$type[grepl(pattern = " elevation", x = paste0("vect_adop_tri$",params$TRIAD2), ignore.case = TRUE)] <- "b"
+vect_adop_tri$type[grepl(pattern = "market", x = paste0("vect_adop_tri$",params$TRIAD2), ignore.case = TRUE)] <- "s"
+vect_adop_tri$type[grepl(pattern = "rain", x = paste0("vect_adop_tri$",params$TRIAD2), ignore.case = TRUE)] <- "b"
+vect_adop_tri$type[grepl(pattern = "SPAM presence", x = paste0("vect_adop_tri$",params$TRIAD2), ignore.case = TRUE)] <- "b"
 
 
 vect_adop_tri %>%
-    dplyr::select(Adoption, adopclass, type) %>%
+    dplyr::select(params$TRIAD2, adopclass, type) %>%
     (knitr::kable) %>% kable_styling("striped", full_width = F) %>% scroll_box(height = "300px")
 ``` 
 </div>
@@ -21871,12 +21936,12 @@ g2 +
     geom_spatvector(
         data = vect_adop_tri, 
         mapping = aes(colour = ifelse(adopclass == "high" , "green", "red")), 
-        size = 2
+        size = 1, shape = 21
     ) +
-    geom_spatvector_text(
-        data = vect_adop_tri, 
-        mapping = aes(label = ifelse(type == "b", "b", "b/s"))
-    ) + 
+    #geom_spatvector_text(
+    #    data = vect_adop_tri, 
+    #    mapping = aes(label = ifelse(type == "b", "b", "b/s"))
+    #) + 
   scale_colour_identity() 
 
 } # end RES if statement 08/12/2019
@@ -22013,7 +22078,7 @@ if (params$RES2 != 2) {
   # then determine and print the names of the rule bases in the Likelihood of Adoption theme
   
   cat(paste("\n\n", n_c0, "Likelihood of Adoption rule bases:"))
-  for (i in 1:n_c0) {
+  for (i in seq_len(nrow(df_criteria_0))) {
     cat(paste0(
       "\n",
       df_criteria_0[i, 3],
@@ -22095,7 +22160,7 @@ g2 +
     geom_spatvector(
         data = vect_adop_tri, 
         mapping = aes(colour = ifelse(adopclass == "high" , "green", "red")), 
-        size = 2
+        size = 1, shape = 21
     ) +
   scale_colour_identity() 
 
@@ -22366,7 +22431,7 @@ g2 +
     geom_spatvector(
         data = vect_adop_tri, 
         mapping = aes(colour = ifelse(adopclass == "high" , "green", "red")), 
-        size = 2
+        size = 1, shape = 21
     ) +
   scale_colour_identity() 
 
@@ -22508,29 +22573,25 @@ The first map is _without_, the second map  _with_ triangulation points. These p
 
 vect_ba_tri <- vect_triangulation %>%
     mutate(
-        baclass = ifelse(grepl(pattern = "suboptimal", x = eval(parse(text = params$TRI2)), ignore.case = TRUE), "suboptimal", ifelse(grepl(pattern = "optimal", x = eval(parse(text = params$TRI2)), ignore.case = TRUE), "optimal", "other"))#,
+        baclass = ifelse(grepl(pattern = "suboptimal", x = eval(parse(text = params$TRIBA2)), ignore.case = TRUE), "suboptimal", ifelse(grepl(pattern = "optimal", x = eval(parse(text = params$TRIBA2)), ignore.case = TRUE), "optimal", "other"))#,
         #type = NA  #a Farrow commented out 26/09/2023
     ) %>%
-    dplyr::filter(!is.na(params$TRI2))
+    dplyr::filter(!is.na(params$TRIBA2))
 
-
-mutate(df_onset, !!as.character(paste0(period_name,"_l")) :=  eval(parse(text = paste0("df_growth_stages_lengths3$", period_name))), .keep = c("all"))
-
-
-vect_ba_tri$type[grepl(pattern = " AE", x = paste0("vect_ba_tri$",params$TRI2), ignore.case = TRUE)] <- "b"
-vect_ba_tri$type[grepl(pattern = " EA", x = paste0("vect_ba_tri$",params$TRI2), ignore.case = TRUE)] <- "b"
-vect_ba_tri$type[grepl(pattern = "bio", x = paste0("vect_ba_tri$",params$TRI2), ignore.case = TRUE)] <- "b"
-vect_ba_tri$type[grepl(pattern = "SE", x = paste0("vect_ba_tri$",params$TRI2), ignore.case = TRUE)] <- "s"
-vect_ba_tri$type[grepl(pattern = "soil", x = paste0("vect_ba_tri$",params$TRI2), ignore.case = TRUE)] <- "b"
-vect_ba_tri$type[grepl(pattern = "lowland", x = paste0("vect_ba_tri$",params$TRI2), ignore.case = TRUE)] <- "b"
-vect_ba_tri$type[grepl(pattern = " temp", x = paste0("vect_ba_tri$",params$TRI2), ignore.case = TRUE)] <- "b"
-vect_ba_tri$type[grepl(pattern = " elevation", x = paste0("vect_ba_tri$",params$TRI2), ignore.case = TRUE)] <- "b"
-vect_ba_tri$type[grepl(pattern = "market", x = paste0("vect_ba_tri$",params$TRI2), ignore.case = TRUE)] <- "s"
-vect_ba_tri$type[grepl(pattern = "rain", x = paste0("vect_ba_tri$",params$TRI2), ignore.case = TRUE)] <- "b"
-vect_ba_tri$type[grepl(pattern = "SPAM presence", x = paste0("vect_ba_tri$",params$TRI2), ignore.case = TRUE)] <- "b"
+vect_ba_tri$type[grepl(pattern = " AE", x = paste0("vect_ba_tri$",params$TRIBA2), ignore.case = TRUE)] <- "b"
+vect_ba_tri$type[grepl(pattern = " EA", x = paste0("vect_ba_tri$",params$TRIBA2), ignore.case = TRUE)] <- "b"
+vect_ba_tri$type[grepl(pattern = "bio", x = paste0("vect_ba_tri$",params$TRIBA2), ignore.case = TRUE)] <- "b"
+vect_ba_tri$type[grepl(pattern = "SE", x = paste0("vect_ba_tri$",params$TRIBA2), ignore.case = TRUE)] <- "s"
+vect_ba_tri$type[grepl(pattern = "soil", x = paste0("vect_ba_tri$",params$TRIBA2), ignore.case = TRUE)] <- "b"
+vect_ba_tri$type[grepl(pattern = "lowland", x = paste0("vect_ba_tri$",params$TRIBA2), ignore.case = TRUE)] <- "b"
+vect_ba_tri$type[grepl(pattern = " temp", x = paste0("vect_ba_tri$",params$TRIBA2), ignore.case = TRUE)] <- "b"
+vect_ba_tri$type[grepl(pattern = " elevation", x = paste0("vect_ba_tri$",params$TRIBA2), ignore.case = TRUE)] <- "b"
+vect_ba_tri$type[grepl(pattern = "market", x = paste0("vect_ba_tri$",params$TRIBA2), ignore.case = TRUE)] <- "s"
+vect_ba_tri$type[grepl(pattern = "rain", x = paste0("vect_ba_tri$",params$TRIBA2), ignore.case = TRUE)] <- "b"
+vect_ba_tri$type[grepl(pattern = "SPAM presence", x = paste0("vect_ba_tri$",params$TRIBA2), ignore.case = TRUE)] <- "b"
 
 vect_ba_tri %>%
-    dplyr::select(params$TRI2, baclass, type) %>%
+    dplyr::select(params$TRIBA2, baclass, type) %>%
     (knitr::kable) %>% kable_styling("striped", full_width = F) %>% scroll_box(height = "300px")
 
 ```
@@ -22779,12 +22840,12 @@ g2 +
     geom_spatvector(
         data = vect_ba_tri, 
         mapping = aes(colour = ifelse(baclass == "optimal" , "green", "red")), 
-        size = 2
+        size = 1, shape = 21
     ) +
-    geom_spatvector_text(
-        data = vect_ba_tri, 
-        mapping = aes(label = ifelse(type == "b", "b", "b/s"))
-    ) + 
+    #geom_spatvector_text(
+    #    data = vect_ba_tri, 
+    #    mapping = aes(label = ifelse(type == "b", "b", "b/s"))
+    #) + 
   scale_colour_identity() 
 
 } # end RES if statement 08/12/2019
@@ -23072,7 +23133,7 @@ cat("### Biophysical Aptitude - FAO limitations classes")
 if (params$RES2 != 2) {
   # new method because of df_irm_i2 dropped no data
   
-  df_df_irm_i2_ba_fao <-
+  df_irm_i2_ba_fao <-
     df_irm_i2 %>% dplyr::select(x, y, ba_1_o) %>% na.omit %>% mutate(FAO = cut(
       ba_1_o,
       breaks = c(-Inf, 0.25, 0.4, 0.6, 0.8, Inf),
@@ -23080,27 +23141,27 @@ if (params$RES2 != 2) {
       include.lowest = TRUE
     ))
 
-  df_faolimits <-
+  df_irm_i2_faolimits <-
     df_irm_i2 %>% dplyr::select(ba_2b_s, ba_2c_s, ba_2d_s, ba_2e_s) %>% na.omit
-  df_faolimits$limit <- names(df_faolimits)[][max.col(df_faolimits[])]
+  df_irm_i2_faolimits$limit <- names(df_irm_i2_faolimits)[][max.col(df_irm_i2_faolimits[])]
   
-  df_ba_faolimits <- cbind(df_df_irm_i2_ba_fao, df_faolimits)
+  df_irm_i2_ba_faolimits <- cbind(df_irm_i2_ba_fao, df_irm_i2_faolimits)
 
-  df_ba_faolimits <- df_ba_faolimits %>% 
+  df_irm_i2_ba_faolimits <- df_irm_i2_ba_faolimits %>% 
       mutate(FAO_limit = case_match(limit, "ba_2b_s" ~ "Cl", "ba_2c_s" ~ "SP", "ba_2d_s" ~ "SF", "ba_2e_s" ~ "Ls",
   .default = "missing"), .keep = "all")
   
-    df_ba_faolimits <- df_ba_faolimits %>% 
+    df_irm_i2_ba_faolimits <- df_irm_i2_ba_faolimits %>% 
       mutate(FAO_limit2 = case_when(FAO == "S1" ~ "S1", .default = paste0(FAO,"_",FAO_limit)))
     
-  df_faolimits_values  <-  df_ba_faolimits %>% select(FAO_limit2) %>% unique()
-  df_faolimits_values  <- df_faolimits_values[order(df_faolimits_values$FAO_limit2), ] %>% data.frame
-  names(df_faolimits_values) <- c('FAO_limit_code')
+  df_irm_i2_faolimits_values  <-  df_irm_i2_ba_faolimits %>% select(FAO_limit2) %>% unique()
+  df_irm_i2_faolimits_values  <- df_irm_i2_faolimits_values[order(df_irm_i2_faolimits_values$FAO_limit2), ] %>% data.frame
+  names(df_irm_i2_faolimits_values) <- c('FAO_limit_code')
   
-  df_faolimits_values  <- mutate(df_faolimits_values, ID = row_number()-1)
-  df_faolimits_values  <- df_faolimits_values[, c(2,1)] # re-order for later use as raster categories
+  df_irm_i2_faolimits_values  <- mutate(df_irm_i2_faolimits_values, ID = row_number()-1)
+  df_irm_i2_faolimits_values  <- df_irm_i2_faolimits_values[, c(2,1)] # re-order for later use as raster categories
   
-  df_faolimits_code <-
+  df_irm_i2_faolimits_code <-
     data.frame(
       "FAO_code_num" = c(1:17),
       "FAO_code_char" = c(
@@ -23124,15 +23185,15 @@ if (params$RES2 != 2) {
       )
     )
   
-  vect_ba_faolimits  <- vect(df_ba_faolimits, geom = c("x", "y"))
+  vect_ba_faolimits  <- vect(df_irm_i2_ba_faolimits, geom = c("x", "y"))
     
   rast_ba_faolimits <- rasterize(vect_ba_faolimits, rast_mask_proj, field = "FAO_limit2")
   names(rast_ba_faolimits) <- c('FAO_limit_code')
-  levels(rast_ba_faolimits) <- df_faolimits_values
+  levels(rast_ba_faolimits) <- df_irm_i2_faolimits_values
   
   vect_ba_faolimits <-    merge(
     x = vect_ba_faolimits,
-    y = df_faolimits_code,
+    y = df_irm_i2_faolimits_code,
     by.x = "FAO_limit2",
     by.y = "FAO_code_char",
     all.x = TRUE
@@ -23157,7 +23218,7 @@ if (params$RES2 != 2) {
   g <- ggplot() +
     geom_spatraster(data = rast_ba_faolimits, na.rm = TRUE, aes(fill = FAO_limit_code)) +
     scale_fill_manual(
-    name = "FAO\nlimitations\nrice",  
+    name = paste0("FAO\nlimitations\n", params$INN2),  
     breaks = c('S1','S2_Cl','S2_Ls','S2_SF','S2_SP','S3_Cl','S3_Ls','S3_SF',
       'S3_SP','N1_Cl','N1_Ls','N1_SF','N1_SP','N2_Cl','N2_Ls','N2_SF','N2_SP'),
     na.value = "transparent",
@@ -23197,9 +23258,9 @@ if (params$RES2 != 2) {
   
 g2 + 
     geom_spatvector(
-        data = vect_triangulation, 
-        mapping = aes(colour = ifelse(Adoption == "high" , "green", "red")), 
-        size = 2
+        data = vect_ba_tri, 
+        mapping = aes(colour = ifelse(baclass == "optimal" , "green", "red")), 
+        size = 1, shape = 21
     ) +
   scale_colour_identity() 
 
@@ -23331,25 +23392,25 @@ cat("## Classified Map of Socioeconomic Feasibility")
 #vect_se_tri <- sfc_as_cols(vect_triangulation) %>%
   vect_se_tri <- vect_triangulation %>%
     mutate(
-        seclass = ifelse(grepl(pattern = "high", x = Feasibility, ignore.case = TRUE), "high", ifelse(grepl(pattern = "moderate", x = Feasibility, ignore.case = TRUE), "moderate", "low")),
+        seclass = ifelse(grepl(pattern = "high", x = eval(parse(text = params$TRISE2)), ignore.case = TRUE), "high", ifelse(grepl(pattern = "moderate", x = eval(parse(text = params$TRISE2)), ignore.case = TRUE), "moderate", "low")),
         type = NA
     ) %>%
-    dplyr::filter(!is.na(Feasibility))
+    dplyr::filter(!is.na(params$TRISE2))
 
 
-vect_se_tri$type[grepl(pattern = " AE", x = vect_se_tri$Feasibility, ignore.case = TRUE)] <- "b"
-vect_se_tri$type[grepl(pattern = " EA", x = vect_se_tri$Feasibility, ignore.case = TRUE)] <- "b"
-vect_se_tri$type[grepl(pattern = "bio", x = vect_se_tri$Feasibility, ignore.case = TRUE)] <- "b"
-vect_se_tri$type[grepl(pattern = "SE", x = vect_se_tri$Feasibility, ignore.case = TRUE)] <- "s"
-vect_se_tri$type[grepl(pattern = "soil", x = vect_se_tri$Feasibility, ignore.case = TRUE)] <- "b"
-vect_se_tri$type[grepl(pattern = "lowland", x = vect_se_tri$Feasibility, ignore.case = TRUE)] <- "b"
-vect_se_tri$type[grepl(pattern = " temp", x = vect_se_tri$Feasibility, ignore.case = TRUE)] <- "b"
-vect_se_tri$type[grepl(pattern = " elevation", x = vect_se_tri$Feasibility, ignore.case = TRUE)] <- "b"
-vect_se_tri$type[grepl(pattern = "market", x = vect_se_tri$Feasibility, ignore.case = TRUE)] <- "s"
-vect_se_tri$type[grepl(pattern = "rain", x = vect_se_tri$Feasibility, ignore.case = TRUE)] <- "b"
+vect_se_tri$type[grepl(pattern = " AE", x = paste0("vect_adop_tri$",params$TRISE2), ignore.case = TRUE)] <- "b"
+vect_se_tri$type[grepl(pattern = " EA", x = paste0("vect_adop_tri$",params$TRISE2), ignore.case = TRUE)] <- "b"
+vect_se_tri$type[grepl(pattern = "bio", x = paste0("vect_adop_tri$",params$TRISE2), ignore.case = TRUE)] <- "b"
+vect_se_tri$type[grepl(pattern = "SE", x = paste0("vect_adop_tri$",params$TRISE2), ignore.case = TRUE)] <- "s"
+vect_se_tri$type[grepl(pattern = "soil", x = paste0("vect_adop_tri$",params$TRISE2), ignore.case = TRUE)] <- "b"
+vect_se_tri$type[grepl(pattern = "lowland", x = paste0("vect_adop_tri$",params$TRISE1), ignore.case = TRUE)] <- "b"
+vect_se_tri$type[grepl(pattern = " temp", x = paste0("vect_adop_tri$",params$TRISE2), ignore.case = TRUE)] <- "b"
+vect_se_tri$type[grepl(pattern = " elevation", x = paste0("vect_adop_tri$",params$TRISE1), ignore.case = TRUE)] <- "b"
+vect_se_tri$type[grepl(pattern = "market", x = paste0("vect_adop_tri$",params$TRISE2), ignore.case = TRUE)] <- "s"
+vect_se_tri$type[grepl(pattern = "rain", x = paste0("vect_adop_tri$",params$TRISE2), ignore.case = TRUE)] <- "b"
 
 vect_se_tri %>%
-    dplyr::select(Feasibility, seclass, type) %>%
+    dplyr::select(params$TRISE2, seclass, type) %>%
     (knitr::kable) %>% kable_styling("striped", full_width = F) %>% scroll_box(height = "300px")
 ``` 
 </div>
@@ -23386,7 +23447,7 @@ if (sef_rb == "hml") {
     df_irm_i2 %>% dplyr::select(se_1_h, se_1_l, x , y) %>% na.omit %>% vect(geom = c("x", "y"))
   rast_se_3class_h <- rasterize(vect_se_3class, rast_mask_proj, field = "se_1_h")
   rast_se_3class_l <- rasterize(vect_se_3class, rast_mask_proj, field = "se_1_l")
-  rast_se_3class <- rast(list(d1, d2))
+  rast_se_3class <- rast(list(rast_se_3class_h, rast_se_3class_l))
   names(rast_se_3class) <- c('high', 'low')
 
   # get max value and export
@@ -23448,13 +23509,13 @@ if (params$RES2 != 2) {
 g2 + 
     geom_spatvector(
         data = vect_se_tri, 
-        mapping = aes(colour = ifelse(seclass == "optimal" , "green", "red")), 
-        size = 2
+        mapping = aes(colour = ifelse(seclass == "high" , "green", "red")), 
+        size = 1, shape = 21
     ) +
-    geom_spatvector_text(
-        data = vect_se_tri, 
-        mapping = aes(label = ifelse(type == "s", "s", "s/b"))
-    ) + 
+    #geom_spatvector_text(
+    #    data = vect_se_tri, 
+    #    mapping = aes(label = ifelse(type == "s", "s", "s/b"))
+    #) + 
   scale_colour_identity() 
 
 } # end RES if statement 08/12/2019
@@ -23647,8 +23708,9 @@ if (params$RES2 != 1) {
 }
 
 ```
+</div>
 
-```{r i2_statistics_adop_faolimits_01, echo=FALSE, results='asis', eval=ba_crit}
+```{r i2_statistics_adop_faolimits_01, echo=FALSE, results='asis', eval=adop_crit}
 
 cat("### Likelihood for Adoption - FAO twenty-one classes - total area (ha)
 
@@ -23657,7 +23719,7 @@ The table and maps shows the area in hectares within each subdivision of each FA
 ```
 
 <div class="fold o"> 
-```{r i2_statistics_adop_faolimits_02, cache = TRUE, cache.whatever=params$Agg,  out.width="100%", warning=FALSE, eval=ba_crit}
+```{r i2_statistics_adop_faolimits_02, cache = TRUE, cache.whatever=params$Agg,  out.width="100%", warning=FALSE, eval=adop_crit}
 # create subdiv level statistics
 # 03/03/2019 A FARROW adde
 
@@ -23740,10 +23802,7 @@ if (params$RES2 != 1) {
 }
 
 ```
-
 </div>
-
-
 
 ```{r i2_statistics_adop_05, echo=FALSE, results='asis', eval=adop_crit}
 
@@ -23785,7 +23844,6 @@ if (params$RES2 != 2) {
 ``` 
 </div>
 
-
 ```{r i2_statistics_adop_faolimits_03, echo=FALSE, results='asis', eval=adop_crit}
 
 cat("### Likelihood for Adoption - FAO twenty-one classes - total area (%)
@@ -23824,9 +23882,7 @@ if (params$RES2 != 1) {
 }
 
 ``` 
-
 </div>
-
 
 ```{r i2_statistics_ba_01, echo=FALSE, results='asis', eval=ba_crit}
 
@@ -23870,7 +23926,6 @@ if (params$RES2 != 2) {
 
 ``` 
 </div>
-
 
 ```{r i2_statistics_ba_fao_01, echo=FALSE, results='asis', eval=ba_crit}
 
@@ -23923,6 +23978,7 @@ if (params$RES2 != 1) {
 }
 
 ``` 
+</div>
 
 ```{r i2_statistics_ba_faolimits_01, echo=FALSE, results='asis', eval=ba_crit}
 
@@ -24008,6 +24064,7 @@ if (params$RES2 != 1) {
 }
 
 ```
+</div>
 
 ```{r i2_statistics_ba_03, echo=FALSE, results='asis', eval=ba_crit}
 
@@ -24049,7 +24106,6 @@ if (params$RES2 != 2) {
 ``` 
 </div>
 
-
 ```{r i2_statistics_ba_faolimits_03, echo=FALSE, results='asis', eval=ba_crit}
 
 cat("### Biophysical Aptitude - seventeen classes - (%)
@@ -24089,7 +24145,6 @@ if (params$RES2 != 1) {
 }
 
 ``` 
-
 </div>
 
 ```{r i2_statistics_se_01, echo=FALSE, results='asis', eval=sef_crit}
@@ -24134,7 +24189,6 @@ if (params$RES2 != 2) {
 
 ``` 
 </div>
-
 
 ```{r i2_statistics_se_03, echo=FALSE, results='asis', eval=sef_crit}
 
@@ -24184,7 +24238,7 @@ The IRM script already calculates the optimality of the individual criteria as w
 
 The first method of calculating yield will calculate the product of the optimality of selected criteria.
 
-
+<div class="fold o"> 
 ```{r i2_calc_yield_1, cache = TRUE, cache.whatever=params$Agg,  out.width="100%", include = TRUE, echo=FALSE, message=FALSE, warning=FALSE, eval=ba_crit}
 
 # get the criteria that contribute to yield
@@ -24207,7 +24261,7 @@ yield_expr
 
 # evaluate the expression
 eval(str2expression(yield_expr))
-str(df_irm_i2$yieldpc)
+#str(df_irm_i2$yieldpc)
 if (summarise(df_irm_i2, Average = mean(yieldpc, na.rm = T)) > 0) {
 
 # df_irm_i2 <- dplyr::select(df_irm_i2,-yield)
@@ -24252,12 +24306,13 @@ output_geotiff(rast_yieldpc, paste0("yieldpc_", params$INN2))
 gy2
 }
 ```
+</div>
 
 ## Calculate yield
 
 The IRM script converts yield proportion to yield using the yield values for sole crop or intercrop.
 
-
+<div class="fold o"> 
 ```{r i2_calc_yield_2, cache = TRUE, cache.whatever=params$Agg, out.width="100%", include = TRUE, echo=FALSE, message=FALSE, warning=FALSE, eval=ba_crit}
 
 # get the criteria that contribute to yield
@@ -24270,11 +24325,11 @@ df_yield_values %>% kable(digits = 3) %>% kable_styling("striped", full_width = 
 
 
 if (params$INN2 == "NA") {
-  df_irm_i2$yield <- df_irm_i2$yieldpc / 100 * df_yield_values$YA
+  df_irm_i2$yield <- df_irm_i2$yieldpc / 100 * df_yield_values$YW
   cat("Sole crop yield")
 } else {
   if (params$SYS == "comparison") {
-    df_irm_i2$yield <- df_irm_i2$yieldpc / 100 * df_yield_values$YA
+    df_irm_i2$yield <- df_irm_i2$yieldpc / 100 * df_yield_values$YW
     cat("Sole crop 1 yield (comparison)")
   } else {
     if (params$SYS == "intercrop") {
@@ -24282,7 +24337,7 @@ if (params$INN2 == "NA") {
       cat("Intercrop 1 yield")
     } else {
       if (params$SYS == "rotation") {
-        df_irm_i2$yield <- df_irm_i2$yieldpc / 100 * df_yield_values$YA
+        df_irm_i2$yield <- df_irm_i2$yieldpc / 100 * df_yield_values$YW
         cat("Rotation crop 1 yield")
       }
     }
@@ -24332,12 +24387,13 @@ gyd <- ggplot() +
 gyd2
 }
 ```
+</div>
 
 ## Calculate production
 
 The IRM script converts yield proportion to production using the yield values for sole crop or intercrop.
 
-
+<div class="fold o"> 
 ```{r i2_calc_yield_3, cache = TRUE, cache.whatever=params$Agg, out.width="100%", include = TRUE, echo=FALSE, message=FALSE, warning=FALSE, eval=ba_crit}
 
 # get the criteria that contribute to yield
@@ -24393,6 +24449,7 @@ if (summarise(df_irm_i2, Average = mean(production, na.rm = T)) > 0) {
   gp2
 }
 ```
+</div>
 
 # Compare the innovations
 
@@ -24535,7 +24592,209 @@ gcsum2
 </div>
 
 
+## Alternative effect of socio-economic feasibility on biophysical aptitude
 
+This is a special situation where an intervention has an effect on biophysical aptitude. We model this by changing the threshold of a particular biophysical criterion. The socio-economic feasibility shows where this effect takes place. This implies that we multiply the value of the biophysical aptitude optimality and the feasibility optimality. We then compare the resulting value with the original biophysical aptitude optimality, and select the highest value and produce classified maps.
+
+<div class="fold o">
+```{r classified compare_score_maps2, cache = TRUE, cache.whatever=params$Agg, out.width="100%", message=FALSE, warning=FALSE, timeit = TRUE, eval=ba_crit}
+
+df_ba_se <-
+  df_irm %>% dplyr::select(paste0(df_criteria_0[1, 3], "_o"),
+                           paste0(df_criteria_0[2, 3], "_o"),
+                           x ,
+                           y) %>% na.omit
+
+# effect on ba optimality equals the product sum
+
+expr_ba_se <-
+  parse(text = paste0("(",
+                      df_criteria_0[1, 3],
+                      "_o) * (",
+                      df_criteria_0[2, 3],
+                      "_o)"))
+
+vect_ba_se <-
+  mutate(df_ba_se, ba_se_o := eval(expr_ba_se), .keep = c("all"))  %>% vect(geom = c("x", "y")) # evaluate the product sum and convert to vect
+
+rast_ba_se <-
+  rasterize(vect_ba_se, rast_mask_proj, field = "ba_se_o")
+
+
+rast_ba_max <-
+  max(rast_ba_se, rast_ba_2class_o) # compare with ba optimality of second innovation and choose max value
+
+rast_ba_max_bin <-
+  classify(rast_ba_max, m_ba_fao, include.lowest = TRUE)
+rast_ba_max_cat <- rast_ba_max_bin
+levels(rast_ba_max_cat) <- df_ba_fao
+rast_ba_max_brick <-
+  rast(list(rast_ba_max, rast_ba_max_bin, rast_ba_max_cat))
+names(rast_ba_max_brick) <- c('optimal', 'bin', 'FAO')
+output_geotiff(rast_ba_max_brick,
+               paste0("1class_ba_max_", params$INN1, "_", params$INN2))
+
+# export class and optimal value as polygon
+vect_ba_max_cat <- as.polygons(rast_ba_max_cat, dissolve = T)
+
+vect_filename <-
+  as.character(paste0("1class_ba_max_", params$INN1, "_", params$INN2, ".shp"))
+writeVector(vect_ba_max_cat, here(vect_filename), overwrite = TRUE)
+
+g <- ggplot() +
+  geom_spatraster(data = rast_ba_max_cat, na.rm = TRUE, aes(fill = FAO)) +
+  scale_fill_manual(
+    name = paste0("FAO\nsuitability\nMax\n", params$INN1, "\n" , params$INN2),
+    na.value = "transparent",
+    values = c(
+      S1 = rgb(51, 160, 44, maxColorValue = 255),
+      S2 = rgb(178, 223, 138, maxColorValue = 255),
+      S3 = rgb(255, 255, 153, maxColorValue = 255),
+      N1 = rgb(255, 127, 0, maxColorValue = 255),
+      N2 = rgb(227, 26, 28, maxColorValue = 255)
+    )
+  )
+
+g2 <- add_subdiv_proj_simple_plot(g)
+g2
+
+```
+</div>
+
+<div class="fold o"> 
+```{r classified compare_score_maps3, cache = TRUE, cache.whatever=params$Agg, out.width="100%", message=FALSE, warning=FALSE, timeit = TRUE, eval=ba_crit}
+
+g2 + 
+    geom_spatvector(
+        data = vect_ba_tri, 
+        mapping = aes(colour = ifelse(baclass == "optimal" , "green", "red")), 
+        size = 1, shape = 21
+    ) +
+  scale_colour_identity() 
+
+``` 
+</div>
+
+We then need to compare the limitations. We can get the limitation value from the raster that has the highest biophysical aptitude optimality value from the two innovations.
+
+
+<div class="fold o"> 
+```{r classified compare_score_maps4, cache = TRUE, cache.whatever=params$Agg, out.width="100%", message=FALSE, warning=FALSE, timeit = TRUE, eval=ba_crit}
+
+df_irm_ba_faolimits_rename <-
+  df_irm_ba_faolimits %>% rename(irm_FAO_limit2 = FAO_limit2)
+
+df_irm_i2_ba_faolimits_rename <-
+  df_irm_i2_ba_faolimits %>% rename(irm_i2_FAO_limit2 = FAO_limit2)
+
+df_irm_compare_ba_faolimits <-
+  cbind(
+    select(df_irm_ba_faolimits_rename, x, y, irm_FAO_limit2),
+    select(df_irm_i2_ba_faolimits_rename, irm_i2_FAO_limit2)
+  )
+
+vect_irm_compare_ba_faolimits <-
+  df_irm_compare_ba_faolimits %>% vect(geom = c("x", "y")) # evaluate the product sum and convert to vect
+
+vect_irm_compare_ba_faolimits <- merge(x = vect_irm_compare_ba_faolimits, y = df_irm_faolimits_code, by.x = "irm_FAO_limit2", by.y = "FAO_code_char", all.x = TRUE)
+tail(vect_irm_compare_ba_faolimits)
+
+vect_irm_compare_ba_faolimits <- merge(x = vect_irm_compare_ba_faolimits, y = df_irm_i2_faolimits_code, by.x = "irm_i2_FAO_limit2", by.y = "FAO_code_char", all.x = TRUE)
+tail(vect_irm_compare_ba_faolimits)
+
+
+rast_irm_compare_ba_faolimits_1 <-
+  rasterize(vect_irm_compare_ba_faolimits, rast_mask_proj, field = "FAO_code_num.x")
+
+rast_irm_compare_ba_faolimits_2 <-
+  rasterize(vect_irm_compare_ba_faolimits, rast_mask_proj, field = "FAO_code_num.y")
+
+rast_ba_opt <- rast(list(rast_ba_se, rast_ba_2class_o))
+
+rast_ba_opt_max <-   which.max(rast_ba_opt) # compare with ba optimality of second innovation and choose max value
+
+rast_ba_opt_max_compare <- rast(list(rast_ba_opt_max, rast_irm_compare_ba_faolimits_1, rast_irm_compare_ba_faolimits_2))
+
+plot(rast_ba_opt_max_compare)
+#rast_ba_opt_max_compare$max_FAO_limit2 <- ifel(rast_ba_opt_max_compare$rast_ba_opt_max == 1, rast_ba_opt_max_compare$irm_FAO_limit2, rast_ba_opt_max_compare$irm_i2_FAO_limit2)
+
+rast_irm_compare_ba_faolimits <- ifel(rast_ba_opt_max == 1, rast_irm_compare_ba_faolimits_1, rast_irm_compare_ba_faolimits_2)
+
+levels(rast_irm_compare_ba_faolimits) <- df_irm_faolimits_code
+
+
+g <- ggplot() +
+  geom_spatraster(data = rast_irm_compare_ba_faolimits, na.rm = TRUE, aes(fill = FAO_code_char)) +
+  scale_fill_manual(
+    name = paste0("FAO\nlimitations\n", params$INN2),
+    breaks = c(
+      'S1',
+      'S2_Cl',
+      'S2_Ls',
+      'S2_SF',
+      'S2_SP',
+      'S3_Cl',
+      'S3_Ls',
+      'S3_SF',
+      'S3_SP',
+      'N1_Cl',
+      'N1_Ls',
+      'N1_SF',
+      'N1_SP',
+      'N2_Cl',
+      'N2_Ls',
+      'N2_SF',
+      'N2_SP'
+    ),
+    na.value = "transparent",
+    values = c(
+      S1 = rgb(0, 102, 0, maxColorValue = 255),
+      S2_Cl = rgb(24, 252, 0, maxColorValue = 255),
+      S2_Ls = rgb(60, 179, 113, maxColorValue = 255),
+      S2_SF = rgb(50, 205, 50, maxColorValue = 255),
+      S2_SP = rgb(34, 139, 34, maxColorValue = 255),
+      S3_Cl = rgb(245, 206, 51, maxColorValue = 255),
+      S3_Ls = rgb(247, 218, 102, maxColorValue = 255),
+      S3_SF = rgb(250, 231, 153, maxColorValue = 255),
+      S3_SP = rgb(252, 243, 204, maxColorValue = 255),
+      N1_Cl = rgb(255, 127, 0, maxColorValue = 255),
+      N1_Ls = rgb(255, 168, 54, maxColorValue = 255),
+      N1_SF = rgb(255, 87, 40, maxColorValue = 255),
+      N1_SP = rgb(255, 187, 60, maxColorValue = 255),
+      N2_Cl = rgb(234, 60, 83, maxColorValue = 255),
+      N2_Ls = rgb(180, 55, 87, maxColorValue = 255),
+      N2_SF = rgb(66, 13, 9, maxColorValue = 255),
+      N2_SP = rgb(240, 128, 128, maxColorValue = 255)
+    )
+  )
+
+g2 <- add_subdiv_proj_simple_plot(g)
+g2
+
+``` 
+</div>
+
+<div class="fold o"> 
+```{r classified compare_score_maps5, cache = TRUE, cache.whatever=params$Agg, out.width="100%", message=FALSE, warning=FALSE, message  = FALSE, timeit = TRUE, eval=ba_crit}
+# create classified suitability map and validation
+# 01/03/2019 A FARROW this chunk split because map not appearing
+
+if (params$RES2 != 2) {
+  
+g2 + 
+    geom_spatvector(
+        data = vect_ba_tri, 
+        mapping = aes(colour = ifelse(baclass == "optimal" , "green", "red")), 
+        size = 1, shape = 21
+    ) +
+  scale_colour_identity() 
+
+} # end RES if statement 08/12/2019
+
+``` 
+</div>
+
+  
 ```{r}
 
 if (params$INT == 1)

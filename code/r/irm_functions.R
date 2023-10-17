@@ -864,7 +864,8 @@ plot_subdiv_maps <- function(n, fill_var_list, pal_col) {
       #      }
     #   )  +
       geom_spatvector(data = vect_ba_tri, aes(colour = ifelse(baclass == "optimal" , "green", "red")),
-                      size = 1) +
+                      shape = 21,
+                      size = 2) +
       #geom_spatvector_text(data = vect_ba_tri, aes(label = ifelse(type == "b", "b", "b/s"))) +
       scale_colour_identity()
   }
@@ -1091,15 +1092,15 @@ add_subdiv_proj_simple_plot <- function(map1) {
   return(addsubdivprojsimple_map)
 }
 
-add_triangulation_plot <- function(map1) {
-  addtriangulation_map <-       map1 +
+add_triangulation_plot_ad <- function(map1) {
+  addtriangulation_map_ad <-       map1 +
     geom_spatvector(
       data = vect_triangulation,
-      aes(fill = tri_label),
+      aes(fill = tri_label_ad),
       colour = "black",
       shape = 21,
       size = 2
-    ) +  
+    ) +
     geom_spatvector_text(
       data = vect_triangulation,
       aes(label = id),
@@ -1108,53 +1109,130 @@ add_triangulation_plot <- function(map1) {
       nudge_x = nudge_xvaltri,
       nudge_y = nudge_yvaltri
     ) +
-    
-    scale_fill_manual(values = 1:nlevels(vect_triangulation$tri_label)) +
+    scale_fill_manual(values = 1:nlevels(vect_triangulation$tri_label_ad)) +
     labs(fill = "Comment") +
-    theme(legend.direction = "vertical", 
-          legend.box = "horizontal",
-          axis.title.x = element_blank(),
-          axis.title.y = element_blank()) +
-    guides(#alpha = guide_legend(order = 2),
-      #shape = guide_legend(order = 3),
-      #colour = guide_legend(order = 1)
-      fill = guide_legend(order = 1))
+    theme(
+      legend.direction = "vertical",
+      legend.box = "horizontal",
+      axis.title.x = element_blank(),
+      axis.title.y = element_blank()
+    ) +
+    guides(fill = guide_legend(order = 1))
   
-  return(addtriangulation_map)
+  return(addtriangulation_map_ad)
          
 }
 
-add_triangulation_plot_no_labels <- function(map1) {
-  addtriangulation_map <-       map1 +
+add_triangulation_plot_no_labels_ad <- function(map1) {
+  addtriangulation_map_nl_ad <-       map1 +
     geom_spatvector(
       data = vect_triangulation,
-      aes(fill = tri_label),
+      aes(fill = tri_label_ad),
       colour = "black",
       shape = 21,
-      size = 2, 
+      size = 2,
       show.legend = FALSE
     ) +
-    #geom_spatvector_text(
-    #  data = vect_triangulation,
-    #  aes(label = id),
-    #  colour = "black",
-    #  size = 2,
-    #  nudge_x = nudge_xvaltri,
-    #  nudge_y = nudge_yvaltri
-    #) +
-    
-    scale_fill_manual(values = 1:nlevels(vect_triangulation$tri_label)) +
-    #labs(fill = "Comment") +
-    theme(#legend.direction = "vertical",
-      #legend.box = "horizontal",
-      axis.title.x = element_blank(),
-      axis.title.y = element_blank()) #+
-    #guides(#alpha = guide_legend(order = 2),
-      #shape = guide_legend(order = 3),
-      #colour = guide_legend(order = 1)
-     #fill = NA)#guide_legend(order = 1))
+    scale_fill_manual(values = 1:nlevels(vect_triangulation$tri_label_ad)) +
+    theme(axis.title.x = element_blank(),
+          axis.title.y = element_blank())
+  return(addtriangulation_map_nl_ad)
   
-  return(addtriangulation_map)
+}
+
+add_triangulation_plot_ba <- function(map1) {
+  addtriangulation_map_ba <-       map1 +
+    geom_spatvector(
+      data = vect_triangulation,
+      aes(fill = tri_label_ba),
+      colour = "black",
+      shape = 21,
+      size = 2
+    ) +
+    geom_spatvector_text(
+      data = vect_triangulation,
+      aes(label = id),
+      colour = "black",
+      size = 2,
+      nudge_x = nudge_xvaltri,
+      nudge_y = nudge_yvaltri
+    ) +
+    scale_fill_manual(values = 1:nlevels(vect_triangulation$tri_label_ba)) +
+    labs(fill = "Comment") +
+    theme(
+      legend.direction = "vertical",
+      legend.box = "horizontal",
+      axis.title.x = element_blank(),
+      axis.title.y = element_blank()
+    ) +
+    guides(fill = guide_legend(order = 1))
+  
+  return(addtriangulation_map_ba)
+  
+}
+
+add_triangulation_plot_no_labels_ba <- function(map1) {
+  addtriangulation_map_nl_ba <-       map1 +
+    geom_spatvector(
+      data = vect_triangulation,
+      aes(fill = tri_label_ba),
+      colour = "black",
+      shape = 21,
+      size = 2,
+      show.legend = FALSE
+    ) +
+    scale_fill_manual(values = 1:nlevels(vect_triangulation$tri_label_ba)) +
+    theme(axis.title.x = element_blank(),
+          axis.title.y = element_blank())
+  return(addtriangulation_map_nl_ba)
+  
+}
+
+add_triangulation_plot_se <- function(map1) {
+  addtriangulation_map_se <-       map1 +
+    geom_spatvector(
+      data = vect_triangulation,
+      aes(fill = tri_label_se),
+      colour = "black",
+      shape = 21,
+      size = 2
+    ) +
+    geom_spatvector_text(
+      data = vect_triangulation,
+      aes(label = id),
+      colour = "black",
+      size = 2,
+      nudge_x = nudge_xvaltri,
+      nudge_y = nudge_yvaltri
+    ) +
+    scale_fill_manual(values = 1:nlevels(vect_triangulation$tri_label_se)) +
+    labs(fill = "Comment") +
+    theme(
+      legend.direction = "vertical",
+      legend.box = "horizontal",
+      axis.title.x = element_blank(),
+      axis.title.y = element_blank()
+    ) +
+    guides(fill = guide_legend(order = 1))
+  
+  return(addtriangulation_map_se)
+  
+}
+
+add_triangulation_plot_no_labels_se <- function(map1) {
+  addtriangulation_map_nl_se <-       map1 +
+    geom_spatvector(
+      data = vect_triangulation,
+      aes(fill = tri_label_se),
+      colour = "black",
+      shape = 21,
+      size = 2,
+      show.legend = FALSE
+    ) +
+    scale_fill_manual(values = 1:nlevels(vect_triangulation$tri_label_se)) +
+    theme(axis.title.x = element_blank(),
+          axis.title.y = element_blank())
+  return(addtriangulation_map_nl_se)
   
 }
 

@@ -1,0 +1,308 @@
+---
+title: Fuzzy rule based modelling of the biophysical aptitude and the socio-economic feasibility
+author: ""
+date: "`r Sys.Date()`"
+output:
+  html_document:  
+    code_folding: "hide"
+    theme: united
+    number_sections: no
+    toc: yes
+    toc_float: true
+    toc_depth: 6
+    css: js/style.css
+params:
+  INT: NA
+  SYS: comparison
+  Agg: 1
+  MASK: 5000
+  INN1: lg_potato
+  RES1: 3
+  SOS1: 1
+  SUBDIV1: Kebelle
+  TRIAD1: Adoption
+  TRIBA1: Aptitude
+  TRISE1: Feasibility
+  INN2: lg_superpotato
+  RES2: 3
+  SOS2: 1
+  SUBDIV2: Kebelle
+  TRIAD2: Adoption
+  TRIBA2: Aptitude
+  TRISE2: Feasibility
+
+---
+
+<style>
+pre {
+  overflow-x: auto;
+}
+pre code {
+  word-wrap: normal;
+  white-space: pre;
+}
+
+div.INN { background-color:#e6f0ff; border-radius: 5px; padding: 10px; font-size: 200%;  color: orange;}
+div.Agg { background-color:#e6f0ff; border-radius: 5px; padding: 10px; font-size: 150%;  color: orange;}
+
+</style>
+
+<script src="js/hideOutput.js"></script>
+
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(dplyr)
+library(tidyr)
+library(data.tree)
+library(knitr)
+library(kableExtra)
+library(here)
+
+r_filename <- function(filename) {
+  here::here("code/r/", filename)
+}
+
+```
+
+# Hierarchies tester
+
+```{r }
+
+
+# Assuming df is your data frame
+df <- data.frame(
+  child = c("Parent1", "Child1", "Child2", "Child3", "Child4", "Child5"),
+  parent = c("root2", "Parent1", "Parent1", "Child1", "Child1", "Child1"),
+  child_age = c(50, 30, 28, 12, 9, 5)
+)
+
+# Convert to tree
+tree <- FromDataFrameNetwork(df)
+
+# Display the tree
+print(tree)
+
+hierarchies <- ToDataFrameTree(tree, 
+                level1 = function(x) x$path[2],
+                level2 = function(x) x$path[3],
+                level3 = function(x) x$path[4],
+                level4 = function(x) x$path[5],
+                level_number = function(x) x$level - 1)[-1,-1]
+
+# Display the df
+print(hierarchies)
+
+```
+
+# Tester with irm data
+
+```{r }
+
+# get the priorities filename using the innovation parameter
+priorities_filename <-
+  as.character(paste("tab_data/input/priorities_", params$INN1, ".csv", sep = ""))
+
+df_priorities <- read.csv(here(priorities_filename), na.strings = c("NA"))
+
+df_priorities %>% kable(digits = 3) %>% kable_styling("striped", full_width = T) %>%
+  row_spec(0, angle = -45) %>%  scroll_box(height = "500px")
+
+df_priorities_short <- df_priorities %>% select(rulebase_stack, rulebase_number)
+
+df_priorities_short[is.na(df_priorities_short)] <- "root2"
+
+# Convert to tree
+tree <- FromDataFrameNetwork(df_priorities_short)
+
+# Display the tree
+print(tree)
+
+hierarchies <- ToDataFrameTree(tree, 
+                level1 = function(x) x$path[2],
+                level2 = function(x) x$path[3],
+                level3 = function(x) x$path[4],
+                level4 = function(x) x$path[5],
+                level5 = function(x) x$path[6],
+                level6 = function(x) x$path[7],
+                level_number = function(x) x$level - 1)[-1,-1]
+
+# Display the df
+hierarchies %>% kable(digits = 3) %>% kable_styling("striped", full_width = T) %>%
+  row_spec(0, angle = -45) %>%  scroll_box(height = "500px")
+
+# set the plot settings
+
+SetGraphStyle(
+  tree,
+  rankdir = "RL",
+  overlap = "true",
+  fontsize = 200,
+  fontname = "Calibri",
+  label = "Rule bases for",
+  labelloc = "t"
+)
+
+SetNodeStyle(
+  tree,
+  shape = "box", 
+  fontsize = 100, 
+  fontname = "Helvetica", 
+  fontcolor = "black",
+  fixedsize = "false",
+  color = "DarkOliveGreen4", 
+  fillcolor = "OliveDrab2", 
+  style = "filled,rounded",
+  tooltip = GetDefaultTooltip
+)
+
+SetEdgeStyle(tree,
+             arrowhead = "vee",
+             color = "blue",
+             penwidth = 2, dir= "back")
+
+plot(tree)
+
+Do(tree$leaves, function(node)
+  SetNodeStyle(
+    node,
+    shape = "oval",
+    fixedsize = "false",
+    width = 0.9,
+    color = "red",
+    fillcolor = "IndianRed3",
+    fontsize = 75,
+    fontname = "Helvetica",
+    fontcolor = "white",
+    style = "filled"
+  ))
+plot(tree)
+
+```
+
+## Use the criterion names
+
+```{r }
+
+priorities_new_columns_filename <-
+  as.character(paste(
+    "tab_data/input/priorities_new_columns_",
+    params$INN1,
+    ".csv",
+    sep = ""
+  ))
+
+df_priorities_new_columns <-
+  read.csv(here(priorities_new_columns_filename), na.strings = c("NA"))
+
+df_priorities_new_columns_short <-
+  df_priorities_new_columns %>% select(stack, criterion, weight)
+
+df_priorities_new_columns_short[is.na(df_priorities_new_columns_short)] <-
+  "root2"
+
+# Convert to tree
+tree_new <- FromDataFrameNetwork(df_priorities_new_columns_short)
+
+# Display the tree
+print(tree_new)
+```
+
+## Get the tree hierarchy
+
+```{r }
+
+hierarchies_new <- ToDataFrameTree(
+  tree_new,
+  level1 = function(x)
+    x$path[2],
+  level2 = function(x)
+    x$path[3],
+  level3 = function(x)
+    x$path[4],
+  level4 = function(x)
+    x$path[5],
+  level5 = function(x)
+    x$path[6],
+  level6 = function(x)
+    x$path[7],
+  level_number = function(x)
+    x$level - 1
+)[-1, -1]
+
+# Display the df
+hierarchies_new %>% kable(digits = 3, caption = "Hierarchies") %>% kable_styling("striped", full_width = T) %>%  row_spec(0, angle = -45) %>%  scroll_box(height = "500px")
+```
+
+## Get the tree leaves
+
+```{r }
+n_leaves <- tree_new$leafCount
+df_leaves <- ToDataFrameTypeCol(tree_new)
+      
+df_leaves %>% kable(digits = 3, caption = "Leaves") %>% kable_styling("striped", full_width = T) %>%  scroll_box(height = "500px")
+
+```
+
+## Plot the tree graph
+
+```{r }
+
+
+SetGraphStyle(
+  tree_new,
+  rankdir = "RL",
+  overlap = "true",
+  fontsize = 200,
+  fontname = "Calibri",
+  label = "Rule bases for",
+  labelloc = "t"
+)
+
+SetNodeStyle(
+  tree_new,
+  shape = "box",
+  fontsize = 200,
+  fontname = "Helvetica",
+  fontcolor = "black",
+  fixedsize = "false",
+  color = "DarkOliveGreen4",
+  fillcolor = "OliveDrab2",
+  style = "filled,rounded",
+  tooltip = GetDefaultTooltip
+)
+
+SetEdgeStyle(
+  tree_new,
+  arrowhead = "vee",
+  color = "blue",
+  penwidth = 5,
+  dir = "back"
+)
+
+plot(tree_new)
+
+SetNodeStyle(
+  tree_new$`Likelihood for Adoption`$`Biophysical Aptitude`,
+  fillcolor = "LightBlue",
+  penwidth = "5px"
+)
+
+Do(tree_new$leaves, function(node)
+  SetNodeStyle(
+    node,
+    shape = "oval",
+    fixedsize = "false",
+    width = 0.9,
+    color = "red",
+    fillcolor = "IndianRed3",
+    fontsize = 200,
+    fontname = "Helvetica",
+    fontcolor = "white",
+    style = "filled"
+  ))
+plot(tree_new)
+
+```
