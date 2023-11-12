@@ -733,6 +733,8 @@ output_sf <- function(results_sf, data_file_prefix) {
 #        data_file_prefix is the prefix used to define the name of the output geojson
 
 output_vect <- function(results_vect, data_file_prefix) {
+  
+
   vector_filename <-
     as.character(paste("spatial_data/output/",
                        data_file_prefix,
@@ -741,7 +743,7 @@ output_vect <- function(results_vect, data_file_prefix) {
   
   writeVector(
     project(results_vect,
-            "epsg:4326"),
+            wkt_geo),
     filename = (here(vector_filename)),
     filetype="geojson",
     overwrite = TRUE)
