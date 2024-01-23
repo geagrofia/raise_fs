@@ -1,5 +1,5 @@
 ---
-title: Fuzzy rule based modelling of the biophysical aptitude and the socio-economic feasibility
+title: Hierarchies of criteria in IRM
 author: ""
 date: "`r Sys.Date()`"
 output:
@@ -16,7 +16,7 @@ params:
   SYS: comparison
   Agg: 1
   MASK: 5000
-  INN1: lg_potato
+  INN1: tester
   RES1: 3
   SOS1: 1
   SUBDIV1: Kebelle
@@ -60,11 +60,42 @@ library(data.tree)
 library(knitr)
 library(kableExtra)
 library(here)
+library(irm)
+library(fuZR)
+library(sf)
+library(terra)
 
 r_filename <- function(filename) {
   here::here("code/r/", filename)
 }
 
+source(r_filename("irm_functions.R"))
+
+
+#set (chunk) options - figure path is necessary to avoid an error message
+opts_chunk$set(
+  comment = NA,
+  dpi = 96,
+  echo = FALSE,
+  fig.path = paste0("figures/", params$INN1,"/"),
+  warning = FALSE,
+  cache = TRUE
+)
+
+options(width = 250, dplyr.width = 120)
+
+```
+```{r }
+
+adop_crit_i1 <- F
+ba_crit_i2 <- T
+
+# order of parameters to evaluate is important
+```
+
+```{r eval=adop_crit_i1,  eval=ba_crit_i2}
+
+print("hello")
 ```
 
 # Hierarchies tester
@@ -198,16 +229,18 @@ df_priorities_new_columns <-
   read.csv(here(priorities_new_columns_filename), na.strings = c("NA"))
 
 df_priorities_new_columns_short <-
-  df_priorities_new_columns %>% select(stack, criterion, weight)
+  df_priorities_new_columns %>% select(stack, criterion, new_weight, weight, threshold, threshold2,	width,	width2)
 
-df_priorities_new_columns_short[is.na(df_priorities_new_columns_short)] <-
+
+df_priorities_new_columns_short$stack[is.na(df_priorities_new_columns_short$stack)] <-
   "root2"
 
 # Convert to tree
-tree_new <- FromDataFrameNetwork(df_priorities_new_columns_short)
+tree_new <- FromDataFrameNetwork(df_priorities_new_columns_short, c("new_weight", "weight", "threshold",	"threshold2",	"width",	"width2"
+))
 
 # Display the tree
-print(tree_new)
+print(tree_new, "new_weight", "weight", "threshold",	"threshold2",	"width",	"width2")
 ```
 
 ## Get the tree hierarchy
@@ -234,6 +267,7 @@ hierarchies_new <- ToDataFrameTree(
 
 # Display the df
 hierarchies_new %>% kable(digits = 3, caption = "Hierarchies") %>% kable_styling("striped", full_width = T) %>%  row_spec(0, angle = -45) %>%  scroll_box(height = "500px")
+
 ```
 
 ## Get the tree leaves
@@ -241,7 +275,10 @@ hierarchies_new %>% kable(digits = 3, caption = "Hierarchies") %>% kable_styling
 ```{r }
 n_leaves <- tree_new$leafCount
 df_leaves <- ToDataFrameTypeCol(tree_new)
-      
+
+df_leaves_criterion <- as.data.frame( df_leaves[cbind(seq(nrow(df_leaves)), max.col(!is.na(df_leaves), ties.method = 'last'))])
+names(df_leaves_criterion) <- c("criterion")
+  
 df_leaves %>% kable(digits = 3, caption = "Leaves") %>% kable_styling("striped", full_width = T) %>%  scroll_box(height = "500px")
 
 ```
@@ -250,14 +287,13 @@ df_leaves %>% kable(digits = 3, caption = "Leaves") %>% kable_styling("striped",
 
 ```{r }
 
-
 SetGraphStyle(
   tree_new,
   rankdir = "RL",
   overlap = "true",
-  fontsize = 200,
+  fontsize = 400,
   fontname = "Calibri",
-  label = "Rule bases for",
+  label = paste("Rule bases for",params$INN1),
   labelloc = "t"
 )
 
@@ -271,15 +307,19 @@ SetNodeStyle(
   color = "DarkOliveGreen4",
   fillcolor = "OliveDrab2",
   style = "filled,rounded",
+  penwidth = 10,
   tooltip = GetDefaultTooltip
 )
 
 SetEdgeStyle(
   tree_new,
-  arrowhead = "vee",
+  arrowhead = "none",
   color = "blue",
-  penwidth = 5,
-  dir = "back"
+  penwidth = function(node) (node$weight * 50),
+  dir = "back",
+  label = function(node) paste("weight = :",node$weight),
+  fontsize = 150,
+  fontcolor = "blue"
 )
 
 plot(tree_new)
@@ -287,7 +327,8 @@ plot(tree_new)
 SetNodeStyle(
   tree_new$`Likelihood for Adoption`$`Biophysical Aptitude`,
   fillcolor = "LightBlue",
-  penwidth = "5px"
+  color = "black",
+  penwidth = 10
 )
 
 Do(tree_new$leaves, function(node)
@@ -303,6 +344,910 @@ Do(tree_new$leaves, function(node)
     fontcolor = "white",
     style = "filled"
   ))
+
 plot(tree_new)
+
+```
+
+# Populate the IRM database
+
+```{r }
+
+df_irm <-
+  data.frame(
+    "x" = c(1, 2, 3, 4, 5, 1, 2, 3, 4, 5, 1, 2, 3, 4, 5, 1, 2, 3, 4, 5, 1, 2, 3, 4, 5),
+    "y" = c(1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5),
+    "ba_2a" = sample(0:1, 25, replace = TRUE),
+    "ba_4a" = sample(1:200, 25, replace = TRUE),
+    "ba_4b" = sample(1:100, 25, replace = TRUE),
+    "ba_4c" = sample(1:100, 25, replace = TRUE),
+    "ba_4d" = sample(1:100, 25, replace = TRUE),
+    "ba_4e" = sample(-1:30, 25, replace = TRUE),
+    "ba_4f" = sample(-1:30, 25, replace = TRUE),
+    "ba_4g" = sample(-1:30, 25, replace = TRUE),
+    "ba_4h" = sample(1:200, 25, replace = TRUE),
+    "ba_3c" = sample(0:1, 25, replace = TRUE),
+    "ba_3d" = sample(1:100, 25, replace = TRUE),
+    "ba_3e" = sample(1:100, 25, replace = TRUE),
+    "ba_3f" = sample(1:100, 25, replace = TRUE),
+    "ba_3g" = sample(1:10, 25, replace = TRUE),
+    "ba_3h" = sample(1:100, 25, replace = TRUE),
+    "ba_3i" = sample(1:8, 25, replace = TRUE),
+    "ba_3j" = sample(0:1, 25, replace = TRUE),
+    "ba_3k" = sample(1:10, 25, replace = TRUE),
+    "ba_3l" = sample(1:5000, 25, replace = TRUE),
+    "ba_3m" = sample(1:100, 25, replace = TRUE),
+    "ba_3n" = sample(1:10, 25, replace = TRUE),
+    "se_5a" = sample(1:10, 25, replace = TRUE),
+    "se_5b" = sample(1:10, 25, replace = TRUE),
+    "se_5c" = sample(1:10, 25, replace = TRUE),
+    "se_5d" = sample(1:10, 25, replace = TRUE),
+    "se_5e" = sample(1:10, 25, replace = TRUE),
+    "se_5f" = sample(1:10, 25, replace = TRUE),
+    "se_4d" = sample(1:10, 25, replace = TRUE),
+    "se_4e" = sample(1:10, 25, replace = TRUE),
+    "se_3c" = sample(1:10, 25, replace = TRUE),
+    "se_3d" = sample(1:10, 25, replace = TRUE),
+    "se_3e" = sample(1:10, 25, replace = TRUE)
+  )
+
+vect <- vect(df_irm, geom=c("x", "y"), crs="+proj=longlat +datum=WGS84")
+rast_mask_proj <- rast(vect, nrow=5, ncol=5)
+values(rast_mask_proj) <- 1
+plot(rast_mask_proj)
+
+```
+
+
+# Evaluate base data level rules
+
+## Create the base data level data frame
+
+```{r }
+
+# join to original table using the criterion name
+
+df_leaves_data <-
+  left_join(df_leaves_criterion,
+            df_priorities_new_columns,
+            by = c("criterion"))
+```
+
+## For loop to create fuzzy partitions and evaluate
+
+```{r }
+
+# create fuzzy partitions
+
+for (i in 1:nrow(df_leaves_data)) {
+  if (!is.na(df_leaves_data$prop_level_3[i])) {
+    # for those criteria with three proposition values
+    
+    # get  the 3 proposition levels
+    prop_levels <-
+      c(
+        as.character(df_leaves_data$prop_level_1[i]),
+        as.character(df_leaves_data$prop_level_2[i]),
+        as.character(df_leaves_data$prop_level_3[i])
+      )
+    
+    # get  the 3 conclusion levels
+    conc_levels <-
+      c(
+        df_leaves_data$conclusion_1[i],
+        df_leaves_data$conclusion_2[i],
+        df_leaves_data$conclusion_3[i]
+      )
+    
+    # get the first letters of the 3 conclusion levels
+    conc_suffixes <-
+      lapply(conc_levels, function(x)
+        substr(x, 1, 1))
+    
+    # get  the 2 crossover points
+    cross_points <-
+      c(df_leaves_data$threshold[i],
+        df_leaves_data$threshold2[i])
+    
+    # get  the 2 transition widths
+    trans_width <-
+      c(df_leaves_data$width[i],
+        df_leaves_data$width2[i])
+    
+    # get  the 2 xlims for the plot
+    plot_xlim <-
+      c((df_leaves_data$threshold[i] - df_leaves_data$width[i]),
+        (df_leaves_data$threshold2[i] + df_leaves_data$width2[i])
+      )
+    
+    
+  } else {
+    # for those criteria with two proposition values
+    # get  the 2 proposition levels
+    
+    prop_levels <-
+      c(
+        df_leaves_data$prop_level_1[i],
+        df_leaves_data$prop_level_2[i]
+      )
+    
+    # get  the 2 conclusion levels
+    conc_levels <-
+      c(
+        df_leaves_data$conclusion_1[i],
+        df_leaves_data$conclusion_2[i]
+      )
+    
+   # get the first letters of the 2 conclusion levels    
+    conc_suffixes <-
+      lapply(conc_levels, function(x)
+        substr(x, 1, 1))
+    
+    # get  the 1 crossover point
+    cross_points <-
+      c(df_leaves_data$threshold[i])
+    
+    # get  the 1 transition width
+    trans_width <-
+      c(df_leaves_data$width[i])
+    
+    # get  the 2 xlims for the plot
+    plot_xlim <-
+      c((df_leaves_data$threshold[i] - df_leaves_data$width[i]),
+        (df_leaves_data$threshold[i] + df_leaves_data$width[i])
+      )
+  }
+  
+  # construct the fuzzy partition
+  
+  assign(
+    paste0("fp_", as.character(df_leaves_data$rulebase_number[i])),
+    LinearFuzzyPartition(
+      level =  prop_levels,
+      crossoverPoint  = cross_points,
+      transitionWidth = trans_width
+    )
+  )
+  
+  # construct the fuzzy partition plot
+  
+  plot_fp <-
+    plot(
+      get(paste0(
+        "fp_", as.character(df_leaves_data$rulebase_number[i])
+      )),
+      xlim = plot_xlim,
+      xlab = as.character(df_leaves_data$criterion[i]),
+      title = "fuzzy partition"
+    )
+  
+  # print the fuzzy partition plot
+  
+  print(plot_fp)
+  
+  # construct the rule bases
+  # set the proposition name
+  
+  Prop_name <-
+    paste0(as.character(df_leaves_data$rulebase_number[i]))
+  # set the conclusion name
+  Conc_name <-
+    paste0(as.character(df_leaves_data$rulebase_number[i]),
+           "_o")
+  
+  # thanks to https://stackoverflow.com/questions/45741498/add-column-in-tibble-with-variable-column-name for the following dynamic assignment of variable names in a tibble
+  
+  # set the proposition values
+  df_prop <- tibble(!!Prop_name := c(prop_levels))
+  # set the conclusion values
+  df_conc <- tibble(!!Conc_name := c(conc_levels))
+  
+  # new proposition and conclusion class objects are made here
+  new_prop <- new("Proposition", table = df_prop)
+  new_conc <- new("Conclusion", table = df_conc)
+  
+  assign(paste0("rb_",
+                as.character(df_leaves_data$rulebase_number[i])),
+         
+         RuleBase(new_prop, new_conc))
+  
+  print(get(paste0(
+    "rb_",
+    as.character(df_leaves_data$rulebase_number[i])
+  )))
+  
+  # apply the fuzzy partitions to the data
+  
+  # first construct the predict function with all arguments as text
+  
+  x <- paste0(
+    "predict(rb_",
+    as.character(df_leaves_data$rulebase_number[i]),
+    ", newdata = df_irm,",
+    as.character(df_leaves_data$rulebase_number[i]),
+    "=",
+    "fp_",
+    as.character(df_leaves_data$rulebase_number[i]),
+    ")"
+  )
+  
+  
+  assign(paste0("fpm_",
+                as.character(df_leaves_data$rulebase_number[i])), eval(parse(text = x)))
+  
+  
+  # need to use the conclusion values
+  
+  if ("optimal" %in% conc_levels) { # the conclusions are optimal and suboptimal
+  
+  
+  # get the membership values from the fpm
+    
+    o_col <- getMembership(get(paste0("fpm_",
+                                      df_leaves_data$rulebase_number[i]))$optimal)
+    s_col <- getMembership(get(paste0("fpm_",
+                                      df_leaves_data$rulebase_number[i]))$suboptimal)
+    df_irm <-
+      mutate(df_irm,!!as.character(paste0(df_leaves_data$rulebase_number[i], "_o")) := o_col, .keep = c("all"))
+    
+    df_irm <-
+      mutate(df_irm,!!as.character(paste0(df_leaves_data$rulebase_number[i], "_s")) := s_col, .keep = c("all"))
+    
+    n = 2
+    fpm_conc_var <-
+      c(as.character(paste0(df_leaves_data$rulebase_number[i], "_o")), as.character(paste0(df_leaves_data$rulebase_number[i], "_s")), "x" , "y")
+    fpm_conc_name <-
+      c(as.character(paste0(
+        df_leaves_data$rulebase_number[i], " optimal"
+      )), as.character(paste0(
+        df_leaves_data$rulebase_number[i], " suboptimal"
+      )))
+    fpm_plot_title <-
+      paste0(df_leaves_data$criterion[i], "optimality membership")
+    
+  } else { # the conclusions are good and poor
+    
+    # get the membership values from the fpm
+    
+    g_col <- getMembership(get(paste0("fpm_",
+                                      df_leaves_data$rulebase_number[i]))$good)
+    p_col <- getMembership(get(paste0("fpm_",
+                                      df_leaves_data$rulebase_number[i]))$poor)
+    df_irm <-
+      mutate(df_irm,!!as.character(paste0(df_leaves_data$rulebase_number[i], "_g")) := g_col, .keep = c("all"))
+    
+    df_irm <-
+      mutate(df_irm,!!as.character(paste0(df_leaves_data$rulebase_number[i], "_p")) := p_col, .keep = c("all"))
+    
+    n = 2
+    fpm_conc_var <-
+      c(as.character(paste0(df_leaves_data$rulebase_number[i], "_g")), as.character(paste0(df_leaves_data$rulebase_number[i], "_p")), "x" , "y")
+    fpm_conc_name <-
+      c(as.character(paste0(
+        df_leaves_data$rulebase_number[i], " good"
+      )), as.character(paste0(
+        df_leaves_data$rulebase_number[i], " poor"
+      )))
+    fpm_plot_title <-
+      paste0(df_leaves_data$criterion[i], "good/poor membership")
+  }
+  
+  plot_fpm <- rasterize_plot_fpm(n, fpm_conc_var, fpm_conc_name, df_irm)
+  print(plot_fpm)
+  
+}
+
+```
+
+## Vectors and apply functions to create fuzzy partitions and evaluate
+### Method 1
+
+```{r }
+
+apply(df_leaves_data, 1, function(row) {
+  if (!is.na(row["prop_level_3"])) {
+    # for those criteria with three proposition values
+    prop_levels <-
+      as.character(row[c("prop_level_1", "prop_level_2", "prop_level_3")])
+    print(prop_levels)
+    conc_levels <-
+      row[c("conclusion_1", "conclusion_2", "conclusion_3")]
+        print(conc_levels)
+    conc_suffixes <-
+      lapply(conc_levels, function(x)
+        substr(x, 1, 1))
+            print(conc_suffixes)
+    cross_points <-
+      as.numeric(c(row["threshold"], row["threshold2"]))
+                print(cross_points)
+    trans_width <- as.numeric(c(row["width"], row["width2"]))
+                    print(trans_width)
+    plot_xlim <-
+      as.numeric(c((as.numeric(row["threshold"]) - as.numeric(row["width"])), (as.numeric(row["threshold2"]) + as.numeric(row["width2"]))))
+  } else {
+    # for those criteria with two proposition values
+    prop_levels <-
+      as.character(row[c("prop_level_1", "prop_level_2")])
+        print(prop_levels)
+    conc_levels <- row[c("conclusion_1", "conclusion_2")]
+            print(conc_levels)
+    conc_suffixes <-
+      lapply(conc_levels, function(x)
+        substr(x, 1, 1))
+                print(conc_suffixes)
+    cross_points <- as.numeric(row["threshold"])
+                    print(cross_points)
+    trans_width <- as.numeric(row["width"])
+                        print(trans_width)
+    plot_xlim <-
+      as.numeric(c((as.numeric(row["threshold"]) - as.numeric(row["width"])), (as.numeric(row["threshold"]) + as.numeric(row["width"]))))
+  }
+  
+  # construct the fuzzy partition
+  assign(
+    paste0("fp_", as.character(row["rulebase_number"])),
+    LinearFuzzyPartition(
+      level = prop_levels,
+      crossoverPoint = cross_points,
+      transitionWidth = trans_width
+    )
+  )
+  
+  # construct the fuzzy partition plot
+  plot_fp <- plot(
+    get(paste0("fp_", as.character(row["rulebase_number"]))),
+    xlim = plot_xlim,
+    xlab = as.character(row["criterion"]),
+    title = "fuzzy partition"
+  )
+  
+  # print the fuzzy partition plot
+  print(plot_fp)
+})
+
+
+```
+
+### Method 2
+
+
+``` {r}
+# the logic for determining prop_levels and conc_levels has been moved into the process_row function. The function returns a list containing these two vectors, and then you can use them as needed in the main loop
+
+process_row <- function(row) {
+  if (!is.na(row["prop_level_3"])) {
+    # for those criteria with three proposition values
+    prop_levels <-
+      as.character(row[c("prop_level_1", "prop_level_2", "prop_level_3")])
+    conc_levels <-
+      row[c("conclusion_1", "conclusion_2", "conclusion_3")]
+  } else {
+    # for those criteria with two proposition values
+    prop_levels <-
+      as.character(row[c("prop_level_1", "prop_level_2")])
+    conc_levels <- row[c("conclusion_1", "conclusion_2")]
+  }
+  
+  return(list(prop_levels = prop_levels, conc_levels = conc_levels))
+}
+
+# main loop
+
+apply(df_leaves_data, 1, function(row) {
+  processed_data <- process_row(row)
+  
+  prop_levels <- processed_data$prop_levels
+  conc_levels <- processed_data$conc_levels
+  conc_suffixes <- lapply(conc_levels, function(x)
+    substr(x, 1, 1))
+  
+  cross_points <-
+    as.numeric(c(row["threshold"], ifelse(!is.na(row["threshold2"]), row["threshold2"], NA)))
+  
+  cross_points <- cross_points[!is.na(cross_points)]
+  
+  trans_width <-
+    as.numeric(c(as.numeric(row["width"]), ifelse(
+      !is.na(as.numeric(row["width2"])), as.numeric(row["width2"]), NA
+    )))
+  
+  trans_width <- trans_width[!is.na(trans_width)]
+  
+  
+  plot_xlim <-
+    as.numeric(c((as.numeric(row["threshold"]) - as.numeric(row["width"])), (as.numeric(row["threshold"]) + as.numeric(row["width"]))))
+  
+  # construct the fuzzy partition
+  assign(
+    paste0("fp_", as.character(row["rulebase_number"])),
+    LinearFuzzyPartition(
+      level = prop_levels,
+      crossoverPoint = cross_points,
+      transitionWidth = trans_width
+    ),
+    .GlobalEnv
+  )
+  
+  # construct the fuzzy partition plot
+  plot_fp <- plot(
+    get(paste0("fp_", as.character(row["rulebase_number"]))),
+    xlim = plot_xlim,
+    xlab = as.character(row["criterion"]),
+    title = "fuzzy partition"
+  )
+  
+  # print the fuzzy partition plot
+  print(plot_fp)
+  
+  # construct the rule bases
+  # set the proposition name
+  
+  Prop_name <-
+    paste0(as.character(row["rulebase_number"]))
+  
+  # set the conclusion name
+  Conc_name <-
+    paste0(as.character(row["rulebase_number"]),
+           "_o")
+  
+  # thanks to https://stackoverflow.com/questions/45741498/add-column-in-tibble-with-variable-column-name for the following dynamic assignment of variable names in a tibble
+  
+  # set the proposition values
+  df_prop <- tibble(!!Prop_name := c(prop_levels))
+  # set the conclusion values
+  df_conc <- tibble(!!Conc_name := c(conc_levels))
+  
+  # new proposition and conclusion class objects are made here
+  new_prop <- new("Proposition", table = df_prop)
+  new_conc <- new("Conclusion", table = df_conc)
+  
+  assign(paste0("rb_",
+                as.character(row["rulebase_number"])),
+         RuleBase(new_prop, new_conc),
+         .GlobalEnv)
+  
+  print(get(paste0("rb_",
+                   as.character(row["rulebase_number"]))))
+  
+  # apply the fuzzy partitions to the data
+  
+  # first construct the predict function with all arguments as text
+  
+  x <- paste0(
+    "predict(rb_",
+    as.character(row["rulebase_number"]),
+    ", newdata = df_irm,",
+    as.character(row["rulebase_number"]),
+    "=",
+    "fp_",
+    as.character(row["rulebase_number"]),
+    ")"
+  )
+  
+  assign(paste0("fpm_",
+                as.character(row["rulebase_number"])), eval(parse(text = x)), .GlobalEnv)
+})
+
+# second function to produce a list of values which is added to df_irm
+
+  result_vectorized <- sapply(conc_levels, function(value, row) {
+    fpm_name <- paste0("fpm_", row["rulebase_number"], "$", value)
+    
+    print(fpm_name)
+    
+    print(paste0("suffix = _", substr(value, 1, 1)))
+    
+    # df_irm <<- 
+    #   mutate(df_irm, hello = 1, .keep = c("all"))
+    
+    # df_irm <<-
+    #   mutate(df_irm, hello = "hello", .keep = c("all"))
+    
+     # df_irm <<-
+     #   mutate(df_irm,
+     #          !!as.character(paste0(row["rulebase_number"], "_", substr(value, 1, 1))) := 1,
+     #          .keep = c("all"))
+      
+     # df_irm <<-
+     #   mutate(df_irm,!!as.character(paste0(row["rulebase_number"], "_", substr(value, 1, 1))) := (paste0(fpm_name)), .keep = c("all"))
+    
+     # df_irm <<-
+     #   mutate(df_irm,!!as.character(paste0(row["rulebase_number"], "_", substr(value, 1, 1))) := getMembership(get(paste0("fpm_", row["rulebase_number"],"$", value))), .keep = c("all"))
+    
+    })
+  
+  # 
+  # # need to use the conclusion values
+  # 
+  # if ("optimal" %in% conc_levels) { # the conclusions are optimal and suboptimal
+  # 
+  # 
+  # # get the membership values from the fpm
+  #   
+  #   o_col <- getMembership(get(paste0("fpm_",
+  #                                     row["rulebase_number"]))$optimal)
+  #   s_col <- getMembership(get(paste0("fpm_",
+  #                                     row["rulebase_number"]))$suboptimal)
+  #   df_irm <-
+  #     mutate(df_irm,!!as.character(paste0(row["rulebase_number"], "_o")) := o_col, .keep = c("all"))
+  #   
+  #   df_irm <-
+  #     mutate(df_irm,!!as.character(paste0(row["rulebase_number"], "_s")) := s_col, .keep = c("all"))
+  #   
+  #   n = 2
+  #   fpm_conc_var <-
+  #     c(as.character(paste0(row["rulebase_number"], "_o")), as.character(paste0(row["rulebase_number"], "_s")), "x" , "y")
+  #   fpm_conc_name <-
+  #     c(as.character(paste0(
+  #       row["rulebase_number"], " optimal"
+  #     )), as.character(paste0(
+  #       row["rulebase_number"], " suboptimal"
+  #     )))
+  #   fpm_plot_title <-
+  #     paste0(row["rulebase_number"], "optimality membership")
+  #   
+  # } else { # the conclusions are good and poor
+  #   
+  #   # get the membership values from the fpm
+  #   
+  #   g_col <- getMembership(get(paste0("fpm_",
+  #                                     row["rulebase_number"]))$good)
+  #   p_col <- getMembership(get(paste0("fpm_",
+  #                                     row["rulebase_number"]))$poor)
+  #   df_irm <-
+  #     mutate(df_irm,!!as.character(paste0(row["rulebase_number"], "_g")) := g_col, .keep = c("all"))
+  #   
+  #   df_irm <-
+  #     mutate(df_irm,!!as.character(paste0(row["rulebase_number"], "_p")) := p_col, .keep = c("all"))
+  #   
+  #   n = 2
+  #   fpm_conc_var <-
+  #     c(as.character(paste0(row["rulebase_number"], "_g")), as.character(paste0(row["rulebase_number"], "_p")), "x" , "y")
+  #   fpm_conc_name <-
+  #     c(as.character(paste0(
+  #       row["rulebase_number"], " good"
+  #     )), as.character(paste0(
+  #       row["rulebase_number"], " poor"
+  #     )))
+  #   fpm_plot_title <-
+  #     paste0(row["rulebase_number"], "good/poor membership")
+  # }
+  # 
+  # plot_fpm <- rasterize_plot_fpm(n, fpm_conc_var, fpm_conc_name, df_irm)
+  # print(plot_fpm)
+  
+
+
+```
+
+### Method 2a
+#### Original from ChatGPT v3
+
+```{r }
+
+
+# Main function
+mainFunction <- function(data) {
+  result_list <- list()
+
+  # Calculate the value list within the main function
+  valueList <- calculateValueList(data)
+
+  # Your main function logic using apply
+  result <- apply(data, 1, function(row) {
+    # Process each row using second function with sapply
+    secondResult <- sapply(valueList, secondFunction, mainData = row)
+    
+    # Your main processing logic for each row
+    mainProcessingResult <- sum(row)  # Replace this with your actual logic
+    
+    # Store results in the list
+    result_list[[length(result_list) + 1]] <- list(
+      MainResult = mainProcessingResult,
+      SecondResult = secondResult
+    )
+  })
+
+  # Return the list of results
+  return(result_list)
+}
+
+# Second function
+secondFunction <- function(value, mainData) {
+  # Your processing logic here using value and mainData
+  
+  # Return the value to be stored
+  return(value)
+}
+
+# Function to calculate the value list based on data
+calculateValueList <- function(data) {
+  # Your logic to calculate the value list based on data
+  # For example, you can extract unique values from a specific column
+  uniqueValues <- unique(data$SomeColumn)
+  return(uniqueValues)
+}
+
+# Example usage
+data <- data.frame(
+  Col1 = c(1, 2, 3),
+  Col2 = c(4, 5, 6),
+  SomeColumn = c("A", "B", "A")
+)
+
+# Call the main function
+resultList <- mainFunction(data)
+
+# Access results from the list
+for (i in seq_along(resultList)) {
+  cat("Main Result for Row", i, ":", resultList[[i]]$MainResult, "\n")
+  cat("Second Result for Row", i, ":", resultList[[i]]$SecondResult, "\n")
+}
+
+```
+
+#### Combined Chat GPTv3 and my code
+
+```{r }
+
+# Function to populate a list of proposition and conclusion levels
+prop_conc <- function(df_leaves_row) {
+  if (!is.na(df_leaves_row["prop_level_3"])) {
+    # for those criteria with three proposition values
+    prop_levels <-
+      as.character(df_leaves_row[c("prop_level_1", "prop_level_2", "prop_level_3")])
+    conc_levels <-
+      df_leaves_row[c("conclusion_1", "conclusion_2", "conclusion_3")]
+  } else {
+    # for those criteria with two proposition values
+    prop_levels <-
+      as.character(df_leaves_row[c("prop_level_1", "prop_level_2")])
+    conc_levels <- df_leaves_row[c("conclusion_1", "conclusion_2")]
+  }
+  
+  return(list(prop_levels = prop_levels, conc_levels = conc_levels))
+}
+
+
+
+# fpm_values <- function(conc_value) {
+#   fpm_name <-
+#     paste0("fpm_", df_leaves_row["rulebase_number"], "$", conc_value)
+#   #print(fpm_name)
+#   conc_col_name <-
+#     paste0(df_leaves_row["rulebase_number"], "_", substr(conc_value, 1, 1))
+#   #print(paste0("suffix = _", substr(conc_value, 1, 1)))
+#   x <- paste0("getMembership(", fpm_name, ")")
+#   #print(x)
+#   #print(eval(parse(text = x)))
+#   
+#   result_list <<-
+#     c(result_list, setNames(list(eval(parse(
+#       text = x
+#     ))), conc_col_name))
+# }
+
+
+result_list <- list()
+
+# Main function
+apply(df_leaves_data, 1, function(df_leaves_row) {
+
+  # Calculate the value list within the main function
+  prop_conc_list <- prop_conc(df_leaves_row)
+  prop_levels <- prop_conc_list$prop_levels
+  conc_levels <- prop_conc_list$conc_levels
+  conc_suffixes <- lapply(conc_levels, function(x)
+    substr(x, 1, 1))
+  
+  cross_points <-
+    as.numeric(c(df_leaves_row["threshold"], ifelse(!is.na(df_leaves_row["threshold2"]), df_leaves_row["threshold2"], NA)))
+  
+  cross_points <- cross_points[!is.na(cross_points)]
+  
+  trans_width <-
+    as.numeric(c(as.numeric(df_leaves_row["width"]), ifelse(
+      !is.na(as.numeric(df_leaves_row["width2"])), as.numeric(df_leaves_row["width2"]), NA
+    )))
+  
+  trans_width <- trans_width[!is.na(trans_width)]
+  
+  
+  plot_xlim <-
+    as.numeric(c((as.numeric(df_leaves_row["threshold"]) - as.numeric(df_leaves_row["width"])), (as.numeric(df_leaves_row["threshold"]) + as.numeric(df_leaves_row["width"]))))
+  
+  # construct the fuzzy partition
+  assign(
+    paste0("fp_", as.character(df_leaves_row["rulebase_number"])),
+    LinearFuzzyPartition(
+      level = prop_levels,
+      crossoverPoint = cross_points,
+      transitionWidth = trans_width
+    ),
+    .GlobalEnv
+  )
+  
+  # construct the fuzzy partition plot
+  plot_fp <- plot(
+    get(paste0("fp_", as.character(df_leaves_row["rulebase_number"]))),
+    xlim = plot_xlim,
+    xlab = as.character(df_leaves_row["criterion"]),
+    title = "fuzzy partition"
+  )
+  
+  # print the fuzzy partition plot
+  print(plot_fp)
+  
+  # construct the rule bases
+  # set the proposition name
+  
+  Prop_name <-
+    paste0(as.character(df_leaves_row["rulebase_number"]))
+  
+  # set the conclusion name
+  Conc_name <-
+    paste0(as.character(df_leaves_row["rulebase_number"]),
+           "_o")
+  
+  # thanks to https://stackoverflow.com/questions/45741498/add-column-in-tibble-with-variable-column-name for the following dynamic assignment of variable names in a tibble
+  
+  # set the proposition values
+  df_prop <- tibble(!!Prop_name := c(prop_levels))
+  # set the conclusion values
+  df_conc <- tibble(!!Conc_name := c(conc_levels))
+  
+  # new proposition and conclusion class objects are made here
+  new_prop <- new("Proposition", table = df_prop)
+  new_conc <- new("Conclusion", table = df_conc)
+  
+  assign(paste0("rb_",
+                as.character(df_leaves_row["rulebase_number"])),
+         RuleBase(new_prop, new_conc),
+         .GlobalEnv)
+  
+  print(get(paste0("rb_",
+                   as.character(df_leaves_row["rulebase_number"]))))
+  
+  # apply the fuzzy partitions to the data
+  
+  # first construct the predict function with all arguments as text
+  
+  x <- paste0(
+    "predict(rb_",
+    as.character(df_leaves_row["rulebase_number"]),
+    ", newdata = df_irm,",
+    as.character(df_leaves_row["rulebase_number"]),
+    "=",
+    "fp_",
+    as.character(df_leaves_row["rulebase_number"]),
+    ")"
+  )
+  
+  assign(paste0("fpm_",
+                as.character(df_leaves_row["rulebase_number"])), eval(parse(text = x)), .GlobalEnv)
+  #print(conc_levels[1])
+  
+  # Define a function to print each element
+  print_element <- function(x) {
+    print(x)
+  }
+  
+  
+  # Function to get the membership values of the fuzzy partition matrix for each conclusion value
+  # this only works when nested in main function
+  
+  fpm_values <- function(conc_value) {
+    fpm_name <-
+      paste0("fpm_", df_leaves_row["rulebase_number"], "$", conc_value)
+    #print(fpm_name)
+    conc_col_name <-
+      paste0(df_leaves_row["rulebase_number"], "_", substr(conc_value, 1, 1))
+    #print(paste0("suffix = _", substr(conc_value, 1, 1)))
+    x <- paste0("getMembership(", fpm_name, ")")
+    #print(x)
+    #print(eval(parse(text = x)))
+    
+    result_list <<-
+      c(result_list, setNames(list(eval(parse(
+        text = x
+      ))), conc_col_name))
+  }
+  
+  # apply the fpm_values to the list of conclusion levels and generate a list of values (result_list)
+  lapply(unique(conc_levels), fpm_values)
+  
+  
+  # apply(conc_levels, 1, function(conc_row) {
+  #   
+  #   print(conc_row)
+    
+    # print(paste("conc_name = ", conc_row, "rb = ", "fpm_",   as.character(df_leaves_row["rulebase_number"])))
+    
+    # print(getMembership(get(paste0(
+    #   "fpm_",
+    #   as.character(df_leaves_row["rulebase_number"])
+    # ))$optimal))
+  # })
+  
+  #print(fpm_values(df_leaves_row, conc_levels[1]))
+    
+    # Store results in the list
+    # result_list[[length(result_list) + 1]] <- list(
+    #   MainResult = mainProcessingResult,
+    #SecondResult = secondResult
+    # )
+  # })
+
+  # Return the list of results
+  #return(result_list)
+# })
+
+# apply(df_leaves_data, 1, function(df_leaves_row) {
+#   
+# print(getMembership(get(paste0("fpm_","ba_2a"))$optimal))
+  
+  return(result_list)
+  
+})
+
+
+# # Example usage
+# data <- data.frame(
+#   Col1 = c(1, 2, 3),
+#   Col2 = c(4, 5, 6),
+#   SomeColumn = c("A", "B", "A")
+# )
+# 
+# # Call the main function
+# resultList <- mainFunction(df_leaves_data)
+# 
+# # Access results from the list
+# for (i in seq_along(resultList)) {
+#   cat("Main Result for Row", i, ":", resultList[[i]]$MainResult, "\n")
+#   cat("Second Result for Row", i, ":", resultList[[i]]$SecondResult, "\n")
+# }
+
+
+
+
+```
+
+
+
+
+# Compute the number of rules and conclusions
+
+```{r }
+
+weights <- c(0.6, 0.4)
+
+# Generate all combinations of addition and subtraction
+combinations <- expand.grid(rep(list(c(1, -1)), length(weights)))
+
+# Initialize vector to store results
+results <- numeric()
+
+# Loop through each combination and calculate the result
+for (i in 1:nrow(combinations)) {
+  result <- sum(combinations[i, ] * weights)
+  results <- c(results, result)
+}
+
+# Display the results
+print(results)
+
+# bin the results
+results_classes <- cut(results, breaks = c(-Inf, (-1/3), (1/3), Inf), labels = c("poor","moderate","good"))
+
+# get the number of unique classes
+results_classes_unique <- unique(results_classes)
+
+# get length
+num_conclusions <- length(results_classes_unique)
+
+# Display the results
+print(paste("Number of unique conclusions = ", num_conclusions))
+print(results_classes_unique)
+
 
 ```
