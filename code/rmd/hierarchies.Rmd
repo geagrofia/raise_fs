@@ -1447,9 +1447,27 @@ apply(df_leaves_data, 1, function(df_leaves_row) {
 })
 ```
 
+# Higher-level rule base evaluation
+
+For each rule base stack:
+
+1) Get the lower-level rule bases
+2) Get the proposition values
+3) Use the weights (if any) to define the rule base conclusions
+4) Construct the list of lower-level rule bases
+5) Construct the list of lower-level fuzzy partitions
+6) Make a new proposition object
+7) Make a new conclusion object 
+8) Create a new rule base
+9) Add to the list of previous rule bases
+10) Evaluate the new rule base (and stack)
+11) Add results to df_irm
+12) Plot results
 
 
-# Compute the number of rules and conclusions
+## Compute the number of rules and conclusions
+
+### Basic script to get the conclusion values from two weights
 
 ```{r }
 
@@ -1486,3 +1504,782 @@ cat("Number of unique conclusions = ", paste(num_conclusions, collapse = ", "), 
 cat("Conclusions = ", paste(results_classes_unique, collapse = ", "), "\n")
 
 ```
+
+### Basic script to get the conclusion values from any number of weights - lapply
+
+```{r }
+
+weights <- list(c(0.6, 0.4), c(0.7, 0.3), c(0.3, 0.4, 0.3), c(0.8, 0.1, 0.1))
+
+
+conc_values <- function(weights){
+# Generate all combinations of addition and subtraction
+combinations <- expand.grid(rep(list(c(1, -1)), length(weights)))
+
+# Initialize vector to store results
+results <- numeric()
+
+# Loop through each combination and calculate the result
+for (i in 1:nrow(combinations)) {
+  result <- sum(combinations[i, ] * weights)
+  results <- c(results, result)
+}
+
+# Display the results
+print(results)
+
+# bin the results
+# results_classes <- cut(results, breaks = c(-Inf, (-1/3), (1/3), Inf), labels = c("poor","moderate","good"))
+results_classes <- cut(results, breaks = c(-Inf, (-1/3), (1/3), Inf), labels = c("poor","moderate","good"))
+                       
+# get the number of unique classes
+results_classes_unique <- unique(results_classes)
+
+# get length
+num_conclusions <- length(results_classes_unique)
+
+# Display the results
+#print(paste("Number of unique conclusions = ", num_conclusions))
+cat("Number of unique conclusions = ", paste(num_conclusions, collapse = ", "), "\n")
+#print(paste("Conclusions = ", results_classes_unique))
+cat("Conclusions = ", paste(results_classes_unique, collapse = ", "), "\n")
+
+return(results_classes_unique)
+
+}
+
+lapply(weights, conc_values)
+
+```
+
+
+### Basic script to get the conclusion values from any number of weights and using conclusion values from a list - lapply
+
+
+```{r }
+
+weights <- list(c(0.6, 0.4), c(0.7, 0.3), c(0.3, 0.4, 0.3), c(0.8, 0.1, 0.1))
+conc_options <- list(c("poor","moderate","good"), c("poor","moderate","good"), c("poor","moderate","good"), c("low","moderate","high"))
+
+
+conc_values_m <- function(weights, conc_options) {
+  # Generate all combinations of addition and subtraction
+  print(weights)
+  print(conc_options)
+  
+  combinations <- expand.grid(rep(list(c(1,-1)), length(weights)))
+  
+  # Initialize vector to store results
+  results <- numeric()
+  
+  # Loop through each combination and calculate the result
+  for (i in 1:nrow(combinations)) {
+    result <- sum(combinations[i,] * weights)
+    results <- c(results, result)
+  }
+  
+  # Display the results
+  print(results)
+  
+  # bin the results
+  # results_classes <- cut(results, breaks = c(-Inf, (-1/3), (1/3), Inf), labels = c("poor","moderate","good"))
+  results_classes <-
+    cut(results,
+        breaks = c(-Inf, (-1 / 3), (1 / 3), Inf),
+        labels = conc_options)
+  
+  cat("Raw conclusions = ",
+      paste(results_classes, collapse = ", "),
+      "\n")
+  
+  # get the number of unique classes
+  results_classes_unique <- unique(results_classes)
+  
+  # get length
+  num_conclusions <- length(results_classes_unique)
+  
+  # Display the results
+  #print(paste("Number of unique conclusions = ", num_conclusions))
+  cat("Number of unique conclusions = ",
+      paste(num_conclusions, collapse = ", "),
+      "\n")
+  #print(paste("Conclusions = ", results_classes_unique))
+  cat("Conclusions = ",
+      paste(results_classes_unique, collapse = ", "),
+      "\n")
+  
+  return(results_classes_unique)
+  
+}
+
+mapply(conc_values_m, weights, conc_options)
+
+```
+
+### Basic script to get the number of conclusions and their values from any number of weights and using conclusion values from a list - lapply
+
+
+```{r }
+
+weights <- list(c(0.6, 0.4), c(0.7, 0.3), c(0.3, 0.4, 0.3), c(0.8, 0.1, 0.1))
+conc_options <- list(c("poor","moderate","good"), c("poor","moderate","good"), c("poor","moderate","good"), c("low","moderate","high"))
+
+
+conc_values_n <- function(weights, conc_options) {
+  # Generate all combinations of addition and subtraction
+  print(weights)
+  print(conc_options)
+  
+  combinations <- expand.grid(rep(list(c(1,-1)), length(weights)))
+  
+  # Initialize vector to store results
+  results <- numeric()
+  
+  # Loop through each combination and calculate the result
+  for (i in 1:nrow(combinations)) {
+    result <- sum(combinations[i,] * weights)
+    results <- c(results, result)
+  }
+  
+  # Display the results
+  print(results)
+  
+  # bin the results
+  # results_classes <- cut(results, breaks = c(-Inf, (-1/3), (1/3), Inf), labels = c("poor","moderate","good"))
+  results_classes <-
+    cut(results,
+        breaks = c(-Inf, (-1 / 3), (1 / 3), Inf),
+        labels = conc_options)
+  
+  cat("Raw conclusions = ",
+      paste(results_classes, collapse = ", "),
+      "\n")
+  
+  return(results_classes)
+  
+}
+
+mapply(conc_values_n, weights, conc_options)
+
+```
+
+
+## Get the lowest level non-data rulebases
+
+Any criterion which is a leaf should be removed from the priorities df.
+Then get the hierarchy level for the remaining rows.
+
+Start with the criteria with the highest level and proceed to the root level
+
+``` {r }
+
+# inverse join df_leaves_data to df_priorities_new_columns
+
+df_rulebases <-
+  anti_join(df_priorities_new_columns,
+            df_leaves_data,
+            by = 'rulebase_number',
+            copy = FALSE)
+
+#  join df_rulebases to hierarchies
+
+# first split hierarchies based on hierarchy level
+
+# get highest level
+
+hierarchy_level_max <- max(unique(hierarchies$level_number))
+print(paste("highest hierarchy level = ", hierarchy_level_max))
+
+# for loop to run through all hierarchy levels from biggest to smallest
+for (i in hierarchy_level_max:1) {
+  print(paste0('level', i))
+  
+  # join to the rulebases
+  assign(paste0("df_hierarchy_", i),
+         inner_join(
+           select(df_rulebases, rulebase_number),
+           filter(select(
+             hierarchies, level_number, paste0('level', i)
+           ), level_number == i),
+           by = c('rulebase_number' = paste0('level', i))
+         ))
+  
+  # if no data move to next
+  if (nrow(get(paste0("df_hierarchy_", i)) != 0)) {
+    print(paste0('level', i))
+    
+    # each row in the df is a rulebase stack
+    # for each row need to join to original priorities
+    
+    # Main function
+    # apply(get(paste0("df_hierarchy_", i)), 1, function(df_row)) {
+    #   df_temp <-
+    #     inner_join(
+    #       df_hierarchy,
+    #       df_priorities_new_columns,
+    #       by = c('rulebase_number' = 'rulebase_stack')
+    #     )
+    #   print(df_temp)
+    # }
+    
+    #Custom function to perform one-to-many join for each row
+    custom_join_function <- function(row) {
+      row_df <- data.frame(rulebase_number = row[["rulebase_number"]])
+      result_df <-
+        left_join(
+          row_df,
+          df_priorities_new_columns,
+          by = c('rulebase_number' = 'rulebase_stack'),
+          keep = TRUE
+        )
+      return(result_df)
+    }
+    
+        # Apply the custom function to each row of df1
+    assign(paste0("result_df", i), apply(get(paste0("df_hierarchy_", i)), 1, custom_join_function)
+    
+    # Print the list of result data frames
+    print(result_list)
+    
+    
+  }
+}
+
+
+```
+
+## Get the one-to-many data frames of rule base stacks and the conclusions from the weights in each rulebase stack
+
+This uses the code from the previous chunk, as well as the computation of the weights from above
+
+``` {r }
+
+# inverse join df_leaves_data to df_priorities_new_columns
+
+df_rulebases <-
+  anti_join(df_priorities_new_columns,
+            df_leaves_data,
+            by = 'rulebase_number',
+            copy = FALSE)
+
+#  join df_rulebases to hierarchies
+
+# first split hierarchies based on hierarchy level
+
+# get highest level
+
+hierarchy_level_max <- max(unique(hierarchies$level_number))
+print(paste("highest hierarchy level = ", hierarchy_level_max))
+
+# for loop to run through all hierarchy levels from biggest to smallest
+for (i in hierarchy_level_max:1) {
+  print(paste0('level', i))
+  
+  # join to the rulebases
+  assign(paste0("df_hierarchy_", i),
+         inner_join(
+           select(df_rulebases, rulebase_number),
+           filter(select(
+             hierarchies, level_number, paste0('level', i)
+           ), level_number == i),
+           by = c('rulebase_number' = paste0('level', i))
+         ))
+  
+  # if no data move to next
+  if (nrow(get(paste0("df_hierarchy_", i)) != 0)) {
+    print(paste0('level', i))
+    
+    #Custom function to perform one-to-many join for each row
+    custom_join_function <- function(row) {
+      df_row <- data.frame(rulebase_number = row[["rulebase_number"]])
+      df_one_many <-
+        left_join(
+          df_row,
+          df_priorities_new_columns,
+          by = c('rulebase_number' = 'rulebase_stack'),
+          keep = TRUE
+        )
+      
+      weights <- list(df_one_many$weight)
+      print(weights)
+      results_classes_unique <- lapply(weights, conc_values) # applies the conc_values function from above
+      newList <- list("df" = df_one_many, "conlusions" = results_classes_unique)
+      return(newList)
+      
+     }
+    
+    # Apply the custom function to each row of df1
+    assign(paste0("df_one_many_", i),
+           apply(get(paste0("df_hierarchy_", i)), 1, custom_join_function))
+    
+    # Print the list of result data frames
+    #print(result_list)
+    
+    
+  }
+}
+
+
+```
+
+## Get the data frames conclusions and rule base for each rulebase stack
+
+This uses the code from the previous chunks.
+
+In addition to before the chunk will get the rule base names
+
+``` {r }
+
+# inverse join df_leaves_data to df_priorities_new_columns
+
+df_rulebases <-
+  anti_join(df_priorities_new_columns,
+            df_leaves_data,
+            by = 'rulebase_number',
+            copy = FALSE)
+
+#  join df_rulebases to hierarchies
+
+# first split hierarchies based on hierarchy level
+
+# get highest level
+
+hierarchy_level_max <- max(unique(hierarchies$level_number))
+print(paste("highest hierarchy level = ", hierarchy_level_max))
+
+# for loop to run through all hierarchy levels from biggest to smallest
+for (i in hierarchy_level_max:1) {
+  print(paste0('level', i))
+  
+  # join to the rulebases
+  assign(paste0("df_hierarchy_", i),
+         inner_join(
+           select(df_rulebases, rulebase_number),
+           filter(select(
+             hierarchies, level_number, paste0('level', i)
+           ), level_number == i),
+           by = c('rulebase_number' = paste0('level', i))
+         ))
+  
+  # if no data move to next
+  if (nrow(get(paste0("df_hierarchy_", i)) != 0)) {
+    print(paste0('level', i))
+    
+    #Custom function to perform one-to-many join for each row
+    custom_join_function <- function(row) {
+      df_row <- data.frame(rulebase_number = row[["rulebase_number"]])
+      df_one_many <-
+        left_join(
+          df_row,
+          df_priorities_new_columns,
+          by = c('rulebase_number' = 'rulebase_stack'),
+          keep = TRUE
+        )
+      
+      weights <- list(df_one_many$weight)
+      print(paste("weights = ", weights))
+      #str(df_one_many)
+      lower_rb <- list(df_one_many$rulebase_number.y)      # get the rule bases
+      print(paste("lower_rb = ", lower_rb))
+      
+      results_classes_unique <- lapply(weights, conc_values) # applies the conc_values function from above
+      newList <- list("df" = df_one_many, "conlusions" = results_classes_unique, "lower rule bases" = lower_rb)
+      return(newList)
+      
+     }
+    
+    # Apply the custom function to each row of df1
+    assign(paste0("df_one_many_", i),
+           apply(get(paste0("df_hierarchy_", i)), 1, custom_join_function))
+    
+    # Print the list of result data frames
+    #print(result_list)
+    
+    
+  }
+}
+
+
+```
+
+## Get the data frames, conclusions, rule bases and fuzzy partitions for each rulebase stack
+
+This uses the code from the previous chunks.
+
+In addition to before the chunk will get the fuzzy partition names.
+
+``` {r }
+
+# inverse join df_leaves_data to df_priorities_new_columns
+
+df_rulebases <-
+  anti_join(df_priorities_new_columns,
+            df_leaves_data,
+            by = 'rulebase_number',
+            copy = FALSE)
+
+#  join df_rulebases to hierarchies
+
+# first split hierarchies based on hierarchy level
+
+# get highest level
+
+hierarchy_level_max <- max(unique(hierarchies$level_number))
+print(paste("highest hierarchy level = ", hierarchy_level_max))
+
+# for loop to run through all hierarchy levels from biggest to smallest
+for (i in hierarchy_level_max:1) {
+  print(paste0('level', i))
+  
+  # join to the rulebases
+  assign(paste0("df_hierarchy_", i),
+         inner_join(
+           select(df_rulebases, rulebase_number),
+           filter(select(
+             hierarchies, level_number, paste0('level', i)
+           ), level_number == i),
+           by = c('rulebase_number' = paste0('level', i))
+         ))
+  
+  # if no data move to next
+  if (nrow(get(paste0("df_hierarchy_", i)) != 0)) {
+    print(paste0('level', i))
+    
+    #Custom function to perform one-to-many join for each row
+    custom_join_function <- function(row) {
+      df_row <- data.frame(rulebase_number = row[["rulebase_number"]])
+      df_one_many <-
+        left_join(
+          df_row,
+          df_priorities_new_columns,
+          by = c('rulebase_number' = 'rulebase_stack'),
+          keep = TRUE
+        )
+      
+      df_one_many_data <-
+        filter(df_one_many,!is.na(data_file_prefix)) # get rows that have a fuzzy partition
+      
+      print(paste("nrow = ", nrow(df_one_many_data)))
+      if (nrow(df_one_many_data) > 0) {
+        fp_prefix <- "fp_"
+        df_one_many_data$fp <-
+          paste(fp_prefix, df_one_many_data$rulebase_number.y, sep = "")
+        fp_list <- list(df_one_many_data$fp) # get the fp names
+        print(paste("fp_list = ", fp_list))
+      }
+      
+      weights <- list(df_one_many$weight)
+      print(paste("weights = ", weights))
+
+      lower_rb <- list(df_one_many$rulebase_number.y)      # get the rule bases
+      print(paste("lower_rb = ", lower_rb))
+      
+      results_classes_unique <- lapply(weights, conc_values) # applies the conc_values function from above
+      newList <- list("df" = df_one_many, "conlusions" = results_classes_unique, "lower rule bases" = lower_rb)
+      
+      return(newList)
+      
+     }
+    
+    # Apply the custom function to each row of df1
+    assign(paste0("df_one_many_", i),
+           apply(get(paste0("df_hierarchy_", i)), 1, custom_join_function))
+    
+    # Print the list of result data frames
+    #print(result_list)
+    
+    
+  }
+}
+
+
+```
+
+## Get the data frames, conclusions (labels from a different list still using lapply), rule bases and fuzzy partitions for each rulebase stack
+
+This uses the code from the previous chunks.
+
+In addition to before the chunk will get the fuzzy partition and lower rule base names.
+
+``` {r }
+
+# inverse join df_leaves_data to df_priorities_new_columns
+
+df_rulebases <-
+  anti_join(df_priorities_new_columns,
+            df_leaves_data,
+            by = 'rulebase_number',
+            copy = FALSE)
+
+#  join df_rulebases to hierarchies
+
+# first split hierarchies based on hierarchy level
+
+# get highest level
+
+hierarchy_level_max <- max(unique(hierarchies$level_number))
+print(paste("highest hierarchy level = ", hierarchy_level_max))
+
+# for loop to run through all hierarchy levels from biggest to smallest
+for (i in hierarchy_level_max:1) {
+  print(paste0('level', i))
+  
+  # join to the rulebases
+  assign(paste0("df_hierarchy_", i),
+         inner_join(
+           select(df_rulebases, rulebase_number, conclusion_1, conclusion_2, conclusion_3),
+           filter(select(
+             hierarchies, level_number, paste0('level', i)
+           ), level_number == i),
+           by = c('rulebase_number' = paste0('level', i))
+         ))
+  
+  # if no data move to next
+  if (nrow(get(paste0("df_hierarchy_", i)) != 0)) {
+    print(paste0('level', i))
+    
+
+    #Custom function to perform one-to-many join for each row
+    custom_join_function <- function(row) {
+      
+      conc_options <-
+        c(row[["conclusion_1"]], row[["conclusion_2"]], row[["conclusion_3"]])
+      print(conc_options)
+      print(paste("conc_options = ", conc_options))
+      
+      df_row <- data.frame(rulebase_number = row[["rulebase_number"]])
+      df_one_many <-
+        left_join(
+          df_row,
+          df_priorities_new_columns,
+          by = c('rulebase_number' = 'rulebase_stack'),
+          keep = TRUE
+        )
+
+      df_one_many_data <-
+        filter(df_one_many,!is.na(data_file_prefix)) # get rows that have a fuzzy partition
+      
+      print(paste("nrow = ", nrow(df_one_many_data)))
+      if (nrow(df_one_many_data) > 0) {
+        fp_prefix <- "fp_"
+        df_one_many_data$fp <-
+          paste(fp_prefix, df_one_many_data$rulebase_number.y, sep = "")
+        fp_list <- list(df_one_many_data$fp) # get the fp names
+        print(paste("fp_list = ", fp_list))
+      } else {print(paste("no fp_list"))}
+      
+      weights <- list(df_one_many$weight)
+      
+      # check if there are NA weights in the list signifying a biophysical aptitude rule
+      if (any(sapply(weights, is.na))) {
+        print("There are NA values in the weights list.")
+        results_classes_unique <- list("suboptimal", "optimal")
+        
+      } else {
+        print("There are no NA values in the weights list.")
+        print(paste("weights = ", weights))
+        results_classes_unique <-
+          lapply(weights, conc_values_m, conc_options) # applies the conc_values function from above
+      }
+      
+      rb_prefix <- "rb_"
+        df_one_many$rb <-
+          paste(rb_prefix, df_one_many$rulebase_number.y, sep = "")
+      lower_rb <- list(df_one_many$rb)      # get the rule bases
+      print(paste("lower_rb = ", lower_rb))
+      
+      newList <- list("df" = df_one_many, "conlusions" = results_classes_unique, "lower rule bases" = lower_rb)
+      
+      return(newList)
+      
+     }
+    
+    # Apply the custom function to each row of df1
+    assign(paste0("df_one_many_", i),
+           apply(get(paste0("df_hierarchy_", i)), 1, custom_join_function))
+    
+    # Print the list of result data frames
+    #print(result_list)
+    
+    
+  }
+}
+
+
+```
+
+## Get the data frames, conclusions (labels from a different list still using lapply), rule bases and fuzzy partitions for each rulebase stack - create the new rule base from the propositions and conclusions.
+
+This uses the code from the previous chunks.
+
+The propositions will be the conclusions of each of the lower rule bases.
+
+``` {r }
+
+# test outside lapply
+
+# this will be done within the lapply for each lower rule base (e.g. rb_se_5a & rb_se_5b)
+hello <- rb_se_5a@conclusion@table
+hello2 <- rb_se_5b@conclusion@table
+
+hello_list  <- list(hello, hello2) # the equivalent of the result of the lapply
+print(paste("str(hello_list) =", str(hello_list)))
+
+final_data_frame <- do.call(cbind, hello_list )
+result_df <- do.call(expand.grid, lapply(final_data_frame, unique))
+prop <- new("Proposition", table = result_df)
+my_conc <- data.frame(se_4a = c("good", "moderate", "moderate", "poor"))
+conc <- new("Conclusion", table = my_conc )
+rb_hello <- RuleBase(prop, conc)
+rb_hello
+
+```
+
+``` {r }
+
+# function to get and print the rule bases and conclusions from a list
+
+get_rb <- function(list_object) {
+  print(paste("rb list_object =" , list_object))
+  rb_list_object <- get(paste(list_object))
+  print(rb_list_object)
+  #str(rb_list_object)
+  lower_conc_table <- rb_list_object@conclusion@table
+  print(paste("lower_conc_table =" , lower_conc_table))
+  str(lower_conc_table)
+  
+  return(lower_conc_table)
+}
+
+``` 
+
+``` {r }
+
+# inverse join df_leaves_data to df_priorities_new_columns
+
+df_rulebases <-
+  anti_join(df_priorities_new_columns,
+            df_leaves_data,
+            by = 'rulebase_number',
+            copy = FALSE)
+
+#  join df_rulebases to hierarchies
+
+# first split hierarchies based on hierarchy level
+
+# get highest level
+
+hierarchy_level_max <- max(unique(hierarchies$level_number))
+print(paste("highest hierarchy level = ", hierarchy_level_max))
+
+# for loop to run through all hierarchy levels from biggest to smallest
+for (i in hierarchy_level_max:1) {
+  print(paste0('level', i))
+  
+  # join to the rulebases
+  assign(paste0("df_hierarchy_", i),
+         inner_join(
+           select(df_rulebases, rulebase_number, conclusion_1, conclusion_2, conclusion_3),
+           filter(select(
+             hierarchies, level_number, paste0('level', i)
+           ), level_number == i),
+           by = c('rulebase_number' = paste0('level', i))
+         ))
+  
+  # if no data move to next
+  if (nrow(get(paste0("df_hierarchy_", i)) != 0)) {
+    print(paste0('level', i))
+    
+
+    #Custom function to perform one-to-many join for each row
+    custom_join_function <- function(row) {
+      
+      conc_options <-
+        c(row[["conclusion_1"]], row[["conclusion_2"]], row[["conclusion_3"]])
+      print(conc_options)
+      print(paste("conc_options = ", conc_options))
+      
+      df_row <- data.frame(rulebase_number = row[["rulebase_number"]])
+      df_one_many <-
+        left_join(
+          df_row,
+          df_priorities_new_columns,
+          by = c('rulebase_number' = 'rulebase_stack'),
+          keep = TRUE
+        )
+
+      df_one_many_data <-
+        filter(df_one_many,!is.na(data_file_prefix)) # get rows that have a fuzzy partition
+      
+      print(paste("nrow = ", nrow(df_one_many_data)))
+      if (nrow(df_one_many_data) > 0) {
+        fp_prefix <- "fp_"
+        df_one_many_data$fp <-
+          paste(fp_prefix, df_one_many_data$rulebase_number.y, sep = "")
+        fp_list <- list(df_one_many_data$fp) # get the fp names
+        print(paste("fp_list = ", fp_list))
+      } else {print(paste("no fp_list"))}
+      
+      weights <- list(df_one_many$weight)
+      
+      # check if there are NA weights in the list signifying a biophysical aptitude rule
+      if (any(sapply(weights, is.na))) {
+        print("There are NA values in the weights list.")
+        results_classes_unique <- list("suboptimal", "optimal")
+        
+      } else {
+        print("There are no NA values in the weights list.")
+        print(paste("weights = ", weights))
+        results_classes <-
+          lapply(weights, conc_values_n, conc_options) # applies the conc_values function from above
+      }
+      
+      rb_prefix <- "rb_"
+        df_one_many$rb <-
+          paste(rb_prefix, df_one_many$rulebase_number.y, sep = "")
+      lower_rb <- df_one_many$rb      # get the rule bases
+      print(paste("lower_rb = ", lower_rb))
+      
+      # get and print the lower rule bases to ensure that these are available
+      str(lower_rb)
+      
+      lower_rb_concs <- lapply(lower_rb, get_rb)
+       
+      print(paste("str(lower_rb_concs) =", str(lower_rb_concs)))
+      print(paste("lower_rb_concs =", lower_rb_concs))
+      
+      df_lower_rb_concs <- do.call(cbind, lower_rb_concs)
+      df_lower_rb_concs_expand <- do.call(expand.grid, lapply(df_lower_rb_concs, unique))
+      prop <- new("Proposition", table = df_lower_rb_concs_expand)
+      
+      # the conclusions must match the number of rules
+      my_conc <-  data.frame(se_4a = c("good", "moderate", "moderate", "poor"))
+      
+      conc <- new("Conclusion", table = my_conc)
+      rb_hello <- RuleBase(prop, conc)
+      print(rb_hello)
+      
+      newList <- list("df" = df_one_many, "conlusions" = results_classes, "lower rule bases" = lower_rb, "lower rule base proposition cross table" = prop)
+
+      
+      return(newList)
+      
+     }
+    
+    # Apply the custom function to each row of df1
+    assign(paste0("df_one_many_", i),
+           apply(get(paste0("df_hierarchy_", i)), 1, custom_join_function))
+    
+    # Print the list of result data frames
+    #print(result_list)
+    
+    
+  }
+}
+
+
+```
+
+
+
+
