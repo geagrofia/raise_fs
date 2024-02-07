@@ -1449,20 +1449,25 @@ apply(df_leaves_data, 1, function(df_leaves_row) {
 
 # Higher-level rule base evaluation
 
-For each rule base stack:
+Each row in each higher-level df is a rule base stack
 
-1) Get the lower-level rule bases
-2) Get the proposition values
-3) Use the weights (if any) to define the rule base conclusions
-4) Construct the list of lower-level rule bases
-5) Construct the list of lower-level fuzzy partitions
-6) Make a new proposition object
-7) Make a new conclusion object 
-8) Create a new rule base
-9) Add to the list of previous rule bases
-10) Evaluate the new rule base (and stack)
-11) Add results to df_irm
-12) Plot results
+For each row in each higher-level df starting with lowest level (e.g. 6)
+
+Join to lower-level criteria to give joined df
+
+1) Get the lower-level rule bases (1 entry per row in joined df)
+2) Construct the list of lower-level rule bases (1 entry per row in joined df)
+3) Construct the list of lower-level fuzzy partitions
+4) Get the conclusion values of the lower-level rule bases (multiple per row in joined df)
+5) Use the weights, number of lower-level rule bases and conclusion values of the lower-level rule bases to determine the number of rules (1 per joined df)
+6) Use the weights (if any) to define the higher-level rule base conclusions (multiple per joined df)
+7) Make a new proposition object (1 per joined df)
+8) Make a new conclusion object 1 per joined df)
+9) Create a new rule base (1 per joined df)
+10) Add to the list of previous rule bases (1 list per joined df)
+11) Evaluate the new rule base (and stack) (per joined df)
+12) Add results to df_irm (per joined df)
+13) Plot results (per joined df)
 
 
 ## Compute the number of rules and conclusions
@@ -1663,6 +1668,88 @@ mapply(conc_values_n, weights, conc_options)
 
 ```
 
+### Basic script to get the number of conclusions and their values from any number of weights and using conclusion values from a list - lapply. Combine with number of rules.
+
+Logic:
+
+1) How many lower rule bases (get from weights)
+2) Get conclusions from lower rule bases
+3) multiply conclusions by weights 
+
+
+``` {r }
+
+weights <-
+  list(c(0.6, 0.4), c(0.7, 0.3), c(0.3, 0.4, 0.3), c(0.8, 0.1, 0.1))
+conc_options <-
+  list(
+    c("poor", "moderate", "good"),
+    c("poor", "moderate", "good"),
+    c("poor", "moderate", "good"),
+    c("low", "moderate", "high")
+  )
+lower_conc_values <-
+  list(list(se_4a_o = c("poor", "moderate", "good"), se_4b_o = c("poor", "good")), 
+       list(se_3a_o = c("poor", "good"), se_3b_o = c("poor", "moderate", "good")),
+       list(se_2a_o = c("poor", "good"), se_2b_o = c("poor", "good"), se_2c_o = c("poor", "good", "moderate")),
+       list(se_2d_o = c("poor", "moderate", "good"), se_2e_o = c("poor", "good"), se_2f_o = c("poor", "good")))
+
+conc_values_1 <- function(weights, conc_options, lower_conc_values) {
+  # Generate all combinations of addition and subtraction
+
+  str(lower_conc_values)
+  rb <- expand.grid(lower_conc_values)
+  n_rb <- nrow(rb)
+  cat(paste("Number of rules =", n_rb, "\n"))
+  
+  rb[,] <- lapply(rb, function(x) type.convert(as.character(x), as.is = TRUE))
+  
+  rb_integer <- rb %>%
+    mutate(across(
+      where(is.character),
+      ~ case_when(. == "poor" ~ -1,
+                  . == "moderate" ~ 0,
+                  . == "good" ~ 1,
+                  TRUE ~ NA_integer_),
+      .names = "{col}_integer"
+    ))  %>% select(-where(is.character)) %>% drop()
+  
+  # Display the modified data frame
+ 
+  #str(rb_integer)
+  #str(weights)
+  cat(paste("Weights =", weights, "\n"))
+  cat(paste("Possible Conclusions =", conc_options, "\n"))
+  
+  rb_integer_weighted <- sweep(rb_integer, 2, weights, `*`)
+  rb_integer_weighted$conc <- rowSums(rb_integer_weighted, na.rm = TRUE)
+  rb_integer_weighted <- cbind(rb, rb_integer_weighted)
+  
+  rb_integer_weighted$conclusion <-
+    ifelse(
+      rb_integer_weighted$conc <= (-1 / 3),
+      conc_options[1],
+      ifelse(rb_integer_weighted$conc < (1 / 3),
+             conc_options[2],
+             conc_options[3])
+    )
+  
+  #str(rb_integer_weighted) 
+  
+  # new proposition object is made here
+  prop <- new("Proposition", table = rb %>% select(where(is.character)))
+  # new conclusion object is made here
+  conc <- new("Conclusion", table = select(rb_integer_weighted, conclusion) )
+  
+  # create a rule base
+  rulebase <- RuleBase(prop, conc) %>% print()
+
+  return(rulebase)
+}
+
+mapply(conc_values_1, weights, conc_options, lower_conc_values)
+
+``` 
 
 ## Get the lowest level non-data rulebases
 
