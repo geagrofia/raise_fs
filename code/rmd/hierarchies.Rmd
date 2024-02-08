@@ -1668,11 +1668,11 @@ mapply(conc_values_n, weights, conc_options)
 
 ```
 
-### Basic script to get the number of conclusions and their values from any number of weights and using conclusion values from a list - lapply. Combine with number of rules.
+### Basic script to get the new rule base - SEF
 
 Logic:
 
-1) How many lower rule bases (get from weights)
+1) How many lower rule bases
 2) Get conclusions from lower rule bases
 3) multiply conclusions by weights 
 
@@ -1748,6 +1748,190 @@ conc_values_1 <- function(weights, conc_options, lower_conc_values) {
 }
 
 mapply(conc_values_1, weights, conc_options, lower_conc_values)
+
+``` 
+
+### Basic script to get the new rule base - BA
+
+Logic:
+
+1) How many lower rule bases
+2) Get conclusions from lower rule bases
+
+
+
+``` {r }
+
+conc_options_ba <-
+  list(c("suboptimal", "optimal"))
+
+lower_conc_values_ba <- list(
+  list(ba_2a_o = c("suboptimal", "optimal"), ba_2b_o = c("suboptimal", "optimal"), ba_2c_o = c("suboptimal", "optimal")))
+
+conc_values_2 <- function(conc_options_ba, lower_conc_values_ba) {
+  # Generate all combinations of addition and subtraction
+
+  str(lower_conc_values_ba)
+  n_ba <- length(lower_conc_values_ba)
+  rb_ba <- expand.grid(lower_conc_values_ba)
+  n_rb_ba <- nrow(rb_ba)
+  cat(paste("Number of rules =", n_rb_ba, "\n"))
+  
+  rb_ba[,] <- lapply(rb_ba, function(x) type.convert(as.character(x), as.is = TRUE))
+  
+  rb_ba_integer <- rb_ba %>%
+    mutate(across(
+      where(is.character),
+      ~ case_when(. == "suboptimal" ~ -1,
+                  . == "optimal" ~ 1,
+                  TRUE ~ NA_integer_),
+      .names = "{col}_integer"
+    ))  %>% select(-where(is.character)) %>% drop()
+  
+  # Display the modified data frame
+ 
+  #str(rb_integer)
+  cat(paste("Possible Conclusions =", conc_options_ba, "\n"))
+  
+  rb_ba_integer$conc <- rowSums(rb_ba_integer, na.rm = TRUE)
+  rb_ba_integer <- cbind(rb_ba, rb_ba_integer)
+  
+  rb_ba_integer$conclusion <-
+    ifelse(rb_ba_integer$conc < n,
+           conc_options_ba[1], conc_options_ba[2])
+    
+  
+  #str(rb_integer_weighted) 
+  
+  # new proposition object is made here
+  prop_ba <- new("Proposition", table = rb_ba %>% select(where(is.character)))
+  # new conclusion object is made here
+  conc_ba <- new("Conclusion", table = select(rb_ba_integer, conclusion) )
+  
+  # create a rule base
+  rulebase_ba <- RuleBase(prop_ba, conc_ba) %>% print()
+
+  return(rulebase_ba)
+}
+
+mapply(conc_values_2, conc_options_ba, lower_conc_values_ba)
+
+``` 
+### Basic script to get the new rule base - ALL
+
+Logic:
+
+1) How many lower rule bases
+2) Get conclusions from lower rule bases
+3) multiply conclusions by weights (if required)
+
+
+``` {r }
+
+weights <-
+  list(c(0.6, 0.4), c(0.7, 0.3), c(0.3, 0.4, 0.3), c(NA, NA, NA), c(0.8, 0.1, 0.1), c(0.6, 0.4))
+
+# to reduce confusion it is preferable to remove conclusions from the higher level rule bases
+# we assume that the conclusions are socio-economic (e.g. poor/moderate/good) except where the lower-level conclusions are biophysical (i.e. suboptimal/optimal)
+
+lower_conc_values <-
+  list(
+    list(
+      se_4a_o = c("poor", "moderate", "good"),
+      se_4b_o = c("poor", "good")
+    ),
+    list(
+      se_3a_o = c("poor", "good"),
+      se_3b_o = c("poor", "moderate", "good")
+    ),
+    list(
+      se_2a_o = c("poor", "good"),
+      se_2b_o = c("poor", "good"),
+      se_2c_o = c("poor", "good", "moderate")
+    ),
+    list(
+      ba_2a_o = c("suboptimal", "optimal"),
+      ba_2b_o = c("suboptimal", "optimal"),
+      ba_2c_o = c("suboptimal", "optimal")
+    ),
+    list(
+      se_2d_o = c("poor", "moderate", "good"),
+      se_2e_o = c("poor", "good"),
+      se_2f_o = c("poor", "good")
+    ),
+    list(
+      ba_1_o = c("suboptimal", "optimal"),
+      se_1_o = c("poor", "moderate", "good")
+    ))
+
+conc_values_3 <- function(weights, lower_conc_values) {
+  
+  # Create conc_options default
+    conc_options <- c("suboptimal", "suboptimal", "optimal")
+    
+  # Check if the text string is present in lower_conc_values
+  if (any(grepl("good",lower_conc_values))) {
+    conc_options <- c("poor", "moderate", "good")
+  }
+  
+  str(lower_conc_values)
+  n <- length(lower_conc_values)
+  weights[is.na(weights)] <- (1/n) # replace NA values in weights with values that sum to 1
+  
+  rb <- expand.grid(lower_conc_values)
+  n_rb <- nrow(rb)
+  cat(paste("Number of rules =", n_rb, "\n"))
+  
+  rb[,] <- lapply(rb, function(x) type.convert(as.character(x), as.is = TRUE))
+  
+  rb_integer <- rb %>%
+    mutate(across(
+      where(is.character),
+      ~ case_when(. == "poor" ~ -1,
+                  . == "suboptimal" ~ -1,
+                  . == "moderate" ~ 0,
+                  . == "good"  ~ 1,
+                  . == "optimal" ~ 1,
+                  TRUE ~ NA_integer_),
+      .names = "{col}_integer"
+    ))  %>% select(-where(is.character)) %>% drop()
+  
+  # Display the modified data frame
+ 
+  #str(rb_integer)
+  #str(weights)
+  cat(paste("Weights =", weights, "\n"))
+  
+  
+  cat(paste("Possible Conclusions =", conc_options, "\n"))
+  
+  rb_integer_weighted <- sweep(rb_integer, 2, weights, `*`)
+  rb_integer_weighted$conc <- rowSums(rb_integer_weighted, na.rm = TRUE)
+  rb_integer_weighted <- cbind(rb, rb_integer_weighted)
+  
+  rb_integer_weighted$conclusion <-
+    ifelse(
+      rb_integer_weighted$conc <= (-1 / 3),
+      conc_options[1],
+      ifelse(rb_integer_weighted$conc <= (1 / 3),
+             conc_options[2],
+             conc_options[3])
+    )
+  
+  #str(rb_integer_weighted) 
+  
+  # new proposition object is made here
+  prop <- new("Proposition", table = rb %>% select(where(is.character)))
+  # new conclusion object is made here
+  conc <- new("Conclusion", table = select(rb_integer_weighted, conclusion) )
+  
+  # create a rule base
+  rulebase <- RuleBase(prop, conc) %>% print()
+
+  return(rulebase)
+}
+
+mapply(conc_values_3, weights, lower_conc_values)
 
 ``` 
 
