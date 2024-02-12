@@ -64,6 +64,7 @@ library(irm)
 library(fuZR)
 library(sf)
 library(terra)
+library(stringr)
 
 r_filename <- function(filename) {
   here::here("code/r/", filename)
@@ -1864,25 +1865,31 @@ lower_conc_values <-
       se_1_o = c("poor", "moderate", "good")
     ))
 
-conc_values_3 <- function(weights, lower_conc_values) {
+
+
+
+conc_values_3 <- function(lower_conc_values, weights, rb_conc_name) {
   
   # Create conc_options default
     conc_options <- c("suboptimal", "suboptimal", "optimal")
+    c_o <- "ba"
     
   # Check if the text string is present in lower_conc_values
   if (any(grepl("good",lower_conc_values))) {
     conc_options <- c("poor", "moderate", "good")
-  }
+    c_o <- "sef"
+    }
   
-  str(lower_conc_values)
+  cat(paste("lower_conc_values =", lower_conc_values, "\n"))
   n <- length(lower_conc_values)
   weights[is.na(weights)] <- (1/n) # replace NA values in weights with values that sum to 1
   
-  rb <- expand.grid(lower_conc_values)
+  rb <- reduce(lower_conc_values, crossing)
   n_rb <- nrow(rb)
+  cat(paste("str(rb) =", str(rb), "\n"))
   cat(paste("Number of rules =", n_rb, "\n"))
   
-  rb[,] <- lapply(rb, function(x) type.convert(as.character(x), as.is = TRUE))
+  #rb[,] <- apply(rb, function(x) type.convert(as.character(x), as.is = TRUE))
   
   rb_integer <- rb %>%
     mutate(across(
@@ -1898,40 +1905,51 @@ conc_values_3 <- function(weights, lower_conc_values) {
   
   # Display the modified data frame
  
-  #str(rb_integer)
-  #str(weights)
+  cat(paste("str(rb_integer) =", str(rb_integer), "\n"))
   cat(paste("Weights =", weights, "\n"))
-  
-  
   cat(paste("Possible Conclusions =", conc_options, "\n"))
   
   rb_integer_weighted <- sweep(rb_integer, 2, weights, `*`)
   rb_integer_weighted$conc <- rowSums(rb_integer_weighted, na.rm = TRUE)
   rb_integer_weighted <- cbind(rb, rb_integer_weighted)
   
-  rb_integer_weighted$conclusion <-
+  if (c_o == "sef") {
+    rb_integer_weighted$conclusion <- 
     ifelse(
       rb_integer_weighted$conc <= (-1 / 3),
       conc_options[1],
-      ifelse(rb_integer_weighted$conc <= (1 / 3),
-             conc_options[2],
-             conc_options[3])
+      ifelse(
+        rb_integer_weighted$conc <= (1 / 3),
+        conc_options[2],
+        conc_options[3]
+      )
     )
+  } else {
+    rb_integer_weighted$conclusion <-
+      ifelse(rb_integer_weighted$conc < 1,
+           conc_options[2],
+           conc_options[3])
+  }
+
   
-  #str(rb_integer_weighted) 
-  
-  # new proposition object is made here
+  cat(paste("str(rb_integer_weighted) =", str(rb_integer_weighted), "\n"))
+  names(rb_integer_weighted)[names(rb_integer_weighted)=="conclusion"] <- rb_conc_name
+  cat(paste("str(rb_integer_weighted) =", str(rb_integer_weighted), "\n"))
+   
+    # new proposition object is made here
   prop <- new("Proposition", table = rb %>% select(where(is.character)))
   # new conclusion object is made here
-  conc <- new("Conclusion", table = select(rb_integer_weighted, conclusion) )
-  
+  conc <- new("Conclusion", table = select(rb_integer_weighted, {{ rb_conc_name }}))
   # create a rule base
   rulebase <- RuleBase(prop, conc) %>% print()
 
   return(rulebase)
 }
 
-mapply(conc_values_3, weights, lower_conc_values)
+#mapply(conc_values_3, weights, lower_conc_values)
+#lapply(lower_rb_concs_glob, conc_values_3,  weights_glob)
+
+conc_values_3(lower_rb_concs_glob, weights_glob_unlist, "hello" )
 
 ``` 
 
@@ -2383,43 +2401,31 @@ for (i in hierarchy_level_max:1) {
 
 This uses the code from the previous chunks.
 
-The propositions will be the conclusions of each of the lower rule bases.
-
 ``` {r }
 
-# test outside lapply
-
-# this will be done within the lapply for each lower rule base (e.g. rb_se_5a & rb_se_5b)
-hello <- rb_se_5a@conclusion@table
-hello2 <- rb_se_5b@conclusion@table
-
-hello_list  <- list(hello, hello2) # the equivalent of the result of the lapply
-print(paste("str(hello_list) =", str(hello_list)))
-
-final_data_frame <- do.call(cbind, hello_list )
-result_df <- do.call(expand.grid, lapply(final_data_frame, unique))
-prop <- new("Proposition", table = result_df)
-my_conc <- data.frame(se_4a = c("good", "moderate", "moderate", "poor"))
-conc <- new("Conclusion", table = my_conc )
-rb_hello <- RuleBase(prop, conc)
-rb_hello
-
-```
-
-``` {r }
-
-# function to get and print the rule bases and conclusions from a list
+# function to get a list of lower level conclusions values in this format
+#list(se_4a_o = c("poor", "moderate", "good"),
+#      se_4b_o = c("poor", "good")
+#    )
 
 get_rb <- function(list_object) {
   print(paste("rb list_object =" , list_object))
   rb_list_object <- get(paste(list_object))
-  print(rb_list_object)
+  #print(rb_list_object)
   #str(rb_list_object)
-  lower_conc_table <- rb_list_object@conclusion@table
-  print(paste("lower_conc_table =" , lower_conc_table))
-  str(lower_conc_table)
-  
+  lower_conc_table <-
+    rb_list_object@conclusion@table # gets the tibble of values
+  # print(lower_conc_table)
+  # str(lower_conc_table)
+  # lower_conc_table_varname <-
+  # names(lower_conc_table) # gets the name
+  # print(paste("lower_conc_table_varname = ", lower_conc_table_varname))
+  # lower_conc_list <- setNames(list(as.character(lower_conc_table[[lower_conc_table_varname]])), lower_conc_table_varname)
+  # 
+  # #str(lower_conc_list)
+  # print(paste("lower_conc_list =" , str(lower_conc_list)))
   return(lower_conc_table)
+  
 }
 
 ``` 
@@ -2441,11 +2447,11 @@ df_rulebases <-
 # get highest level
 
 hierarchy_level_max <- max(unique(hierarchies$level_number))
-print(paste("highest hierarchy level = ", hierarchy_level_max))
+print(paste("Highest hierarchy level = ", hierarchy_level_max))
 
 # for loop to run through all hierarchy levels from biggest to smallest
 for (i in hierarchy_level_max:1) {
-  print(paste0('level', i))
+  cat(paste0('\nLevel', i, "\n"))
   
   # join to the rulebases
   assign(paste0("df_hierarchy_", i),
@@ -2459,16 +2465,15 @@ for (i in hierarchy_level_max:1) {
   
   # if no data move to next
   if (nrow(get(paste0("df_hierarchy_", i)) != 0)) {
-    print(paste0('level', i))
+    print(paste0('Level', i, " has higher rule bases"))
     
-
     #Custom function to perform one-to-many join for each row
     custom_join_function <- function(row) {
       
-      conc_options <-
-        c(row[["conclusion_1"]], row[["conclusion_2"]], row[["conclusion_3"]])
-      print(conc_options)
-      print(paste("conc_options = ", conc_options))
+      # conc_options <-
+      #   c(row[["conclusion_1"]], row[["conclusion_2"]], row[["conclusion_3"]])
+      # print(conc_options)
+      # print(paste("conc_options = ", conc_options))
       
       df_row <- data.frame(rulebase_number = row[["rulebase_number"]])
       df_one_many <-
@@ -2478,62 +2483,83 @@ for (i in hierarchy_level_max:1) {
           by = c('rulebase_number' = 'rulebase_stack'),
           keep = TRUE
         )
-
+      
+      
+      print(paste("Stack = ", df_one_many[["rulebase_stack"]], df_one_many[["stack"]]))
+      print(paste("Criterion = ", df_one_many[["criterion"]]))
+      conc_name <- unique(df_one_many[["rulebase_stack"]])
+      print(paste("conc_name = ", conc_name))
+      
       df_one_many_data <-
         filter(df_one_many,!is.na(data_file_prefix)) # get rows that have a fuzzy partition
       
       print(paste("nrow = ", nrow(df_one_many_data)))
+      
       if (nrow(df_one_many_data) > 0) {
         fp_prefix <- "fp_"
         df_one_many_data$fp <-
           paste(fp_prefix, df_one_many_data$rulebase_number.y, sep = "")
         fp_list <- list(df_one_many_data$fp) # get the fp names
+        fp_list_glob <<- fp_list
         print(paste("fp_list = ", fp_list))
       } else {print(paste("no fp_list"))}
       
-      weights <- list(df_one_many$weight)
+      weights <- df_one_many$weight
+      weights_glob <<- weights
+      print(weights)
       
-      # check if there are NA weights in the list signifying a biophysical aptitude rule
-      if (any(sapply(weights, is.na))) {
-        print("There are NA values in the weights list.")
-        results_classes_unique <- list("suboptimal", "optimal")
-        
-      } else {
-        print("There are no NA values in the weights list.")
-        print(paste("weights = ", weights))
-        results_classes <-
-          lapply(weights, conc_values_n, conc_options) # applies the conc_values function from above
-      }
+      # # check if there are NA weights in the list signifying a biophysical aptitude rule
+      # if (any(sapply(weights, is.na))) {
+      #   print("There are NA values in the weights list.")
+      #   results_classes_unique <- list("suboptimal", "optimal")
+      #   
+      # } else {
+      #   print("There are no NA values in the weights list.")
+      #   print(paste("weights = ", weights))
+      #   results_classes <-
+      #     lapply(weights, conc_values_n, conc_options) # applies the conc_values function from above
+      # }
       
       rb_prefix <- "rb_"
         df_one_many$rb <-
           paste(rb_prefix, df_one_many$rulebase_number.y, sep = "")
       lower_rb <- df_one_many$rb      # get the rule bases
+      
+      lower_rb_glob <<- lower_rb
       print(paste("lower_rb = ", lower_rb))
       
       # get and print the lower rule bases to ensure that these are available
       str(lower_rb)
       
       lower_rb_concs <- lapply(lower_rb, get_rb)
+      lower_rb_concs_glob <<- (lower_rb_concs)
        
       print(paste("str(lower_rb_concs) =", str(lower_rb_concs)))
       print(paste("lower_rb_concs =", lower_rb_concs))
       
-      df_lower_rb_concs <- do.call(cbind, lower_rb_concs)
-      df_lower_rb_concs_expand <- do.call(expand.grid, lapply(df_lower_rb_concs, unique))
-      prop <- new("Proposition", table = df_lower_rb_concs_expand)
+      #result_rb <- mapply(weights, conc_values_3, lower_rb_concs) 
+      result_rb <- conc_values_3(lower_rb_concs, weights, conc_name )
       
-      # the conclusions must match the number of rules
-      my_conc <-  data.frame(se_4a = c("good", "moderate", "moderate", "poor"))
+      assign(paste0("rb_",conc_name), result_rb, .GlobalEnv)
       
-      conc <- new("Conclusion", table = my_conc)
-      rb_hello <- RuleBase(prop, conc)
-      print(rb_hello)
+      cat(paste("\nEND \n\n"))
       
-      newList <- list("df" = df_one_many, "conlusions" = results_classes, "lower rule bases" = lower_rb, "lower rule base proposition cross table" = prop)
-
+      # df_lower_rb_concs <- do.call(cbind, lower_rb_concs)
+      # df_lower_rb_concs_expand <- do.call(expand.grid, lapply(df_lower_rb_concs, unique))
       
-      return(newList)
+      # prop <- new("Proposition", table = df_lower_rb_concs_expand)
+      # 
+      # # the conclusions must match the number of rules
+      # my_conc <-  data.frame(se_4a = c("good", "moderate", "moderate", "poor"))
+      # 
+      # conc <- new("Conclusion", table = my_conc)
+      # rb_hello <- RuleBase(prop, conc)
+      # print(rb_hello)
+      
+      # newList <- list("df" = df_one_many, "conlusions" = results_classes, "lower rule bases" = lower_rb, "lower rule base proposition cross table" = prop)
+      # 
+      # 
+      # return(newList)
       
      }
     
