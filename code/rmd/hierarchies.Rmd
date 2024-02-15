@@ -65,6 +65,7 @@ library(fuZR)
 library(sf)
 library(terra)
 library(stringr)
+library(purrr)
 
 r_filename <- function(filename) {
   here::here("code/r/", filename)
@@ -436,7 +437,7 @@ df_leaves_data <-
 
 ## For loop to create fuzzy partitions and evaluate
 
-```{r for_loop, time_it = TRUE}
+```{r for_loop, eval = F, time_it = TRUE}
 
 # create fuzzy partitions
 
@@ -663,7 +664,7 @@ for (i in 1:nrow(df_leaves_data)) {
 ## Vectors and apply functions to create fuzzy partitions and evaluate
 ### Method 1
 
-```{r }
+```{r eval = F}
 
 apply(df_leaves_data, 1, function(row) {
   if (!is.na(row["prop_level_3"])) {
@@ -732,7 +733,7 @@ apply(df_leaves_data, 1, function(row) {
 ### Method 2
 
 
-``` {r}
+``` {r eval = F}
 # # the logic for determining prop_levels and conc_levels has been moved into the process_row function. The function returns a list containing these two vectors, and then you can use them as needed in the main loop
 # 
 # process_row <- function(row) {
@@ -944,7 +945,7 @@ apply(df_leaves_data, 1, function(row) {
 ### Method 2a
 #### Original from ChatGPT v3
 
-```{r }
+```{r  eval = F }
 
 
 # # Main function
@@ -1009,7 +1010,7 @@ apply(df_leaves_data, 1, function(row) {
 
 #### Combined Chat GPTv3 and my code
 
-```{r vectorised, time_it = TRUE, results = "asis"}
+```{r vectorised, time_it = TRUE, results = "asis", eval = F}
 
 # Function to populate a list of proposition and conclusion levels
 prop_conc <- function(df_leaves_row) {
@@ -1475,7 +1476,7 @@ Join to lower-level criteria to give joined df
 
 ### Basic script to get the conclusion values from two weights
 
-```{r }
+```{r eval = F}
 
 weights <- c(0.6, 0.4)
 
@@ -1513,7 +1514,7 @@ cat("Conclusions = ", paste(results_classes_unique, collapse = ", "), "\n")
 
 ### Basic script to get the conclusion values from any number of weights - lapply
 
-```{r }
+```{r eval = F}
 
 weights <- list(c(0.6, 0.4), c(0.7, 0.3), c(0.3, 0.4, 0.3), c(0.8, 0.1, 0.1))
 
@@ -1562,7 +1563,7 @@ lapply(weights, conc_values)
 ### Basic script to get the conclusion values from any number of weights and using conclusion values from a list - lapply
 
 
-```{r }
+```{r eval = F}
 
 weights <- list(c(0.6, 0.4), c(0.7, 0.3), c(0.3, 0.4, 0.3), c(0.8, 0.1, 0.1))
 conc_options <- list(c("poor","moderate","good"), c("poor","moderate","good"), c("poor","moderate","good"), c("low","moderate","high"))
@@ -1625,7 +1626,7 @@ mapply(conc_values_m, weights, conc_options)
 ### Basic script to get the number of conclusions and their values from any number of weights and using conclusion values from a list - lapply
 
 
-```{r }
+```{r eval = F }
 
 weights <- list(c(0.6, 0.4), c(0.7, 0.3), c(0.3, 0.4, 0.3), c(0.8, 0.1, 0.1))
 conc_options <- list(c("poor","moderate","good"), c("poor","moderate","good"), c("poor","moderate","good"), c("low","moderate","high"))
@@ -1678,7 +1679,7 @@ Logic:
 3) multiply conclusions by weights 
 
 
-``` {r }
+``` {r eval = F }
 
 weights <-
   list(c(0.6, 0.4), c(0.7, 0.3), c(0.3, 0.4, 0.3), c(0.8, 0.1, 0.1))
@@ -1761,7 +1762,7 @@ Logic:
 
 
 
-``` {r }
+``` {r eval = F }
 
 conc_options_ba <-
   list(c("suboptimal", "optimal"))
@@ -1818,7 +1819,8 @@ conc_values_2 <- function(conc_options_ba, lower_conc_values_ba) {
 mapply(conc_values_2, conc_options_ba, lower_conc_values_ba)
 
 ``` 
-### Basic script to get the new rule base - ALL
+
+### Function to construct the new rule base - ALL
 
 Logic:
 
@@ -1827,7 +1829,7 @@ Logic:
 3) multiply conclusions by weights (if required)
 
 
-``` {r }
+``` {r  }
 
 weights <-
   list(c(0.6, 0.4), c(0.7, 0.3), c(0.3, 0.4, 0.3), c(NA, NA, NA), c(0.8, 0.1, 0.1), c(0.6, 0.4))
@@ -1866,9 +1868,7 @@ lower_conc_values <-
     ))
 
 
-
-
-conc_values_3 <- function(lower_conc_values, weights, rb_conc_name) {
+fn_create_rb <- function(lower_conc_values, weights, rb_conc_name) {
   
   # Create conc_options default
     conc_options <- c("suboptimal", "suboptimal", "optimal")
@@ -1942,16 +1942,348 @@ conc_values_3 <- function(lower_conc_values, weights, rb_conc_name) {
   conc <- new("Conclusion", table = select(rb_integer_weighted, {{ rb_conc_name }}))
   # create a rule base
   rulebase <- RuleBase(prop, conc) %>% print()
+  
+  return_list <- list(rulebase, conc)
 
-  return(rulebase)
+  return(return_list)
 }
 
-#mapply(conc_values_3, weights, lower_conc_values)
-#lapply(lower_rb_concs_glob, conc_values_3,  weights_glob)
+#mapply(fn_create_rb, weights, lower_conc_values)
+#lapply(lower_rb_concs_glob, fn_create_rb,  weights_glob)
 
-conc_values_3(lower_rb_concs_glob, weights_glob_unlist, "hello" )
+#fn_create_rb(lower_rb_concs_glob, weights_glob_unlist, "hello" )
 
 ``` 
+
+### Function to get all previous fuzzy partition names
+
+Logic:
+
+1) Does the row of the one-to-many df have data
+If yes:
+A2)  get fp name using rulebase number
+A3)  append the fp name to the fp_list for the one-to-many df
+If no:
+B2) this row has an existing fp_list - get fp_list
+B3) append this list to the fp_list for the one-to-many df
+
+return the fp_list for the one-to-many df
+
+``` {r  }
+
+test_one_to_many_df <-
+  data.frame(
+    data_file_prefix = c(NA, NA, "data", "data"),
+    rulebase_number.y = c("test_stack1", "test_stack2", "test_data1", "test_data2")
+  )
+
+fp_test_stack1_list <- as.list(c("test1 = fp_test1", "test2 = fp_test2"))
+fp_test_stack2_list <- as.list(c("test3 = fp_test3", "test4 = fp_test4"))
+
+fn_fill_fp_list <- function(df_one_many) {
+  
+  fp_list <- list() #initialise list
+  df_one_many_data <-
+    filter(df_one_many, !is.na(data_file_prefix)) # get rows that have a fuzzy partition
+  df_one_many_nodata <-
+    filter(df_one_many, is.na(data_file_prefix)) # get rows that have a fuzzy partition
+  
+  print(paste("nrow data = ", nrow(df_one_many_data)))
+  
+  if (nrow(df_one_many_data) > 0) {
+    fp_prefix <- "fp_"
+    df_one_many_data$fp <-
+      paste(fp_prefix, df_one_many_data$rulebase_number.y, sep = "")
+    str(df_one_many_data)
+    fp_list <-
+      append(fp_list, list(
+        paste(
+          df_one_many_data$rulebase_number.y,
+          " = ",
+          df_one_many_data$fp
+        )
+      ))
+    fp_list <- as.list(unlist(fp_list))
+  }
+  
+  print(paste("nrow no data = ", nrow(df_one_many_nodata)))
+  
+  if (nrow(df_one_many_nodata) > 0) {
+    for (i in 1:nrow(df_one_many_nodata)){
+    fp_list <-
+      append(fp_list, get(
+        paste0("fp_",
+          df_one_many_nodata$rulebase_number.y[i],
+          "_list")
+      ))
+  }}
+  
+  return(fp_list)
+}
+
+test_fp_list <- fn_fill_fp_list(test_one_to_many_df )
+
+``` 
+
+### Function to get all previous rule base names
+
+Logic:
+
+1) Does the row of the one-to-many df have data
+If yes:
+A2)  get rb name using rulebase number
+A3)  append the rb name to a rule base list for the one-to-many df
+If no:
+B2) this row has an existing rule base stack - get the rule base stack list
+B3) append this rule base stack list to the rule base list for the one-to-many df
+
+return the rule base list for the one-to-many df
+
+``` {r  }
+
+test_one_to_many_df <-
+  data.frame(
+    data_file_prefix = c(NA, NA, "data", "data"),
+    rulebase_number.y = c("test_data7", "test_data8", "test_data1", "test_data2"),
+    rulebase_stack = c("test_data9", "test_data9", "test_data9", "test_data9"),
+    rb = c("rb_test_data7", "rb_test_data8", "rb_test_data1", "rb_test_data2")
+  )
+
+
+# test input rule bases for data rows
+rb_test_data1 <-
+  RuleBase(new("Proposition", table = tibble(test_data1 = c("low", "high"))),
+           new("Conclusion", table = tibble(test_data1_o = c("poor", "good"))))
+rb_test_data2 <-
+  RuleBase(new("Proposition", table = tibble(test_data2 = c("low", "high"))),
+           new("Conclusion", table = tibble(test_data2_o = c("poor", "good"))))
+
+
+# test input rule bases for stack rows
+rb_test_data3 <-
+  RuleBase(new("Proposition", table = tibble(test_data3 = c("low", "high"))),
+           new("Conclusion", table = tibble(test_data3_o = c("poor", "good"))))
+rb_test_data4 <-
+  RuleBase(new("Proposition", table = tibble(test_data4 = c("low", "high"))),
+           new("Conclusion", table = tibble(test_data4_o = c("poor", "good"))))
+rb_test_data5 <-
+  RuleBase(new("Proposition", table = tibble(test_data5 = c("low", "high"))),
+           new("Conclusion", table = tibble(test_data5_o = c("poor", "good"))))
+rb_test_data6 <-
+  RuleBase(new("Proposition", table = tibble(test_data6 = c("low", "high"))),
+           new("Conclusion", table = tibble(test_data6_o = c("poor", "good"))))
+
+
+# test input higher level rule bases for stack rows
+rb_test_data7 <-
+  RuleBase(new("Proposition", table = tibble(test_data3_o = c("poor", "good","poor", "good"), test_data4_o = c("poor", "poor","good", "good"))),
+           new("Conclusion", table = tibble(test_data7 = c("poor", "moderate", "moderate", "good"))))
+
+rb_test_data8 <-
+  RuleBase(new("Proposition", table = tibble(test_data5_o = c("poor", "good","poor", "good"), test_data6_o = c("poor", "poor","good", "good"))),
+           new("Conclusion", table = tibble(test_data8 = c("poor", "good","poor", "good"))))
+
+# test input higher level rule bases for the whole one-to-many table (24 rules)
+rb_test_data9 <-
+  RuleBase(new(
+    "Proposition",
+    table = tibble(
+      test_data7 = c(
+        "poor",
+        "moderate",
+        "good",
+        "poor",
+        "moderate",
+        "good",
+        "poor",
+        "moderate",
+        "good",
+        "poor",
+        "moderate",
+        "good",
+        "poor",
+        "moderate",
+        "good",
+        "poor",
+        "moderate",
+        "good",
+        "poor",
+        "moderate",
+        "good",
+        "poor",
+        "moderate",
+        "good"
+      ),
+      test_data8 = c(
+        "poor",
+        "poor",
+        "poor",
+        "good",
+        "good",
+        "good",
+        "poor",
+        "poor",
+        "poor",
+        "good",
+        "good",
+        "good",
+        "poor",
+        "poor",
+        "poor",
+        "good",
+        "good",
+        "good",
+        "poor",
+        "poor",
+        "poor",
+        "good",
+        "good",
+        "good"
+      ),
+      test_data1_o = c(
+        "poor",
+        "poor",
+        "poor",
+        "poor",
+        "poor",
+        "poor",
+        "good",
+        "good",
+        "good",
+        "good",
+        "good",
+        "good",
+        "poor",
+        "poor",
+        "poor",
+        "poor",
+        "poor",
+        "poor",
+        "good",
+        "good",
+        "good",
+        "good",
+        "good",
+        "good"
+      ),
+      test_data2_o = c(
+        "poor",
+        "poor",
+        "poor",
+        "poor",
+        "poor",
+        "poor",
+        "poor",
+        "poor",
+        "poor",
+        "poor",
+        "poor",
+        "poor",
+        "good",
+        "good",
+        "good",
+        "good",
+        "good",
+        "good",
+        "good",
+        "good",
+        "good",
+        "good",
+        "good",
+        "good"
+      )
+    )
+  ),
+  new("Conclusion", table = tibble(
+    test_data8 = c(
+      "poor",
+      "good",
+      "poor",
+      "good",
+      "poor",
+      "good",
+      "poor",
+      "good",
+      "poor",
+      "good",
+      "poor",
+      "good",
+      "poor",
+      "good",
+      "poor",
+      "good",
+      "poor",
+      "good",
+      "poor",
+      "good",
+      "poor",
+      "good",
+      "poor",
+      "good"
+    )
+  )))
+
+# test input rule base stacks for stack rows
+rbs_test_data7 <-  stack(rb_test_data7, rb_test_data3, rb_test_data4)
+rb_list_test_data7 <-  list("rb_test_data7", "rb_test_data3", "rb_test_data4")
+rbs_test_data8 <-  stack(rb_test_data8, rb_test_data5, rb_test_data6)
+rb_list_test_data8 <-  list("rb_test_data8", "rb_test_data5", "rb_test_data6")
+
+
+# test input rule base stack for the whole one-to-many table
+x <-        paste("stack(rb_test_data9,", gsub(",$", "", paste0(
+  rb_list_test_data7, sep = ",", collapse = ""
+)),"," ,gsub(",$", "", paste0(
+  rb_list_test_data8, sep = ",", collapse = ""
+)),", rb_test_data1,  rb_test_data2)")
+
+
+
+
+fn_fill_rb_list <- function(df_one_many) {
+  
+  rb_list <- list() #initialise list
+  df_one_many_data <-
+    filter(df_one_many, !is.na(data_file_prefix)) # get rows that have a fuzzy partition
+  df_one_many_nodata <-
+    filter(df_one_many, is.na(data_file_prefix)) # get rows that have a fuzzy partition
+  
+  print(paste("nrow data = ", nrow(df_one_many_data)))
+  
+  if (nrow(df_one_many_data) > 0) {
+    # rb_prefix <- "rb_"
+    # df_one_many_data$rb <-
+    #   paste(rb_prefix, df_one_many_data$rulebase_number.y, sep = "")
+    # str(df_one_many_data)
+    rb_list <-
+      append(rb_list, list(
+        paste(df_one_many_data$rb
+        )
+      ))
+    rb_list <- as.list(unlist(rb_list))
+  }
+  
+  print(paste("nrow no data = ", nrow(df_one_many_nodata)))
+  
+  if (nrow(df_one_many_nodata) > 0) {
+    for (i in 1:nrow(df_one_many_nodata)) {
+      print(paste0("rb_list_",
+                   df_one_many_nodata$rulebase_number.y[i]))
+      rb_list <-
+        append(rb_list, get(
+          paste0("rb_list_",
+                 df_one_many_nodata$rulebase_number.y[i])
+        ))
+    }
+  }
+  
+  return(rb_list)
+}
+
+test_rb_list <- fn_fill_rb_list(test_one_to_many_df )
+
+``` 
+
 
 ## Get the lowest level non-data rulebases
 
@@ -1960,7 +2292,7 @@ Then get the hierarchy level for the remaining rows.
 
 Start with the criteria with the highest level and proceed to the root level
 
-``` {r }
+``` {r eval = F }
 
 # inverse join df_leaves_data to df_priorities_new_columns
 
@@ -2041,7 +2373,7 @@ for (i in hierarchy_level_max:1) {
 
 This uses the code from the previous chunk, as well as the computation of the weights from above
 
-``` {r }
+``` {r eval = F }
 
 # inverse join df_leaves_data to df_priorities_new_columns
 
@@ -2117,7 +2449,7 @@ This uses the code from the previous chunks.
 
 In addition to before the chunk will get the rule base names
 
-``` {r }
+``` {r eval = F }
 
 # inverse join df_leaves_data to df_priorities_new_columns
 
@@ -2197,7 +2529,7 @@ This uses the code from the previous chunks.
 
 In addition to before the chunk will get the fuzzy partition names.
 
-``` {r }
+``` {r  eval = F}
 
 # inverse join df_leaves_data to df_priorities_new_columns
 
@@ -2290,7 +2622,7 @@ This uses the code from the previous chunks.
 
 In addition to before the chunk will get the fuzzy partition and lower rule base names.
 
-``` {r }
+``` {r  eval = F}
 
 # inverse join df_leaves_data to df_priorities_new_columns
 
@@ -2490,86 +2822,185 @@ for (i in hierarchy_level_max:1) {
       conc_name <- unique(df_one_many[["rulebase_stack"]])
       print(paste("conc_name = ", conc_name))
       
-      df_one_many_data <-
-        filter(df_one_many,!is.na(data_file_prefix)) # get rows that have a fuzzy partition
       
-      print(paste("nrow = ", nrow(df_one_many_data)))
+      ### GET OR ADD TO THE FUZZY PARTITION LIST ###
       
-      if (nrow(df_one_many_data) > 0) {
-        fp_prefix <- "fp_"
-        df_one_many_data$fp <-
-          paste(fp_prefix, df_one_many_data$rulebase_number.y, sep = "")
-        fp_list <- list(df_one_many_data$fp) # get the fp names
-        fp_list_glob <<- fp_list
-        print(paste("fp_list = ", fp_list))
-      } else {print(paste("no fp_list"))}
+      fp_list <- fn_fill_fp_list(df_one_many) # function gets the fp list
+      
+      assign(paste0("fp_", conc_name, "_list"),
+             fp_list,
+             .GlobalEnv) # make a globally available named list
+      
+      ### GET WEIGHTS ###
       
       weights <- df_one_many$weight
       weights_glob <<- weights
       print(weights)
       
-      # # check if there are NA weights in the list signifying a biophysical aptitude rule
-      # if (any(sapply(weights, is.na))) {
-      #   print("There are NA values in the weights list.")
-      #   results_classes_unique <- list("suboptimal", "optimal")
-      #   
-      # } else {
-      #   print("There are no NA values in the weights list.")
-      #   print(paste("weights = ", weights))
-      #   results_classes <-
-      #     lapply(weights, conc_values_n, conc_options) # applies the conc_values function from above
-      # }
+      ### CONSTRUCT THE NEW RULE BASE ###    
       
       rb_prefix <- "rb_"
-        df_one_many$rb <-
-          paste(rb_prefix, df_one_many$rulebase_number.y, sep = "")
+      df_one_many$rb <-
+        paste(rb_prefix, df_one_many$rulebase_number.y, sep = "")
+
       lower_rb <- df_one_many$rb      # get the rule bases
-      
-      lower_rb_glob <<- lower_rb
-      print(paste("lower_rb = ", lower_rb))
-      
       # get and print the lower rule bases to ensure that these are available
+      print(paste("lower_rb = ", lower_rb))
       str(lower_rb)
-      
+
+      lower_rb_glob <<-
+        lower_rb      # save to global env for debugging
       lower_rb_concs <- lapply(lower_rb, get_rb)
       lower_rb_concs_glob <<- (lower_rb_concs)
        
       print(paste("str(lower_rb_concs) =", str(lower_rb_concs)))
       print(paste("lower_rb_concs =", lower_rb_concs))
       
-      #result_rb <- mapply(weights, conc_values_3, lower_rb_concs) 
-      result_rb <- conc_values_3(lower_rb_concs, weights, conc_name )
+      cat(paste("\nDEBUG2 START\n\n"))
       
+      #### HERE
+      
+      
+      #result_rb <- mapply(weights, fn_create_rb, lower_rb_concs) 
+      results_rb  <- fn_create_rb(lower_rb_concs, weights, conc_name)
+      str(results_rb)
+      result_rb <- unlist(results_rb[[1]])
+      print(result_rb)
+      result_rb_conc <- unlist(results_rb[[2]])
+      print(result_rb_conc)
+      
+      cat(paste("\nDEBUG2 END\n\n"))
+                  
       assign(paste0("rb_",conc_name), result_rb, .GlobalEnv)
       
+      
+      ### GET OR ADD TO THE RULE BASE STACK ###
+      
+      rb_list <- fn_fill_rb_list(df_one_many)
+      rb_list <-  append(rb_list, paste0("rb_", conc_name))
+      rb_list_glob <<- rb_list
+      print(rb_list)   
+      
+      assign(paste0("rb_list_", conc_name), rb_list,
+             .GlobalEnv) # convert to rule base list
+
+      newList <- list("df" = df_one_many, "fp" = fp_list , "rb" = result_rb, rbs = rb_list)
+
+      
+ 
+      
+      # print(get(paste0("rb_list_", conc_name)))
+      # str(get(paste0("rb_list_", conc_name)))
+      
+      # # create the rule base stack from the list
+      x <-
+        paste("stack(", gsub(",$", "", paste0(
+          get(paste0("rb_list_", conc_name)), sep = ",", collapse = ""
+        )), ")")
+      
+      print(x)
+      
+      assign(paste0("rbs_", conc_name), eval(parse(text = x)))
+      #print(get(paste0("rbs_", conc_name)))
+      
+      # # evaluate the rule base stack
+      
+      w <-
+        paste0("predict(",
+              "rbs_",
+              conc_name,
+              ", newdata = df_irm,",
+              gsub(",$", "", paste0(
+                fp_list, sep = ",", collapse = ""
+              )),
+              ")")
+      print(w)
+      assign(paste0("fpm_", conc_name), eval(parse(text = w)),
+             .GlobalEnv)
+
+      
+      # columns defined by conclusions to rule base
+      
+      fpm_colnames <<- pull(distinct(result_rb_conc@table))
+      
+      print(fpm_colnames)
+      
+      for (i in 1:length(fpm_colnames)) {
+        
+      col_suffix <-   substr( fpm_colnames[[i]] , start = 1 , stop = 1 )
+      print(col_suffix)
+      
+      mem_text <- paste0("getMembership(","fpm_", conc_name,"$", fpm_colnames[[i]],")")
+      print(mem_text)
+      membership <- eval(parse(text = mem_text))
+      
+      df_irm <<-
+        mutate(df_irm,!!as.character(paste0(conc_name, "_", col_suffix)) := membership, .keep = c("all"))
+        
+      }
+      
+      # o_col <- getMembership(get(paste0("fpm_",
+      #                                   df_criteria_ba1[1, 2]))$optimal)
+      # s_col <- getMembership(get(paste0("fpm_",
+      #                                   df_criteria_ba1[1, 2]))$suboptimal)
+      # df_irm <-
+      #   mutate(df_irm,!!as.character(paste0(df_criteria_ba1[1, 2], "_o")) := o_col, .keep = c("all"))
+      # df_irm <-
+      #   mutate(df_irm,!!as.character(paste0(df_criteria_ba1[1, 2], "_s")) := s_col, .keep = c("all"))
+      # 
+      # g_col <- getMembership(get(paste0("fpm_",
+      #                                   df_criteria_se3a_4a[1, 3]))$good)
+      # df_irm <-
+      #   mutate(df_irm, !!as.character(paste0(df_criteria_se3a_4a[1, 3], "_g")) := g_col, .keep = c("all"))
+      # 
+      # if (ext_conclusion2 == "moderate" |
+      #     ext_conclusion3 == "moderate") {
+      #   m_col <- getMembership(get(paste0("fpm_",
+      #                                     df_criteria_se3a_4a[1, 3]))$moderate)
+      #   df_irm <-
+      #     mutate(df_irm,!!as.character(paste0(df_criteria_se3a_4a[1, 3], "_m")) := m_col, .keep = c("all"))
+      #   
+      #   ext_rb <- "gmp"
+      # } else
+      #   ext_rb <- "gp"
+      # 
+      # p_col <- getMembership(get(paste0("fpm_",
+      #                                   df_criteria_se3a_4a[1, 3]))$poor)
+      # df_irm <-
+      #   mutate(df_irm,!!as.character(paste0(df_criteria_se3a_4a[1, 3], "_p")) := p_col, .keep = c("all"))
+            
+      # ### TO BE DONE 16/02/2024 ### START
+      #
+      
+      cat(paste("\nDEBUG1 START\n\n"))
+      n = 2
+      fpm_conc_var <-
+        c(as.character(paste0(df_criteria_se3a_4a[1, 3], "_g")),  as.character(paste0(df_criteria_se3a_4a[1, 3], "_p")), "x" , "y")
+      fpm_conc_name <-
+        c(as.character(paste0(df_criteria_se3a_4a[1, 4], " good")),  as.character(paste0(df_criteria_se3a_4a[1, 4], " poor")))
+      
+    }
+    fpm_plot_title <-
+      "Extension\nAccess\noptimality\nmembership"
+    
+    plot_fpm <-
+      rasterize_plot_fpm(n, fpm_conc_var, fpm_conc_name, df_irm)
+    #
+    cat(paste("\nDEBUG1 END\n\n"))      #
+      
+      
+      ### TO BE DONE 16/02/2024 ### END
+      
+      
       cat(paste("\nEND \n\n"))
-      
-      # df_lower_rb_concs <- do.call(cbind, lower_rb_concs)
-      # df_lower_rb_concs_expand <- do.call(expand.grid, lapply(df_lower_rb_concs, unique))
-      
-      # prop <- new("Proposition", table = df_lower_rb_concs_expand)
-      # 
-      # # the conclusions must match the number of rules
-      # my_conc <-  data.frame(se_4a = c("good", "moderate", "moderate", "poor"))
-      # 
-      # conc <- new("Conclusion", table = my_conc)
-      # rb_hello <- RuleBase(prop, conc)
-      # print(rb_hello)
-      
-      # newList <- list("df" = df_one_many, "conlusions" = results_classes, "lower rule bases" = lower_rb, "lower rule base proposition cross table" = prop)
-      # 
-      # 
-      # return(newList)
+            
+      return(newList)
       
      }
     
     # Apply the custom function to each row of df1
     assign(paste0("df_one_many_", i),
            apply(get(paste0("df_hierarchy_", i)), 1, custom_join_function))
-    
-    # Print the list of result data frames
-    #print(result_list)
-    
     
   }
 }
