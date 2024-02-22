@@ -66,6 +66,8 @@ library(sf)
 library(terra)
 library(stringr)
 library(purrr)
+library(tidyterra)
+library(tidyverse)
 
 r_filename <- function(filename) {
   here::here("code/r/", filename)
@@ -379,38 +381,38 @@ df_irm <-
   data.frame(
     "x" = c(1, 2, 3, 4, 5, 1, 2, 3, 4, 5, 1, 2, 3, 4, 5, 1, 2, 3, 4, 5, 1, 2, 3, 4, 5),
     "y" = c(1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5),
-    "ba_2a" = sample(0:1, 25, replace = TRUE),
-    "ba_4a" = sample(1:200, 25, replace = TRUE),
-    "ba_4b" = sample(1:100, 25, replace = TRUE),
-    "ba_4c" = sample(1:100, 25, replace = TRUE),
-    "ba_4d" = sample(1:100, 25, replace = TRUE),
-    "ba_4e" = sample(-1:30, 25, replace = TRUE),
-    "ba_4f" = sample(-1:30, 25, replace = TRUE),
-    "ba_4g" = sample(-1:30, 25, replace = TRUE),
-    "ba_4h" = sample(1:200, 25, replace = TRUE),
-    "ba_3c" = sample(0:1, 25, replace = TRUE),
-    "ba_3d" = sample(1:100, 25, replace = TRUE),
-    "ba_3e" = sample(1:100, 25, replace = TRUE),
-    "ba_3f" = sample(1:100, 25, replace = TRUE),
-    "ba_3g" = sample(1:10, 25, replace = TRUE),
-    "ba_3h" = sample(1:100, 25, replace = TRUE),
-    "ba_3i" = sample(1:8, 25, replace = TRUE),
-    "ba_3j" = sample(0:1, 25, replace = TRUE),
-    "ba_3k" = sample(1:10, 25, replace = TRUE),
-    "ba_3l" = sample(1:5000, 25, replace = TRUE),
-    "ba_3m" = sample(1:100, 25, replace = TRUE),
-    "ba_3n" = sample(1:10, 25, replace = TRUE),
-    "se_5a" = sample(1:10, 25, replace = TRUE),
-    "se_5b" = sample(1:10, 25, replace = TRUE),
-    "se_5c" = sample(1:10, 25, replace = TRUE),
+    "ba_2a" = sample(0.5:1.5, 25, replace = TRUE),
+    "ba_4a" = sample(30:200, 25, replace = TRUE),
+    "ba_4b" = sample(60:200, 25, replace = TRUE),
+    "ba_4c" = sample(60:200, 25, replace = TRUE),
+    "ba_4d" = sample(25:200, 25, replace = TRUE),
+    "ba_4e" = sample(15:25, 25, replace = TRUE),
+    "ba_4f" = sample(5:25, 25, replace = TRUE),
+    "ba_4g" = sample(5:25, 25, replace = TRUE),
+    "ba_4h" = sample(5:25, 25, replace = TRUE),
+    "ba_3c" = sample(0.75:1.5, 25, replace = TRUE),
+    "ba_3d" = sample(1:35, 25, replace = TRUE),
+    "ba_3e" = sample(50:200, 25, replace = TRUE),
+    "ba_3f" = sample(40:80, 25, replace = TRUE),
+    "ba_3g" = sample(5:20, 25, replace = TRUE),
+    "ba_3h" = sample(30:100, 25, replace = TRUE),
+    "ba_3i" = sample(5.5:9, 25, replace = TRUE),
+    "ba_3j" = sample(0.5:10, 25, replace = TRUE),
+    "ba_3k" = sample(0:1, 25, replace = TRUE),
+    "ba_3l" = sample(1800:3000, 25, replace = TRUE),
+    "ba_3m" = sample(1:23, 25, replace = TRUE),
+    "ba_3n" = sample(3.5:10, 25, replace = TRUE),
+    "se_5a" = sample(0:1, 25, replace = TRUE),
+    "se_5b" = sample(0:5, 25, replace = TRUE),
+    "se_5c" = sample(100:1000, 25, replace = TRUE),
     "se_5d" = sample(1:10, 25, replace = TRUE),
-    "se_5e" = sample(1:10, 25, replace = TRUE),
-    "se_5f" = sample(1:10, 25, replace = TRUE),
-    "se_4d" = sample(1:10, 25, replace = TRUE),
-    "se_4e" = sample(1:10, 25, replace = TRUE),
-    "se_3c" = sample(1:10, 25, replace = TRUE),
-    "se_3d" = sample(1:10, 25, replace = TRUE),
-    "se_3e" = sample(1:10, 25, replace = TRUE)
+    "se_5e" = sample(0:1, 25, replace = TRUE),
+    "se_5f" = sample(0:5, 25, replace = TRUE),
+    "se_4d" = sample(0:1, 25, replace = TRUE),
+    "se_4e" = sample(0:2, 25, replace = TRUE),
+    "se_3c" = sample(0:1, 25, replace = TRUE),
+    "se_3d" = sample(0:5, 25, replace = TRUE),
+    "se_3e" = sample(0:5, 25, replace = TRUE)
   )
 
 vect <- vect(df_irm, geom=c("x", "y"), crs="+proj=longlat +datum=WGS84")
@@ -2285,6 +2287,61 @@ test_rb_list <- fn_fill_rb_list(test_one_to_many_df )
 ``` 
 
 
+### Function to get the previous rule-base stack names
+
+Logic:
+
+1) Get the criteria that contribute to the higher-level rule base
+2) Get the code for the suffix for use in mapping
+3) If no code available use the number of the lower-level rule bases as a suffix 
+
+return the codes/names of the contributing criteria for the one-to-many df
+
+``` {r  }
+
+test_one_to_many_df_1 <-
+  data.frame(
+    criterion = c(
+      "Landscape Aptitude",
+      "Climatic Aptitude",
+      "Land Aptitude",
+      "Soil Fertility Aptitude"
+    ),
+    rulebase_number.y = c("test_stack1", "test_stack2", "test_stack3", "test_stack4"),
+    mapping_code =  c("Ls", "Cl", "L", "SF")
+  )
+
+test_one_to_many_df_2 <-
+  data.frame(
+    criterion = c(
+      "Landscape Aptitude",
+      "Climatic Aptitude",
+      "Land Aptitude",
+      "Soil Fertility Aptitude"
+    ),
+    rulebase_number.y = c("test_stack1", "test_stack2", "test_stack3", "test_stack4")
+  )
+
+fn_rbs_names <- function(df_one_many) {
+  
+  if ("mapping_code" %in% colnames(df_one_many)) {
+    df_one_many <- select(df_one_many, rulebase_number.y, mapping_code)
+  } else {
+    df_one_many <- select(df_one_many, rulebase_number.y)
+    df_one_many$mapping_code <- df_one_many$rulebase_number.y
+  }
+  
+  rbs_names <- as.list(df_one_many)
+  return(rbs_names)
+}
+
+test_rbs_names_1 <- fn_rbs_names(test_one_to_many_df_1)
+test_rbs_names_2 <- fn_rbs_names(test_one_to_many_df_2)
+
+``` 
+
+
+
 ## Get the lowest level non-data rulebases
 
 Any criterion which is a leaf should be removed from the priorities df.
@@ -2740,29 +2797,29 @@ This uses the code from the previous chunks.
 #      se_4b_o = c("poor", "good")
 #    )
 
-get_rb <- function(list_object) {
+fn_get_rb_conc <- function(list_object) {
   print(paste("rb list_object =" , list_object))
   rb_list_object <- get(paste(list_object))
   #print(rb_list_object)
   #str(rb_list_object)
   lower_conc_table <-
     rb_list_object@conclusion@table # gets the tibble of values
-  # print(lower_conc_table)
-  # str(lower_conc_table)
-  # lower_conc_table_varname <-
-  # names(lower_conc_table) # gets the name
-  # print(paste("lower_conc_table_varname = ", lower_conc_table_varname))
-  # lower_conc_list <- setNames(list(as.character(lower_conc_table[[lower_conc_table_varname]])), lower_conc_table_varname)
-  # 
-  # #str(lower_conc_list)
-  # print(paste("lower_conc_list =" , str(lower_conc_list)))
   return(lower_conc_table)
-  
+}
+
+fn_get_rb_prop <- function(list_object) {
+  print(paste("rb list_object =" , list_object))
+  rb_list_object <- get(paste(list_object))
+  #print(rb_list_object)
+  #str(rb_list_object)
+  lower_prop_table <-
+    rb_list_object@proposition@table # gets the tibble of values
+  return(lower_prop_table)
 }
 
 ``` 
 
-``` {r }
+``` {r , results = 'asis' }
 
 # inverse join df_leaves_data to df_priorities_new_columns
 
@@ -2799,8 +2856,8 @@ for (i in hierarchy_level_max:1) {
   if (nrow(get(paste0("df_hierarchy_", i)) != 0)) {
     print(paste0('Level', i, " has higher rule bases"))
     
-    #Custom function to perform one-to-many join for each row
-    custom_join_function <- function(row) {
+    #Custom function to perform one-to-many join for each row and evaluate rule base
+    eval_rule_base <- function(row) {
       
       # conc_options <-
       #   c(row[["conclusion_1"]], row[["conclusion_2"]], row[["conclusion_3"]])
@@ -2816,11 +2873,14 @@ for (i in hierarchy_level_max:1) {
           keep = TRUE
         )
       
-      
-      print(paste("Stack = ", df_one_many[["rulebase_stack"]], df_one_many[["stack"]]))
-      print(paste("Criterion = ", df_one_many[["criterion"]]))
+      cat("\n\n\n")
+      cat("##", unique(df_one_many[["stack"]]), "\n")
+      cat("\n\n\n")
       conc_name <- unique(df_one_many[["rulebase_stack"]])
-      print(paste("conc_name = ", conc_name))
+      
+      cat("Stack = ", df_one_many[["rulebase_stack"]], df_one_many[["stack"]])
+      cat("Criterion = ", df_one_many[["criterion"]])
+      cat("conc_name = ", conc_name)
       
       
       ### GET OR ADD TO THE FUZZY PARTITION LIST ###
@@ -2847,29 +2907,24 @@ for (i in hierarchy_level_max:1) {
       # get and print the lower rule bases to ensure that these are available
       print(paste("lower_rb = ", lower_rb))
       str(lower_rb)
-
       lower_rb_glob <<-
         lower_rb      # save to global env for debugging
-      lower_rb_concs <- lapply(lower_rb, get_rb)
-      lower_rb_concs_glob <<- (lower_rb_concs)
+      
+      lower_rb_concs <- lapply(lower_rb, fn_get_rb_conc)
+      lower_rb_concs_glob <<- (lower_rb_concs)      
+      lower_rb_props <- lapply(lower_rb, fn_get_rb_prop)
+      lower_rb_props_glob <<- (lower_rb_props) 
        
-      print(paste("str(lower_rb_concs) =", str(lower_rb_concs)))
-      print(paste("lower_rb_concs =", lower_rb_concs))
-      
-      cat(paste("\nDEBUG2 START\n\n"))
-      
-      #### HERE
-      
-      
-      #result_rb <- mapply(weights, fn_create_rb, lower_rb_concs) 
+      # print(paste("str(lower_rb_concs) =", str(lower_rb_concs)))
+      # print(paste("lower_rb_concs =", lower_rb_concs))
+
       results_rb  <- fn_create_rb(lower_rb_concs, weights, conc_name)
       str(results_rb)
       result_rb <- unlist(results_rb[[1]])
       print(result_rb)
       result_rb_conc <- unlist(results_rb[[2]])
       print(result_rb_conc)
-      
-      cat(paste("\nDEBUG2 END\n\n"))
+
                   
       assign(paste0("rb_",conc_name), result_rb, .GlobalEnv)
       
@@ -2925,12 +2980,12 @@ for (i in hierarchy_level_max:1) {
       
       print(fpm_colnames)
       
-      for (i in 1:length(fpm_colnames)) {
+      for (j in 1:length(fpm_colnames)) {
         
-      col_suffix <-   substr( fpm_colnames[[i]] , start = 1 , stop = 1 )
+      col_suffix <-   substr( fpm_colnames[[j]] , start = 1 , stop = 1 )
       print(col_suffix)
       
-      mem_text <- paste0("getMembership(","fpm_", conc_name,"$", fpm_colnames[[i]],")")
+      mem_text <- paste0("getMembership(","fpm_", conc_name,"$", fpm_colnames[[j]],")")
       print(mem_text)
       membership <- eval(parse(text = mem_text))
       
@@ -2939,57 +2994,564 @@ for (i in hierarchy_level_max:1) {
         
       }
       
-      # o_col <- getMembership(get(paste0("fpm_",
-      #                                   df_criteria_ba1[1, 2]))$optimal)
-      # s_col <- getMembership(get(paste0("fpm_",
-      #                                   df_criteria_ba1[1, 2]))$suboptimal)
-      # df_irm <-
-      #   mutate(df_irm,!!as.character(paste0(df_criteria_ba1[1, 2], "_o")) := o_col, .keep = c("all"))
-      # df_irm <-
-      #   mutate(df_irm,!!as.character(paste0(df_criteria_ba1[1, 2], "_s")) := s_col, .keep = c("all"))
-      # 
-      # g_col <- getMembership(get(paste0("fpm_",
-      #                                   df_criteria_se3a_4a[1, 3]))$good)
-      # df_irm <-
-      #   mutate(df_irm, !!as.character(paste0(df_criteria_se3a_4a[1, 3], "_g")) := g_col, .keep = c("all"))
-      # 
-      # if (ext_conclusion2 == "moderate" |
-      #     ext_conclusion3 == "moderate") {
-      #   m_col <- getMembership(get(paste0("fpm_",
-      #                                     df_criteria_se3a_4a[1, 3]))$moderate)
-      #   df_irm <-
-      #     mutate(df_irm,!!as.character(paste0(df_criteria_se3a_4a[1, 3], "_m")) := m_col, .keep = c("all"))
-      #   
-      #   ext_rb <- "gmp"
-      # } else
-      #   ext_rb <- "gp"
-      # 
-      # p_col <- getMembership(get(paste0("fpm_",
-      #                                   df_criteria_se3a_4a[1, 3]))$poor)
-      # df_irm <-
-      #   mutate(df_irm,!!as.character(paste0(df_criteria_se3a_4a[1, 3], "_p")) := p_col, .keep = c("all"))
+      rasterize_plot_fpm <-
+        function(n,
+                 fpm_conc_var,
+                 fpm_conc_name,
+                 df_data,
+                 fpm_plot_title) {
+          df_plot <- df_data %>%
+            dplyr::select(unlist(as.character(noquote(fpm_conc_var)))) %>%
+            na.omit %>%
+            st_as_sf(coords = c("x", "y"))
+          
+          # initialise the dB raster brick using the first layer
+          rast_plot <-
+            rasterize(df_plot, rast_mask_proj, fpm_conc_var[[1]]) #%>% brick   # SpatRasters don't need to be bricks
+          
+          # in a loop add subsequent layers to the dB SpatRaster starting from the second layer
+          for (k in 2:n) {
+            rast_plot <-
+              rast(list(rast_plot, rasterize(df_plot, rast_mask_proj, field = fpm_conc_var[[k]])))
+          }
+          
+          # give the dB layers sensible names
+          names(rast_plot) <- fpm_conc_name
+          
+          # plot all the layers in facets
+          ggplot() +
+            geom_spatraster(data = rast_plot, na.rm = TRUE) +
+            scale_fill_stepsn(
+              na.value = "transparent",
+              n.breaks = 10,
+              colours = hcl.colors(palette = "Greens 3", 10, rev = T),
+              guide = "legend"
+            ) +
+            facet_wrap( ~ lyr) +
+            labs(title = fpm_plot_title) +
+            theme(
+              panel.grid.major.x = element_blank(),
+              panel.grid.minor.x = element_blank(),
+              axis.title.x = element_blank(),
+              axis.title.y = element_blank(),
+              strip.background = element_rect(fill=NA),
+              panel.background = element_rect(fill=NA))
+        }
+      
+      n = length(fpm_colnames)
+      fpm_conc_var <- c()
+      for (j in 1:length(fpm_colnames)) {
+        col_suffix <-   substr(fpm_colnames[[j]] , start = 1 , stop = 1)
+        fpm_conc_var <-
+          c(fpm_conc_var, paste0(conc_name, "_", col_suffix))
+      }
+      
+      fpm_conc_var <-    c(fpm_conc_var, "x" , "y")
+      fpm_conc_name <- fpm_colnames
+      fpm_plot_title <-    paste(unique(df_one_many[["stack"]]))
+      
+      
+      plot_fpm <-
+      rasterize_plot_fpm(n, fpm_conc_var, fpm_conc_name, df_irm, fpm_plot_title)
+      
+      print(plot_fpm)
+    # #
+    
+
+      
+      # Classified maps
+      cat(
+        "\n\n\n
+Classified maps are currently produced for Adoption, Biophysical Aptitude and for Socio-economic Feasibility.
+
+Problem 1): Currently, the evaluation of the chunks that create these maps is determined by a parameter in the chunk options. That parameter is either TRUE or FALSE depending on the name of the rule base stack in the priorities table.
+
+Problem 2): The number of classes for the biophysical aptitude limitations maps is also dependent on the number of types of limitations possible (e.g. soil fertility).
+
+Logic: For the two top hierarchy level rule-bases produce classified maps with limitations based on lower-level inputs.\n\n\n")
+      
+      
+      classify_maps_FAO <-
+        function(n,
+                 fpm_conc_var,
+                 fpm_conc_name,
+                 df_data,
+                 fpm_plot_title) {
+          df_plot <- df_data %>%
+            dplyr::select(unlist(as.character(noquote(fpm_conc_var)))) %>%
+            na.omit %>%
+            st_as_sf(coords = c("x", "y"))
+
+          #cat("str(df_one_many) = ", str(df_one_many),"\n")
+          stack_code <<- unique(df_one_many[['rulebase_stack']])
+          cat("stack_code = ", stack_code,"\n")
+       
+          if ("optimal" %in% fpm_conc_name) { # biophysical aptitude criteria
             
-      # ### TO BE DONE 16/02/2024 ### START
+            cat("OPTIMAL")           
+            print(match("optimal",fpm_conc_name))
+            opt_match <- match("optimal",fpm_conc_name)
+            opt_match_glob <<- opt_match
+            
+            #create raster using the 'optimal' layer
+            rast_plot <-
+              rasterize(df_plot, rast_mask_proj, fpm_conc_var[[opt_match]])
+            names(rast_plot) <- fpm_conc_name[[opt_match]]
+            
+          } else {
+            # socio-economic feasibility criteria
+            
+            cat("GOOD")
+            match_set <- c("good", "high")
+            print(match(match_set, fpm_conc_name))
+            good_match <- max(match(match_set, fpm_conc_name), na.rm = T)
+            good_match_glob <<- good_match
+            
+            #create raster using the 'good/high' layer
+            rast_plot <-
+              rasterize(df_plot, rast_mask_proj, fpm_conc_var[[good_match]])
+            names(rast_plot) <- fpm_conc_name[[good_match]]
+            
+            if (length(fpm_conc_name) == 3) {# only run when a moderate conclusion
+            
+            cat("MODERATE")  
+            match_set <- c("moderate")
+            print(match(match_set, fpm_conc_name))
+            moderate_match <- max(match(match_set, fpm_conc_name), na.rm = T)
+            moderate_match_glob <<- moderate_match
+            
+            #create raster using the 'good/high' layer
+            rast_plot2 <- rasterize(df_plot, rast_mask_proj, fpm_conc_var[[moderate_match]])
+            names(rast_plot2) <- fpm_conc_name[[moderate_match]]
+            
+            #*Optimal*
+            # High feasibility has a value of 1.
+            # Moderate feasibility has a value of 0.5.
+            
+            rast_plot <- sum(rast_plot, (rast_plot2 * 0.5))
+            }
+          }
+          
+          rast_plot_name <- names(rast_plot)
+          
+          # plot the 'optimal' layer
+          ggplot() +
+            geom_spatraster(data = rast_plot, na.rm = TRUE, aes(fill = rast_plot_name)) +
+            scale_fill_stepsn(
+              na.value = "transparent",
+              n.breaks = 10,
+              colours = hcl.colors(palette = "Greens 3", 10, rev = T),
+              guide = "legend"
+            ) +
+            #facet_wrap(~ lyr) +
+            labs(title = fpm_plot_title) +
+            theme(
+              panel.grid.major.x = element_blank(),
+              panel.grid.minor.x = element_blank(),
+              axis.title.x = element_blank(),
+              axis.title.y = element_blank(),
+              strip.background = element_rect(fill = NA),
+              panel.background = element_rect(fill = NA)
+            )
+          
+          # classify values and export
+          ## from-to-becomes
+          # classify the optimal values into five groups
+          # all values >= 0 and <= 0.25 become N2, etc.
+          v_clas_fao <- c(-Inf, 0.25, 5,
+                        0.25, 0.4, 4,
+                        0.4, 0.6, 3,
+                        0.6, 0.85, 2,
+                        0.85, Inf, 1)
+          m_clas_fao <- matrix(v_clas_fao, ncol = 3, byrow = TRUE)
+          rast_clas_fao_bin <-
+            classify(rast_plot, m_clas_fao, include.lowest = TRUE)
+          rast_clas_fao_cat <- rast_clas_fao_bin
+          df_clas_fao <-
+            data.frame(id = 1:5, FAO = c("S1", "S2", "S3", "N1", "N2"))
+          levels(rast_clas_fao_cat) <- df_clas_fao
+          rast_clas_fao_brick <-
+            rast(list(rast_plot, rast_clas_fao_bin, rast_clas_fao_cat))
+          names(rast_clas_fao_brick) <- c(rast_plot_name, 'bin', 'FAO')
+          output_geotiff(rast_clas_fao_brick, paste0("FAO_", stack_code, "_", params$INN1))
+          
+          # export class and optimal value as polygon
+          vect_clas_fao_cat <-
+            as.polygons(rast_clas_fao_cat, dissolve = T)
+          
+          # vect_filename <-
+          #   as.character(paste("spatial_data/output/1class_clas1_", params$INN1, ".shp"))
+          # writeVector(vect_clas_fao_cat, here(vect_filename), overwrite = TRUE)
+          
+          ggplot() +
+            geom_spatraster(data = rast_clas_fao_cat, na.rm = TRUE, aes(fill = FAO)) +
+            scale_fill_manual(
+              name = paste0("FAO\n", fpm_plot_title),
+              na.value = "transparent",
+              values = c(
+                S1 = rgb(51, 160, 44, maxColorValue = 255),
+                S2 = rgb(178, 223, 138, maxColorValue = 255),
+                S3 = rgb(255, 255, 153, maxColorValue = 255),
+                N1 = rgb(255, 127, 0, maxColorValue = 255),
+                N2 = rgb(227, 26, 28, maxColorValue = 255)
+              )
+            )
+        } # end of classify_maps_FAO function
+      # ### TO BE DONE 17/02/2024 ### START
+      cat(paste("\nDEBUG1 START\n\n"))
+      
+      classify_maps_limits <- function(n, fpm_conc_var, fpm_conc_name, df_data, fpm_plot_title) {
+        
+        # what are the previous level inputs - the rows in the one-to-many table
+        
+        rbs_names <- fn_rbs_names(df_one_many)[[1]]
+    
+        lower_rb_var_1 <- lapply(rbs_names, function(x) paste0(x, "_s"))
+        lower_rb_var_2 <- lapply(rbs_names, function(x) paste0(x, "_p"))
+        lower_rb_var_3 <- lapply(rbs_names, function(x) paste0(x, "_l"))
+        lower_rb_var_4 <- lapply(rbs_names, function(x) paste0(x, "_m"))
+        lower_rb_var   <- c(lower_rb_var_1, lower_rb_var_2, lower_rb_var_3, lower_rb_var_4)
+        
+        mapping_code_suffixes <- (fn_rbs_names(df_one_many)[[2]]) 
+
+        limits_var <- c(unlist(as.character(noquote(fpm_conc_var))), unlist(lower_rb_var))
+        cat("limits_var")
+        print(limits_var)
+       
+        # df_limits <- df_data %>%
+        #     dplyr::select(any_of(limits_var)) %>%
+        #     na.omit %>%
+        #     st_as_sf(coords = c("x", "y"))
+        
+        df_limits <- df_data %>%
+            dplyr::select(any_of(limits_var))
+        
+        cat("df_limits")
+        str(df_limits)
+        
+        # get a combined score for each contributing rule base
+        
+        cat("\n\ncombined score\n\n")
+                # get a weighted score
+        
+        cat("\n\nweighted score\n\n")
+        
+  
+        
+        w_score_list <- list() # initialise list
+        
+        for (l in 1:length(rbs_names)) {
+          cat("rbs_names[[l]] = ", rbs_names[[l]],"\n")
+          cat("weights[[l]] = ", weights[[l]],"\n")
+          
+          if (is.na(weights[[l]])) {weights[[l]] <- 1/length(rbs_names)}
+          
+          score_var <- paste0(rbs_names[[l]], "_score")
+          w_score_var <- paste0(rbs_names[[l]], "_w_score")
+          w_score_list <- append(w_score_list, w_score_var)
+          
+          expr_w_score <- parse(text = paste0(weights[[l]]," * ", score_var)) # weighted score
+          
+          
+          if (paste0(rbs_names[[l]], "_m") %in% colnames(df_limits)) {
+            print("moderate")# there is a moderate conclusion
+            expr_score <- parse(text = paste0(rbs_names[[l]], "_p + (", rbs_names[[l]], "_m * 0.5)" ))
+            df_limits <- mutate(
+              df_limits,
+              !!score_var := eval(expr_score), !!w_score_var := eval(expr_w_score), .keep = c("all"))
+            str(df_limits)
+            
+          } else {
+            if (paste0(rbs_names[[l]], "_p") %in% colnames(df_limits)) {
+              print("poor") # there is a poor conclusion
+              expr_score <-
+                parse(text = paste0(rbs_names[[l]], "_p"))
+              df_limits <- mutate(df_limits,!!score_var := eval(expr_score), !!w_score_var := eval(expr_w_score),  .keep = c("all"))
+              str(df_limits)
+            } else {
+              if (paste0(rbs_names[[l]], "_l") %in% colnames(df_limits)) {
+                print("low") # there is a low conclusion
+                expr_score <-
+                parse(text = paste0(rbs_names[[l]], "_l"))
+              df_limits <- mutate(df_limits,!!score_var := eval(expr_score), !!w_score_var := eval(expr_w_score),  .keep = c("all"))
+              str(df_limits)
+              } else {
+                print("suboptimal") # there is a suboptimal conclusion
+                expr_score <-
+                parse(text = paste0(rbs_names[[l]], "_s"))
+              df_limits <- mutate(df_limits,!!score_var := eval(expr_score), !!w_score_var := eval(expr_w_score),  .keep = c("all"))
+              str(df_limits)
+              }
+            }
+          }
+        }
+        
+        # get the max value
+        cat("\n\nmax value\n\n")
+        df_limits_w_score <- select(df_limits, unlist(w_score_list))
+        w_score_max_index <-
+          matrix(apply(df_limits_w_score, 1 , which.max))
+        map_code <- mapping_code_suffixes[w_score_max_index]
+        w_score_max_name <-
+          matrix(colnames(df_limits_w_score)[apply(df_limits_w_score, 1 , which.max)])
+        
+        df_map_code <-
+          data.frame(
+            w_score_max_index = w_score_max_index[, 1],
+            w_score_max_name = w_score_max_name[, 1],
+            map_code = map_code
+          )
+        
+        rast_filename <-
+          as.character(paste0(
+            "spatial_data/output/FAO_",
+            stack_code,
+            "_",
+            params$INN1,
+            ".tif"
+          ))
+        
+        rast_clas_fao_brick <- rast(here(rast_filename)) # get the FAO raster
+        cat("rast_clas_fao_brick \n")
+        print(rast_clas_fao_brick)
+        
+        str(df_map_code)
+        df_limits_max <- cbind(df_limits, df_map_code)
+        # str(df_limits_max)
+        
+        v_limits_max <- df_limits_max %>% na.omit %>% st_as_sf(coords = c("x", "y"))
+        # str(v_limits_max)
+        
+        rast_limits_max <- rasterize(v_limits_max, rast_mask_proj, field = "w_score_max_index")
+        cat("rast_limits_max \n")
+        print(rast_limits_max)
+        
+        cat("df_map_code \n")
+        str(df_map_code)
+                
+        cat("df_map_code_cat \n")
+        df_map_code_cat <- unique(df_map_code[c("w_score_max_index", "map_code")])
+        str(df_map_code_cat)
+        
+        levels(rast_limits_max) <- df_map_code_cat
+        
+        rast_limits_max_FAO <-  concats(rast_clas_fao_brick$FAO, rast_limits_max)
+
+        
+        
+        # df_clas_fao <-
+        #   data.frame(id = 1:5, FAO = c("S1", "S2", "S3", "N1", "N2"))
+        
+        
+
+        ggplot() +
+            geom_spatraster(data = rast_limits_max_FAO, na.rm = TRUE)
+        
+
+        # df_adop_fao <-
+        #   mutate(df_adop_fao, adop_0_o := eval(expr_adop_fao), .keep = c("all"))
+        # 
+        # df_adop_fao <-
+        #   mutate(df_adop_fao,
+        #          FAO = cut(
+        #            adop_0_o,
+        #            breaks = c(-Inf, 0.25, 0.4, 0.6, 0.8, Inf),
+        #            labels = c("N2", "N1", "S3", "S2", "S1"),
+        #            include.lowest = TRUE
+        #          ))
+        # 
+        # df_adop_limits <-
+        #   df_irm %>% dplyr::select(ba_2b_s, ba_2c_s, ba_2d_s, ba_2e_s, se_1_s) %>% na.omit
+        # df_adop_limits$limit <-
+        #   names(df_adop_limits)[][max.col(df_adop_limits[])]
+        # 
+        # df_adop_faolimits <- cbind(df_adop_fao, df_adop_limits)
+        # 
+        # df_adop_faolimits <- df_adop_faolimits %>%
+        #   mutate(
+        #     FAO_adop_limit = case_match(
+        #       limit,
+        #       "ba_2b_s" ~ "Cl",
+        #       "ba_2c_s" ~ "SP",
+        #       "ba_2d_s" ~ "SF",
+        #       "ba_2e_s" ~ "Ls",
+        #       "se_1_s" ~ "SE",
+        #       .default = "missing"
+        #     ),
+        #     .keep = "all"
+        #   )
+        # 
+        # df_adop_faolimits <- df_adop_faolimits %>%
+        #   mutate(FAO_adop_limit2 = case_when(FAO == "S1" ~ "S1", .default = paste0(FAO, "_", FAO_adop_limit)))
+        # 
+        # df_adop_faolimits_values  <-
+        #   df_adop_faolimits %>% select(FAO_adop_limit2) %>% unique()
+        # df_adop_faolimits_values  <-
+        #   df_adop_faolimits_values[order(df_adop_faolimits_values$FAO_adop_limit2),] %>% data.frame
+        # names(df_adop_faolimits_values) <- c('FAO_adop_limit_code')
+        # 
+        # df_adop_faolimits_values  <-
+        #   mutate(df_adop_faolimits_values, ID = row_number() - 1)
+        # df_adop_faolimits_values  <-
+        #   df_adop_faolimits_values[, c(2, 1)] # re-order for later use as raster categories
+        # 
+        # df_adop_faolimits_code <-
+        #   data.frame(
+        #     "FAO_code_num" = c(1:21),
+        #     "FAO_code_char" = c(
+        #       'S1',
+        #       'S2_SE',
+        #       'S2_Cl',
+        #       'S2_Ls',
+        #       'S2_SF',
+        #       'S2_SP',
+        #       'S3_SE',
+        #       'S3_Cl',
+        #       'S3_Ls',
+        #       'S3_SF',
+        #       'S3_SP',
+        #       'N1_SE',
+        #       'N1_Cl',
+        #       'N1_Ls',
+        #       'N1_SF',
+        #       'N1_SP',
+        #       'N2_SE',
+        #       'N2_Cl',
+        #       'N2_Ls',
+        #       'N2_SF',
+        #       'N2_SP'
+        #     )
+        #   )
+        # 
+        # vect_adop_faolimits  <-
+        #   vect(df_adop_faolimits, geom = c("x", "y"))
+        # 
+        # rast_adop_faolimits <-
+        #   rasterize(vect_adop_faolimits, rast_mask_proj, field = "FAO_adop_limit2")
+        # names(rast_adop_faolimits) <- c('FAO_adop_limit_code')
+        # levels(rast_adop_faolimits) <- df_adop_faolimits_values
+        # 
+        # vect_adop_faolimits <-    merge(
+        #   x = vect_adop_faolimits,
+        #   y = df_adop_faolimits_code,
+        #   by.x = "FAO_adop_limit2",
+        #   by.y = "FAO_code_char",
+        #   all.x = TRUE
+        # )
+        # 
+        # rast_adop_faolimits_bin <-
+        #   rasterize(vect_adop_faolimits, rast_mask_proj, field = "FAO_code_num")
+        # 
+        # rast_adop_0_o <-
+        #   rasterize(vect_adop_faolimits, rast_mask_proj, field = "adop_0_o")
+        # 
+        # rast_adop_faolimits_brick <-
+        #   rast(list(
+        #     rast_adop_0_o,
+        #     rast_adop_faolimits,
+        #     rast_adop_faolimits_bin
+        #   ))
+        # 
+        # names(rast_adop_faolimits_brick) <-
+        #   c('optimal', 'FAO_adop_limits', 'bin')
+        # output_geotiff(rast_adop_faolimits_brick,
+        #                paste0("FAO_adop_limits_adop0_", params$INN1))
+        # 
+        # # export class and optimal value as polygon
+        # vect_adop_faolimits_cat <-
+        #   as.polygons(rast_adop_faolimits_brick, dissolve = T)
+        # 
+        # vect_filename <-
+        #   as.character(paste(
+        #     "spatial_data/output/FAO_adop_limits_adop0_",
+        #     params$INN1,
+        #     ".shp"
+        #   ))
+        # writeVector(vect_adop_faolimits_cat, here(vect_filename), overwrite = TRUE)
+        # 
+        # g <- ggplot() +
+        #   geom_spatraster(data = rast_adop_faolimits,
+        #                   na.rm = TRUE,
+        #                   aes(fill = FAO_adop_limit_code)) +
+        #   scale_fill_manual(
+        #     name = paste0("FAO\nlimitations\nAdoption\n", params$INN1),
+        #     na.value = "transparent",
+        #     breaks = c(
+        #       'S1',
+        #       'S2_SE',
+        #       'S2_Cl',
+        #       'S2_Ls',
+        #       'S2_SF',
+        #       'S3_SE',
+        #       'S2_SP',
+        #       'S3_Cl',
+        #       'S3_Ls',
+        #       'S3_SF',
+        #       'S3_SP',
+        #       'N1_SE',
+        #       'N1_Cl',
+        #       'N1_Ls',
+        #       'N1_SF',
+        #       'N1_SP',
+        #       'N2_SE',
+        #       'N2_Cl',
+        #       'N2_Ls',
+        #       'N2_SF',
+        #       'N2_SP'
+        #     ),
+        #     values = c(
+        #       S1 = rgb(0, 102, 0, maxColorValue = 255),
+        #       S2_SE = rgb(150, 255, 127, maxColorValue = 255),
+        #       S2_Cl = rgb(24, 252, 0, maxColorValue = 255),
+        #       S2_Ls = rgb(60, 179, 113, maxColorValue = 255),
+        #       S2_SF = rgb(50, 205, 50, maxColorValue = 255),
+        #       S2_SP = rgb(34, 139, 34, maxColorValue = 255),
+        #       S3_SE = rgb(255, 255, 0, maxColorValue = 255),
+        #       S3_Cl = rgb(245, 206, 51, maxColorValue = 255),
+        #       S3_Ls = rgb(247, 218, 102, maxColorValue = 255),
+        #       S3_SF = rgb(250, 231, 153, maxColorValue = 255),
+        #       S3_SP = rgb(252, 243, 204, maxColorValue = 255),
+        #       N1_SE = rgb(255, 79, 0, maxColorValue = 255),
+        #       N1_Cl = rgb(255, 127, 0, maxColorValue = 255),
+        #       N1_Ls = rgb(255, 168, 54, maxColorValue = 255),
+        #       N1_SF = rgb(255, 87, 40, maxColorValue = 255),
+        #       N1_SP = rgb(255, 187, 60, maxColorValue = 255),
+        #       N2_SE = rgb(124, 10, 2, maxColorValue = 255),
+        #       N2_Cl = rgb(234, 60, 83, maxColorValue = 255),
+        #       N2_Ls = rgb(180, 55, 87, maxColorValue = 255),
+        #       N2_SF = rgb(66, 13, 9, maxColorValue = 255),
+        #       N2_SP = rgb(240, 128, 128, maxColorValue = 255)
+        #     )
+        #   )
+        # 
+        # g2 <- add_subdiv_proj_simple_plot(g)
+        # g2
+        
+        
+        
+        
+      }# end of classify_maps_limits function
+      
+        ### TO BE DONE 19/02/2024 ### END    
       #
       
-      cat(paste("\nDEBUG1 START\n\n"))
-      n = 2
-      fpm_conc_var <-
-        c(as.character(paste0(df_criteria_se3a_4a[1, 3], "_g")),  as.character(paste0(df_criteria_se3a_4a[1, 3], "_p")), "x" , "y")
-      fpm_conc_name <-
-        c(as.character(paste0(df_criteria_se3a_4a[1, 4], " good")),  as.character(paste0(df_criteria_se3a_4a[1, 4], " poor")))
+      if (i < 3) {
+        #only run for top two levels
+        map_classified_FAO <-
+          classify_maps_FAO(n, fpm_conc_var, fpm_conc_name, df_irm, fpm_plot_title)
+        print(map_classified_FAO)
+      }
       
-    }
-    fpm_plot_title <-
-      "Extension\nAccess\noptimality\nmembership"
-    
-    plot_fpm <-
-      rasterize_plot_fpm(n, fpm_conc_var, fpm_conc_name, df_irm)
-    #
-    cat(paste("\nDEBUG1 END\n\n"))      #
+      if (i < 3) {
+        map_classified_limits <-
+          classify_maps_limits(n, fpm_conc_var, fpm_conc_name, df_irm, fpm_plot_title)
+        print(map_classified_limits)
+      }
+      
+      cat(paste("\nDEBUG1 END\n\n"))
       
       
-      ### TO BE DONE 16/02/2024 ### END
+
       
       
       cat(paste("\nEND \n\n"))
@@ -2998,15 +3560,28 @@ for (i in hierarchy_level_max:1) {
       
      }
     
-    # Apply the custom function to each row of df1
+    # Apply the rule base evaluation function to each row of df1
     assign(paste0("df_one_many_", i),
-           apply(get(paste0("df_hierarchy_", i)), 1, custom_join_function))
+           apply(get(paste0("df_hierarchy_", i)), 1, eval_rule_base))
+    
+    
+
+    
+    
+    
     
   }
 }
 
 
 ```
+
+
+
+ 
+
+
+
 
 
 
