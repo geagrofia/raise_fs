@@ -68,6 +68,7 @@ library(stringr)
 library(purrr)
 library(tidyterra)
 library(tidyverse)
+library(colorspace)
 
 r_filename <- function(filename) {
   here::here("code/r/", filename)
@@ -3186,7 +3187,7 @@ Logic: For the two top hierarchy level rule-bases produce classified maps with l
           ggplot() +
             geom_spatraster(data = rast_clas_fao_cat, na.rm = TRUE, aes(fill = FAO)) +
             scale_fill_manual(
-              name = paste0("FAO\n", fpm_plot_title),
+              name = paste0("FAO\n", fpm_plot_title, "\n", params$INN1),
               na.value = "transparent",
               values = c(
                 S1 = rgb(51, 160, 44, maxColorValue = 255),
@@ -3336,213 +3337,113 @@ Logic: For the two top hierarchy level rule-bases produce classified maps with l
         levels(rast_limits_max) <- df_map_code_cat
         
         rast_limits_max_FAO <-  concats(rast_clas_fao_brick$FAO, rast_limits_max)
+        names(rast_limits_max_FAO) <- c('FAO_limit')
+        cat("rast_limits_max_FAO \n")
+        print(rast_limits_max_FAO)
+        
+        # how many suitability levels?
+        FAO_levels <- unique(rast_clas_fao_brick$FAO)
+        cat(nrow(FAO_levels), " FAO_levels \n")
+        print(str(FAO_levels))
+        
+        # how many limits levels?
+        FAO_limit_levels <- unique(droplevels(pull(rast_limits_max_FAO, FAO_limit)))
+        cat(length(FAO_limit_levels), " FAO_limit_levels \n")
+        print(str(FAO_limit_levels))
+        
+        # how many limits levels?
+        df_FAO_limit_levels <-
+          unique(rast_limits_max_FAO$FAO_limit)
+        cat(nrow(df_FAO_limit_levels), " df_FAO_limit_levels \n")
+        print(str(df_FAO_limit_levels))
+        
+        df_FAO_limit_levels <- df_FAO_limit_levels %>%
+          mutate(value = case_when(
+            grepl("S1", FAO_limit) ~ 1,
+            grepl("S2", FAO_limit) ~ 0.875,
+            grepl("S3", FAO_limit) ~ 0.75,
+            grepl("N1", FAO_limit) ~ 0.625,
+            grepl("N2", FAO_limit) ~ 0.5,
+            TRUE ~ 0.5  # Default value if none of the conditions are met
+          ))
+        
+        df_FAO_limit_levels <- df_FAO_limit_levels %>%
+          mutate(
+            hue = case_when(
+              grepl("BA", FAO_limit) ~ 0.25,
+              grepl("SE", FAO_limit) ~ 0.75,
+              grepl("LU", FAO_limit) ~ 0,
+              grepl("Cl", FAO_limit) ~ 0.2,
+              grepl("Ls", FAO_limit) ~ 0.4,
+              grepl("SF", FAO_limit) ~ 0.6,
+              grepl("SP", FAO_limit) ~ 0.8,
+              grepl("MA", FAO_limit) ~ 0.5,
+              grepl("FP", FAO_limit) ~ 1,
+              TRUE ~ 0.9  # Default value if none of the conditions are met
+            )
+          )
+        
+        df_FAO_limit_levels <-
+          df_FAO_limit_levels %>%
+          mutate(
+            sat = case_when(
+              grepl("BA", FAO_limit) ~ 0.8,
+              grepl("SE", FAO_limit) ~ 0.8,
+              grepl("LU", FAO_limit) ~ 0.5,
+              grepl("Cl", FAO_limit) ~ 0.5,
+              grepl("Ls", FAO_limit) ~ 0.5,
+              grepl("SF", FAO_limit) ~ 0.5,
+              grepl("SP", FAO_limit) ~ 0.5,
+              grepl("MA", FAO_limit) ~ 0.5,
+              grepl("FP", FAO_limit) ~ 0.5,
+              TRUE ~ 0.4  # Default value if none of the conditions are met
+            )
+          )
+        
+        df_FAO_limit_levels$hsv <-
+          paste(
+            "(",
+            df_FAO_limit_levels$hue, ",",
+            df_FAO_limit_levels$sat, ",",
+            df_FAO_limit_levels$value,
+            ")")
+        
+        # Create a new column using the apply function
+        df_FAO_limit_levels$hsv_eval <-
+          apply(df_FAO_limit_levels[, c("hue", "sat", "value")], 1, function(row) {
+            hsv(row[1], row[2], row[3])
+          })
+        
+        cat(nrow(df_FAO_limit_levels), " df_FAO_limit_levels \n")
+        print(str(df_FAO_limit_levels))
 
-        
-        
-        # df_clas_fao <-
-        #   data.frame(id = 1:5, FAO = c("S1", "S2", "S3", "N1", "N2"))
-        
+        test_FAO_limits <- pull(df_FAO_limit_levels, FAO_limit)
+        test_FAO_colours <- pull(df_FAO_limit_levels, hsv_eval)
         
 
         ggplot() +
-            geom_spatraster(data = rast_limits_max_FAO, na.rm = TRUE)
-        
-
-        # df_adop_fao <-
-        #   mutate(df_adop_fao, adop_0_o := eval(expr_adop_fao), .keep = c("all"))
-        # 
-        # df_adop_fao <-
-        #   mutate(df_adop_fao,
-        #          FAO = cut(
-        #            adop_0_o,
-        #            breaks = c(-Inf, 0.25, 0.4, 0.6, 0.8, Inf),
-        #            labels = c("N2", "N1", "S3", "S2", "S1"),
-        #            include.lowest = TRUE
-        #          ))
-        # 
-        # df_adop_limits <-
-        #   df_irm %>% dplyr::select(ba_2b_s, ba_2c_s, ba_2d_s, ba_2e_s, se_1_s) %>% na.omit
-        # df_adop_limits$limit <-
-        #   names(df_adop_limits)[][max.col(df_adop_limits[])]
-        # 
-        # df_adop_faolimits <- cbind(df_adop_fao, df_adop_limits)
-        # 
-        # df_adop_faolimits <- df_adop_faolimits %>%
-        #   mutate(
-        #     FAO_adop_limit = case_match(
-        #       limit,
-        #       "ba_2b_s" ~ "Cl",
-        #       "ba_2c_s" ~ "SP",
-        #       "ba_2d_s" ~ "SF",
-        #       "ba_2e_s" ~ "Ls",
-        #       "se_1_s" ~ "SE",
-        #       .default = "missing"
-        #     ),
-        #     .keep = "all"
-        #   )
-        # 
-        # df_adop_faolimits <- df_adop_faolimits %>%
-        #   mutate(FAO_adop_limit2 = case_when(FAO == "S1" ~ "S1", .default = paste0(FAO, "_", FAO_adop_limit)))
-        # 
-        # df_adop_faolimits_values  <-
-        #   df_adop_faolimits %>% select(FAO_adop_limit2) %>% unique()
-        # df_adop_faolimits_values  <-
-        #   df_adop_faolimits_values[order(df_adop_faolimits_values$FAO_adop_limit2),] %>% data.frame
-        # names(df_adop_faolimits_values) <- c('FAO_adop_limit_code')
-        # 
-        # df_adop_faolimits_values  <-
-        #   mutate(df_adop_faolimits_values, ID = row_number() - 1)
-        # df_adop_faolimits_values  <-
-        #   df_adop_faolimits_values[, c(2, 1)] # re-order for later use as raster categories
-        # 
-        # df_adop_faolimits_code <-
-        #   data.frame(
-        #     "FAO_code_num" = c(1:21),
-        #     "FAO_code_char" = c(
-        #       'S1',
-        #       'S2_SE',
-        #       'S2_Cl',
-        #       'S2_Ls',
-        #       'S2_SF',
-        #       'S2_SP',
-        #       'S3_SE',
-        #       'S3_Cl',
-        #       'S3_Ls',
-        #       'S3_SF',
-        #       'S3_SP',
-        #       'N1_SE',
-        #       'N1_Cl',
-        #       'N1_Ls',
-        #       'N1_SF',
-        #       'N1_SP',
-        #       'N2_SE',
-        #       'N2_Cl',
-        #       'N2_Ls',
-        #       'N2_SF',
-        #       'N2_SP'
-        #     )
-        #   )
-        # 
-        # vect_adop_faolimits  <-
-        #   vect(df_adop_faolimits, geom = c("x", "y"))
-        # 
-        # rast_adop_faolimits <-
-        #   rasterize(vect_adop_faolimits, rast_mask_proj, field = "FAO_adop_limit2")
-        # names(rast_adop_faolimits) <- c('FAO_adop_limit_code')
-        # levels(rast_adop_faolimits) <- df_adop_faolimits_values
-        # 
-        # vect_adop_faolimits <-    merge(
-        #   x = vect_adop_faolimits,
-        #   y = df_adop_faolimits_code,
-        #   by.x = "FAO_adop_limit2",
-        #   by.y = "FAO_code_char",
-        #   all.x = TRUE
-        # )
-        # 
-        # rast_adop_faolimits_bin <-
-        #   rasterize(vect_adop_faolimits, rast_mask_proj, field = "FAO_code_num")
-        # 
-        # rast_adop_0_o <-
-        #   rasterize(vect_adop_faolimits, rast_mask_proj, field = "adop_0_o")
-        # 
-        # rast_adop_faolimits_brick <-
-        #   rast(list(
-        #     rast_adop_0_o,
-        #     rast_adop_faolimits,
-        #     rast_adop_faolimits_bin
-        #   ))
-        # 
-        # names(rast_adop_faolimits_brick) <-
-        #   c('optimal', 'FAO_adop_limits', 'bin')
-        # output_geotiff(rast_adop_faolimits_brick,
-        #                paste0("FAO_adop_limits_adop0_", params$INN1))
-        # 
-        # # export class and optimal value as polygon
-        # vect_adop_faolimits_cat <-
-        #   as.polygons(rast_adop_faolimits_brick, dissolve = T)
-        # 
-        # vect_filename <-
-        #   as.character(paste(
-        #     "spatial_data/output/FAO_adop_limits_adop0_",
-        #     params$INN1,
-        #     ".shp"
-        #   ))
-        # writeVector(vect_adop_faolimits_cat, here(vect_filename), overwrite = TRUE)
-        # 
-        # g <- ggplot() +
-        #   geom_spatraster(data = rast_adop_faolimits,
-        #                   na.rm = TRUE,
-        #                   aes(fill = FAO_adop_limit_code)) +
-        #   scale_fill_manual(
-        #     name = paste0("FAO\nlimitations\nAdoption\n", params$INN1),
-        #     na.value = "transparent",
-        #     breaks = c(
-        #       'S1',
-        #       'S2_SE',
-        #       'S2_Cl',
-        #       'S2_Ls',
-        #       'S2_SF',
-        #       'S3_SE',
-        #       'S2_SP',
-        #       'S3_Cl',
-        #       'S3_Ls',
-        #       'S3_SF',
-        #       'S3_SP',
-        #       'N1_SE',
-        #       'N1_Cl',
-        #       'N1_Ls',
-        #       'N1_SF',
-        #       'N1_SP',
-        #       'N2_SE',
-        #       'N2_Cl',
-        #       'N2_Ls',
-        #       'N2_SF',
-        #       'N2_SP'
-        #     ),
-        #     values = c(
-        #       S1 = rgb(0, 102, 0, maxColorValue = 255),
-        #       S2_SE = rgb(150, 255, 127, maxColorValue = 255),
-        #       S2_Cl = rgb(24, 252, 0, maxColorValue = 255),
-        #       S2_Ls = rgb(60, 179, 113, maxColorValue = 255),
-        #       S2_SF = rgb(50, 205, 50, maxColorValue = 255),
-        #       S2_SP = rgb(34, 139, 34, maxColorValue = 255),
-        #       S3_SE = rgb(255, 255, 0, maxColorValue = 255),
-        #       S3_Cl = rgb(245, 206, 51, maxColorValue = 255),
-        #       S3_Ls = rgb(247, 218, 102, maxColorValue = 255),
-        #       S3_SF = rgb(250, 231, 153, maxColorValue = 255),
-        #       S3_SP = rgb(252, 243, 204, maxColorValue = 255),
-        #       N1_SE = rgb(255, 79, 0, maxColorValue = 255),
-        #       N1_Cl = rgb(255, 127, 0, maxColorValue = 255),
-        #       N1_Ls = rgb(255, 168, 54, maxColorValue = 255),
-        #       N1_SF = rgb(255, 87, 40, maxColorValue = 255),
-        #       N1_SP = rgb(255, 187, 60, maxColorValue = 255),
-        #       N2_SE = rgb(124, 10, 2, maxColorValue = 255),
-        #       N2_Cl = rgb(234, 60, 83, maxColorValue = 255),
-        #       N2_Ls = rgb(180, 55, 87, maxColorValue = 255),
-        #       N2_SF = rgb(66, 13, 9, maxColorValue = 255),
-        #       N2_SP = rgb(240, 128, 128, maxColorValue = 255)
-        #     )
-        #   )
-        # 
-        # g2 <- add_subdiv_proj_simple_plot(g)
-        # g2
-        
-        
-        
+          geom_spatraster(data = rast_limits_max_FAO, aes(fill = FAO_limit), na.rm = TRUE) +
+          scale_fill_manual(
+            name = paste0("FAO limitations\n", fpm_plot_title, "\n", params$INN1),
+            na.value = "transparent",
+            breaks = test_FAO_limits,
+            values = test_FAO_colours
+          )
+          
         
       }# end of classify_maps_limits function
       
         ### TO BE DONE 19/02/2024 ### END    
       #
       
-      if (i < 3) {
+      if (i < 4) {
         #only run for top two levels
         map_classified_FAO <-
           classify_maps_FAO(n, fpm_conc_var, fpm_conc_name, df_irm, fpm_plot_title)
         print(map_classified_FAO)
       }
       
-      if (i < 3) {
+      if (i < 4) {
         map_classified_limits <-
           classify_maps_limits(n, fpm_conc_var, fpm_conc_name, df_irm, fpm_plot_title)
         print(map_classified_limits)
