@@ -382,6 +382,7 @@ df_irm <-
   data.frame(
     "x" = c(1, 2, 3, 4, 5, 1, 2, 3, 4, 5, 1, 2, 3, 4, 5, 1, 2, 3, 4, 5, 1, 2, 3, 4, 5),
     "y" = c(1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5),
+    "subdiv" = c( "1", "1", "1", "1", "1", "2", "2", "2", "2", "2", "3", "3", "3", "3", "3", "4", "4", "4", "4", "4", "5", "5", "5", "5", "5"),
     "ba_2a" = sample(0.5:1.5, 25, replace = TRUE),
     "ba_4a" = sample(30:200, 25, replace = TRUE),
     "ba_4b" = sample(60:200, 25, replace = TRUE),
@@ -417,9 +418,20 @@ df_irm <-
   )
 
 vect <- vect(df_irm, geom=c("x", "y"), crs="+proj=longlat +datum=WGS84")
+plot(vect$subdiv)
+
 rast_mask_proj <- rast(vect, nrow=5, ncol=5)
 values(rast_mask_proj) <- 1
 plot(rast_mask_proj)
+
+rast_subdiv <- rasterize(vect, field = "subdiv", rast_mask_proj )
+vect_subdiv <- as.polygons(rast_subdiv, values=TRUE)
+
+ggplot()+
+  geom_spatvector(data = vect_subdiv, aes(fill = subdiv))+
+  geom_spatvector_text(data = vect_subdiv, aes(label = subdiv))
+
+df_irm <- select(df_irm, -subdiv)
 
 ```
 
@@ -2839,6 +2851,13 @@ df_rulebases <-
 hierarchy_level_max <- max(unique(hierarchies$level_number))
 print(paste("Highest hierarchy level = ", hierarchy_level_max))
 
+# initialise FAO limits raster list
+list_rast_clas_FAO_cat <- list()
+
+# initialise FAO limits raster list
+list_rast_limits_max_FAO <- list()
+       
+
 # for loop to run through all hierarchy levels from biggest to smallest
 for (i in hierarchy_level_max:1) {
   cat(paste0('\nLevel', i, "\n"))
@@ -3184,6 +3203,15 @@ Logic: For the two top hierarchy level rule-bases produce classified maps with l
           #   as.character(paste("spatial_data/output/1class_clas1_", params$INN1, ".shp"))
           # writeVector(vect_clas_fao_cat, here(vect_filename), overwrite = TRUE)
           
+          assign(paste0("rast_clas_fao_cat", fpm_plot_title),
+                 rast_clas_fao_cat,
+                 .GlobalEnv)
+          
+          list_rast_clas_FAO_cat <<-
+            append(list_rast_clas_FAO_cat,
+                   paste0("rast_clas_fao_cat", fpm_plot_title))
+                  
+                            
           ggplot() +
             geom_spatraster(data = rast_clas_fao_cat, na.rm = TRUE, aes(fill = FAO)) +
             scale_fill_manual(
@@ -3197,6 +3225,9 @@ Logic: For the two top hierarchy level rule-bases produce classified maps with l
                 N2 = rgb(227, 26, 28, maxColorValue = 255)
               )
             )
+          
+
+                  
         } # end of classify_maps_FAO function
       # ### TO BE DONE 17/02/2024 ### START
       cat(paste("\nDEBUG1 START\n\n"))
@@ -3420,6 +3451,12 @@ Logic: For the two top hierarchy level rule-bases produce classified maps with l
         test_FAO_limits <- pull(df_FAO_limit_levels, FAO_limit)
         test_FAO_colours <- pull(df_FAO_limit_levels, hsv_eval)
         
+        # save raster
+        assign(paste0("rast_limits_max_FAO_", fpm_plot_title), rast_limits_max_FAO,
+             .GlobalEnv)
+        
+        # add raster to list
+        list_rast_limits_max_FAO <<- append(list_rast_limits_max_FAO, paste0("rast_limits_max_FAO_", fpm_plot_title))
 
         ggplot() +
           geom_spatraster(data = rast_limits_max_FAO, aes(fill = FAO_limit), na.rm = TRUE) +
@@ -3430,6 +3467,7 @@ Logic: For the two top hierarchy level rule-bases produce classified maps with l
             values = test_FAO_colours
           )
           
+
         
       }# end of classify_maps_limits function
       
@@ -3478,6 +3516,133 @@ Logic: For the two top hierarchy level rule-bases produce classified maps with l
 ```
 
 
+# Subdiv statistics
+
+This section gets the statistics for each sub-division, taking into account the dynamically created limitations for adoption, suitability and feasibility.
+
+
+The existing function expects arguments showing:
+
+1) the number of maps to produce - one per class (of whatever output)
+2) a vector of the variables (classes) that need to be mapped (1 and 2 are linked and 1 is not really necessary)
+3) a palette of colours with the same number of colours as classes - these are 
+
+The palettes in the current IRM do not match with the any of the colours used in the classified maps.
+Instead they are just a distinct colour.
+
+The variables and colour palette names are currently hard coded. The names of the palettes are from the ggplot2 package but derive from colorbrewer, all palettes are sequential. There are 18 named sequential palettes, they can be referenced by name or as an index from the list.
+
+The index works as long as the values do not exceed 18, so need to wrap.
+
+
+```{r}
+
+palettes <-
+  c(
+    "Blues",
+    "BuGn",
+    "BuPu",
+    "GnBu",
+    "Greens",
+    "Greys",
+    "Oranges",
+    "OrRd",
+    "PuBu",
+    "PuBuGn",
+    "PuRd",
+    "Purples",
+    "RdPu",
+    "Reds",
+    "YlGn",
+    "YlGnBu",
+    "YlOrBr",
+    "YlOrRd"
+  )
+
+
+for (i in 1:length(list_rast_limits_max_FAO))   {
+  
+  rast_to_plot <- get(paste0(list_rast_limits_max_FAO[i]))
+  
+  df_extr <-
+    terra::extract(rast_to_plot, vect_subdiv, fun = sum, na.rm = TRUE)
+  print(df_extr)
+  
+}  
+  
+  
+  
+  
+  for (i in 1:length(list_rast_limits_max_FAO))   {
+    colour_index <- i
+    colour_index_mod <- (colour_index %% 18)
+    colour_index_mod <-
+      ifelse(colour_index_mod == 0, 18, colour_index_mod)
+    result <- palettes[colour_index_mod]
+    
+    
+    
+    fillvar <- fill_var_list[[i]]
+    
+    
+    subdiv_plot <- ggplot() +
+      geom_spatvector(data = vect_subdiv, aes(group = subdiv, fill = fillvar)) +
+      scale_fill_distiller(
+        type = "seq",
+        palette = result,
+        direction = 1,
+        limits = c(0, 4),
+        guide = "legend"
+      )
+    print(subdiv_plot)
+  }
+}
+
+```
+
+
+
+
+
+
+
+
+``` {r}
+# temporary function to create subdivision level maps of % with terra
+
+# where: n is the number of maps to produce (the number of values for the suitability)
+#        fill_var_list is a vector of the possible values for suitability
+#        pal_col is a vector of the names of the colour palette
+
+plot_subdiv_maps_pc <- function(n, fill_var_list, pal_col) {
+  subdiv_map_pc_list <- list()
+  
+  for (i in 1:n)   {
+    fillvar <- fill_var_list[[i]]
+    subdiv_map_pc_list[[i]] <-
+      ggplot() +
+      geom_spatvector(data = vect_subdiv, aes(group = "id", fill = !!sym(fillvar))) +
+      scale_fill_distiller(
+        type = "seq",
+        palette = pal_col[i],
+        direction = 1,
+        limits = c(0, 100),
+        guide = "legend"
+        ) +
+
+          geom_spatvector(data = vect_ba_tri, aes(colour = ifelse(baclass == "optimal" , "green", "red")),
+                          size = 1) +
+          #geom_spatvector_text(data = vect_ba_tri, aes(label = ifelse(type == "b", "b", "b/s"))) +
+          scale_colour_identity()
+  }
+  return(subdiv_map_pc_list)
+} 
+
+
+
+
+
+```
 
  
 
