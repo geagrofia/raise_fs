@@ -68,7 +68,7 @@ library(stringr)
 library(purrr)
 library(tidyterra)
 library(tidyverse)
-library(colorspace)
+library(scales)
 
 r_filename <- function(filename) {
   here::here("code/r/", filename)
@@ -382,7 +382,7 @@ df_irm <-
   data.frame(
     "x" = c(1, 2, 3, 4, 5, 1, 2, 3, 4, 5, 1, 2, 3, 4, 5, 1, 2, 3, 4, 5, 1, 2, 3, 4, 5),
     "y" = c(1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5),
-    "subdiv" = c( "1", "1", "1", "1", "1", "2", "2", "2", "2", "2", "3", "3", "3", "3", "3", "4", "4", "4", "4", "4", "5", "5", "5", "5", "5"),
+    "subdiv" = c( "one", "one", "one", "one", "one", "two", "two", "two", "two", "two", "three", "three", "three", "three", "three", "four", "four", "four", "four", "four", "five", "five", "five", "five", "five"),
     "ba_2a" = sample(0.5:1.5, 25, replace = TRUE),
     "ba_4a" = sample(30:200, 25, replace = TRUE),
     "ba_4b" = sample(60:200, 25, replace = TRUE),
@@ -418,14 +418,20 @@ df_irm <-
   )
 
 vect <- vect(df_irm, geom=c("x", "y"), crs="+proj=longlat +datum=WGS84")
-plot(vect$subdiv)
+print(vect$subdiv)
 
 rast_mask_proj <- rast(vect, nrow=5, ncol=5)
 values(rast_mask_proj) <- 1
 plot(rast_mask_proj)
 
-rast_subdiv <- rasterize(vect, field = "subdiv", rast_mask_proj )
+rast_subdiv <- rasterize(vect, field = "subdiv", rast_mask_proj)
 vect_subdiv <- as.polygons(rast_subdiv, values=TRUE)
+df_subdiv_area <- as.data.frame(expanse(vect_subdiv, unit="ha"))
+max_area <- max(df_subdiv_area)
+  
+vect_subdiv <- setValues(vect_subdiv, c(1:5))
+names(vect_subdiv) <- c("subdiv")
+
 
 ggplot()+
   geom_spatvector(data = vect_subdiv, aes(fill = subdiv))+
@@ -3535,8 +3541,97 @@ The variables and colour palette names are currently hard coded. The names of th
 The index works as long as the values do not exceed 18, so need to wrap.
 
 
+
 ```{r}
 
+# create a list of valid names of colorbrewer palettes for sequential data
+palettes <-
+  c("Blues",
+    "YlGn",
+    "Greys",
+    "Oranges",
+    "YlOrRd"
+  )
+
+
+# loop through the FAO class rasters created above
+
+for (i in 1:length(list_rast_clas_FAO_cat))   {
+  # get the name of the criteria from the raster name - this is used in the plotting
+  subdiv_criteria_name <- list_rast_clas_FAO_cat[i]
+  subdiv_criteria_name <-
+    sub(paste0(".*", "fao_cat"), "", subdiv_criteria_name)
+  
+  # get the raster for which statistics are derived for each limitation
+  rast_to_plot <- get(paste0(list_rast_clas_FAO_cat[i]))
+  
+  # get the cellsize for each raster
+  rast_to_plot_cellsize <- cellSize(rast_to_plot, unit = "ha")
+  
+  
+  # extract the raster class to a data frame using the subdivisions
+  df_extr <-
+    terra::extract(rast_to_plot, vect_subdiv, na.rm = TRUE, ID = T)
+  
+    # extract the raster cellsize to a data frame using the subdivisions
+  df_extr_cellsize <-
+    terra::extract(rast_to_plot_cellsize, vect_subdiv, na.rm = TRUE, ID = T)
+  
+  df_extr <- mutate(df_extr, df_extr_cellsize)
+  
+   # summarise the class for each subdivision raster ID
+  df_extr_summary <- df_extr %>%
+    group_by(ID) %>%
+    count(FAO, wt = area, .drop = FALSE)
+  
+  # join the summary data frame to the original subdivision data spatvector
+  vect_subdiv_extr <<-
+    left_join(vect_subdiv, df_extr_summary, by = c('subdiv' = 'ID'))
+  
+  # loop through each existing class type 
+  for (class_type in unique(vect_subdiv_extr$FAO)) {
+    
+    # Get the current iteration number
+    j <- match(class_type, unique(vect_subdiv_extr$FAO))
+
+    # get the palette using the iteration number
+    colour_index <- j
+    colour_index_mod <- (colour_index %% 18)
+    colour_index_mod <-
+      ifelse(colour_index_mod == 0, 18, colour_index_mod)
+    result <- palettes[colour_index_mod]
+    
+    # Filter the joined data for the current limitation
+    filtered_data <-
+      vect_subdiv_extr[vect_subdiv_extr$FAO == class_type,]
+    #print(filtered_data)
+    
+    # Create a ggplot for count value per subdivision for the current class type using the palette from above
+    subdiv_plot <- ggplot() +
+      geom_spatvector(data = filtered_data, aes(group = subdiv, fill = n)) +
+      labs(
+        title = paste(subdiv_criteria_name, "\nLimit = ", class_type),
+        fill = "Area (ha)"
+      ) +
+      scale_fill_distiller(
+        type = "seq",
+        palette = result,
+        direction = 1,
+        limits = c(0, max_area),
+        guide = "legend", labels = comma
+      ) 
+    
+    print(subdiv_plot)
+  }
+}  
+
+
+```
+
+
+```{r}
+
+# create a list of valid names of colorbrewer palettes for sequential data
 palettes <-
   c(
     "Blues",
@@ -3560,90 +3655,223 @@ palettes <-
   )
 
 
+# loop through the limitation rasters created above
+
 for (i in 1:length(list_rast_limits_max_FAO))   {
+  # get the name of the criteria from the raster name - this is used in the plotting
+  subdiv_criteria_name <- list_rast_limits_max_FAO[i]
+  subdiv_criteria_name <-
+    sub(paste0(".*", "FAO_"), "", subdiv_criteria_name)
   
+  # get the raster for which statistics are derived for each limitation
   rast_to_plot <- get(paste0(list_rast_limits_max_FAO[i]))
   
+  # get the cellsize for each raster
+  rast_to_plot_cellsize <- cellSize(rast_to_plot, unit = "ha")
+  
+  
+  # extract the raster limitations to a data frame using the subdivisions
   df_extr <-
-    terra::extract(rast_to_plot, vect_subdiv, fun = sum, na.rm = TRUE)
-  print(df_extr)
+    terra::extract(rast_to_plot, vect_subdiv, na.rm = TRUE, ID = T)
   
-}  
+    # extract the raster cellsize to a data frame using the subdivisions
+  df_extr_cellsize <-
+    terra::extract(rast_to_plot_cellsize, vect_subdiv, na.rm = TRUE, ID = T)
   
+  df_extr <- mutate(df_extr, df_extr_cellsize)
   
+   # summarise the limitations for each subdivision raster ID
+  df_extr_summary <- df_extr %>%
+    group_by(ID) %>%
+    count(FAO_limit, wt = area, .drop = FALSE)
   
+  # join the summary data frame to the original subdivision data spatvector
+  vect_subdiv_extr <<-
+    left_join(vect_subdiv, df_extr_summary, by = c('subdiv' = 'ID'))
   
-  for (i in 1:length(list_rast_limits_max_FAO))   {
-    colour_index <- i
+  # loop through each existing limitation type 
+  for (limitation_type in unique(vect_subdiv_extr$FAO_limit)) {
+    
+    # Get the current iteration number
+    j <- match(limitation_type, unique(vect_subdiv_extr$FAO_limit))
+
+    # get the palette using the iteration number
+    colour_index <- j
     colour_index_mod <- (colour_index %% 18)
     colour_index_mod <-
       ifelse(colour_index_mod == 0, 18, colour_index_mod)
     result <- palettes[colour_index_mod]
     
+    # Filter the joined data for the current limitation
+    filtered_data <-
+      vect_subdiv_extr[vect_subdiv_extr$FAO_limit == limitation_type,]
+    #print(filtered_data)
     
-    
-    fillvar <- fill_var_list[[i]]
-    
-    
+    # Create a ggplot for count value per subdivision for the current limitation type using the palette from above
     subdiv_plot <- ggplot() +
-      geom_spatvector(data = vect_subdiv, aes(group = subdiv, fill = fillvar)) +
+      geom_spatvector(data = filtered_data, aes(group = subdiv, fill = n)) +
+      labs(
+        title = paste(subdiv_criteria_name, "\nLimit = ", limitation_type),
+        fill = "Area (ha)"
+      ) +
       scale_fill_distiller(
         type = "seq",
         palette = result,
         direction = 1,
-        limits = c(0, 4),
-        guide = "legend"
-      )
+        limits = c(0, max_area),
+        guide = "legend", labels = comma
+      ) 
+    
     print(subdiv_plot)
+  }
+}  
+
+
+```
+
+
+# Calculate yield
+
+The IRM script converts yield proportion to yield using the yield values for sole crop or intercrop.
+
+<div class="fold o"> 
+```{r i1_calc_yield_2, cache = TRUE, cache.whatever=params$Agg, out.width="100%", include = TRUE, echo=FALSE, message=FALSE, warning=FALSE, eval=ba_crit_i1}
+
+# get the criteria that contribute to yield
+
+filename_yield <-
+  as.character(paste("tab_data/input/yield_", params$INN1, ".csv", sep = ""))
+df_yield_values <- read.csv(here(filename_yield), na.strings = c("NA"))
+
+df_yield_values %>% kable(digits = 3) %>% kable_styling("striped", full_width = T)  %>%  scroll_box(height = "100px")
+
+
+if (params$INN2 == "NA") {
+  df_irm$yield <- df_irm$yieldpc / 100 * df_yield_values$YW
+  cat("Sole crop yield")
+} else {
+  if (params$SYS == "comparison") {
+    df_irm$yield <- df_irm$yieldpc / 100 * df_yield_values$YW
+    cat("Sole crop 1 yield (comparison)")
+  } else {
+    if (params$SYS == "intercrop") {
+      df_irm$yield <- df_irm$yieldpc / 100 * df_yield_values$YI
+      cat("Intercrop 1 yield")
+    } else {
+      if (params$SYS == "rotation") {
+        df_irm$yield <- df_irm$yieldpc / 100 * df_yield_values$YW
+        cat("Rotation crop 1 yield")
+      }
+    }
   }
 }
 
-```
-
-
-
-
-
-
-
-
-``` {r}
-# temporary function to create subdivision level maps of % with terra
-
-# where: n is the number of maps to produce (the number of values for the suitability)
-#        fill_var_list is a vector of the possible values for suitability
-#        pal_col is a vector of the names of the colour palette
-
-plot_subdiv_maps_pc <- function(n, fill_var_list, pal_col) {
-  subdiv_map_pc_list <- list()
+if (summarise(df_irm, Average = mean(yield, na.rm = T)) > 0) {
   
-  for (i in 1:n)   {
-    fillvar <- fill_var_list[[i]]
-    subdiv_map_pc_list[[i]] <-
-      ggplot() +
-      geom_spatvector(data = vect_subdiv, aes(group = "id", fill = !!sym(fillvar))) +
-      scale_fill_distiller(
-        type = "seq",
-        palette = pal_col[i],
-        direction = 1,
-        limits = c(0, 100),
-        guide = "legend"
-        ) +
+  vect_yield <-
+    select(df_irm, x, y, yield) %>% na.omit %>% vect(geom = c("x", "y"))
+  
+  rast_yield <- rasterize(vect_yield, rast_mask_proj, field = "yield")
+  names(rast_yield) <-  c('yield')
 
-          geom_spatvector(data = vect_ba_tri, aes(colour = ifelse(baclass == "optimal" , "green", "red")),
-                          size = 1) +
-          #geom_spatvector_text(data = vect_ba_tri, aes(label = ifelse(type == "b", "b", "b/s"))) +
-          scale_colour_identity()
-  }
-  return(subdiv_map_pc_list)
-} 
+# export
+output_geotiff(rast_yield, paste0("yield_", params$INN1))
+
+#dyd <- dByd %>%
+#  as.data.frame(xy = TRUE) %>%
+#  na.omit
 
 
+gyd <- ggplot() +
+  geom_spatraster(data = rast_yield, aes(fill = yield)) +
+  scale_fill_stepsn(
+    paste0("Yield (kg/ha) \n", params$INN1),
+    n.breaks = 10,
+    colours = hcl.colors(palette = "OrRd", 10, rev = TRUE),
+    guide = "legend",
+    labels = comma,  na.value = "transparent"
+  ) +
+#  scale_x_continuous(
+#    name = "",
+#    labels = function(x) {
+#      1.0e-3 * x
+#    }
+#  ) +
+#  scale_y_continuous(
+#    name = "",
+#    labels = function(x) {
+#      1.0e-3 * x
+#    }
+#  ) +
+  coord_sf()
 
-
-
+  gyd2 <- add_subdiv_proj_simple_plot(gyd)
+gyd2
+}
 ```
+</div>
 
+# Calculate production
+
+The IRM script converts yield proportion to production using the yield values for sole crop or intercrop.
+
+<div class="fold o">
+```{r i1_calc_yield_3, cache = TRUE, cache.whatever=params$Agg, out.width="100%", include = TRUE, echo=FALSE, message=FALSE, warning=FALSE, eval=ba_crit_i1}
+
+# get the criteria that contribute to yield
+
+#yield_filename <-
+#  as.character(paste("tab_data/input/yield_", params$INN1, ".csv", sep = ""))
+#yield_tab <- read.csv(here(yield_filename), na.strings = c("NA"))
+
+#yield_tab %>% kable(digits = 3) %>% kable_styling("striped", full_width = T)  %>%  scroll_box(height = "150px")
+
+df_irm$production <- df_irm$yieldpc *  Stat_factor_ha
+
+if (summarise(df_irm, Average = mean(production, na.rm = T)) > 0) {
+  vect_production <-
+    select(df_irm, x, y, production) %>% na.omit %>% vect(geom = c("x", "y"))
+  
+  rast_production <-
+    rasterize(vect_production, rast_mask_proj, field = "production")
+  names(rast_production) <- c('production')
+  
+  # export
+  output_geotiff(rast_production, paste0("production_", params$INN1))
+  
+  #  dp <- dBp %>%
+  #    as.data.frame(xy = TRUE) %>%
+  #    na.omit
+  
+  gp <- ggplot() +
+    geom_spatraster(data = rast_production, aes(fill = production)) +
+    scale_fill_stepsn(
+      paste0("Production (kg) \n", params$INN1),
+      n.breaks = 10,
+      colours = hcl.colors(palette = "BuPu", 10, rev = TRUE),
+      guide = "legend",
+      labels = comma,
+      na.value = "transparent"
+    ) +
+#    scale_x_continuous(
+#      name = "",
+#      labels = function(x) {
+#        1.0e-3 * x
+#      }
+#    ) +
+#    scale_y_continuous(
+#      name = "",
+#      labels = function(x) {
+#        1.0e-3 * x
+#      }
+#    ) +
+    coord_sf()
+  
+  gp2 <- add_subdiv_proj_simple_plot(gp)
+  gp2
+}
+```
+</div>
  
 
 
