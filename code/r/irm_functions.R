@@ -1084,8 +1084,11 @@ add_subdiv_simple_plot <- function(map1) {
 add_subdiv_proj_simple_plot <- function(map1) {
   addsubdivprojsimple_map <-       map1 +
     geom_spatvector(data = project(vect_subdiv, wkt_lam),
-                    colour = "dark grey",
-                    fill = NA) +
+                    colour = "black",
+                    fill = NA, linewidth = 2) +
+    geom_spatvector_text(data = project(vect_subdiv, wkt_lam),
+                    colour = "black", size = 2,
+                    aes_string(label= params$SUBDIV1)) +
     theme(legend.direction = "vertical", 
           legend.box = "horizontal",
           axis.title.x = element_blank(),

@@ -226,11 +226,11 @@ df_priorities_short$stack[is.na(df_priorities_short$stack)] <-
   "root2"
 
 # Convert to tree
-tree_new <- FromDataFrameNetwork(df_priorities_short, c("weight", "threshold",	"threshold2",	"width",	"width2"
+tree_plot <- FromDataFrameNetwork(df_priorities_short, c("weight", "threshold",	"threshold2",	"width",	"width2"
 ))
 
 # Display the tree
-print(tree_new, "weight", "threshold",	"threshold2",	"width",	"width2", "level")
+print(tree_plot, "weight", "threshold",	"threshold2",	"width",	"width2", "level")
 
 ```
 
@@ -238,11 +238,11 @@ print(tree_new, "weight", "threshold",	"threshold2",	"width",	"width2", "level")
 
 ```{r }
 
-tree_max_level <- max(tree_new$Get('level')) - 1
+tree_max_level <- max(tree_plot$Get('level')) - 1
 cat("\n\nNumber of levels", tree_max_level, "\n\n")
 
 hierarchies_new <- ToDataFrameTree(
-  tree_new,
+  tree_plot,
   level1 = function(x)
     x$path[2],
   level2 = function(x)
@@ -272,8 +272,8 @@ hierarchies_new %>% kable(digits = 3, caption = "Hierarchies") %>% kable_styling
 
 ```{r }
 
-n_leaves <- tree_new$leafCount
-df_leaves <- ToDataFrameTypeCol(tree_new)
+n_leaves <- tree_plot$leafCount
+df_leaves <- ToDataFrameTypeCol(tree_plot)
 
 df_leaves_criterion <- as.data.frame( df_leaves[cbind(seq(nrow(df_leaves)), max.col(!is.na(df_leaves), ties.method = 'last'))])
 names(df_leaves_criterion) <- c("criterion")
@@ -287,7 +287,7 @@ df_leaves %>% kable(digits = 3, caption = "Criteria with spatial data") %>% kabl
 ```{r }
 # 
 SetGraphStyle(
-  tree_new,
+  tree_plot,
   rankdir = "RL",
   overlap = "true",
   fontsize = 400,
@@ -297,7 +297,7 @@ SetGraphStyle(
 )
 
 SetNodeStyle(
-  tree_new,
+  tree_plot,
   shape = "box",
   fontsize = 200,
   fontname = "Helvetica",
@@ -311,7 +311,7 @@ SetNodeStyle(
 )
 
 SetEdgeStyle(
-  tree_new,
+  tree_plot,
   arrowhead = "none",
   color = "blue",
   penwidth = function(node) (node$weight * 50),
@@ -321,17 +321,23 @@ SetEdgeStyle(
   fontcolor = "blue"
 )
 
-# 
-# plot(tree_new)
+level2 <- Traverse(tree_plot, filterFun = function(x) x$level == 2)
 
-SetNodeStyle(
-  tree_new$`Likelihood for Adoption`$`Biophysical Aptitude`,
-  fillcolor = "LightBlue",
-  color = "black",
-  penwidth = 10
-)
+Do(level2, function(node)
+  SetNodeStyle(
+    node,
+    shape = "oval",
+    fixedsize = "false",
+    width = 0.9,
+    color = "lightblue",
+    fillcolor = "IndianRed3",
+    fontsize = 200,
+    fontname = "Helvetica",
+    fontcolor = "white",
+    style = "filled"
+  ))
 
-Do(tree_new$leaves, function(node)
+Do(tree_plot$leaves, function(node)
   SetNodeStyle(
     node,
     shape = "oval",
@@ -345,7 +351,7 @@ Do(tree_new$leaves, function(node)
     style = "filled"
   ))
 
-plot(tree_new)
+plot(tree_plot)
 
 ```
 
@@ -369,9 +375,10 @@ print(tree_new, "weight", "threshold",	"threshold2",	"width",	"width2", "level")
 
 ```
 
-## Get the tree hierarchy
+
 
 ```{r }
+## Get the tree hierarchy
 
 tree_max_level <- max(tree_new$Get('level')) - 1
 cat("\n\nNumber of levels", tree_max_level, "\n\n")
@@ -399,13 +406,12 @@ hierarchies_new <- ToDataFrameTree(
 )[-1, -1]
 
 # Display the df
-hierarchies_new %>% kable(digits = 3, caption = "Hierarchies") %>% kable_styling("striped", full_width = T) %>%  row_spec(0, angle = -45) %>%  scroll_box(height = "500px")
+# hierarchies_new %>% kable(digits = 3, caption = "Hierarchies") %>% kable_styling("striped", full_width = T) %>%  row_spec(0, angle = -45) %>%  scroll_box(height = "500px")
 
 ```
 
-## Get the tree leaves
-
 ```{r }
+## Get the tree leaves
 
 n_leaves <- tree_new$leafCount
 df_leaves <- ToDataFrameTypeCol(tree_new)
@@ -736,21 +742,53 @@ In this section the input spatial data are cropped to the extent of the sub-divi
 
 # do a rough crop of the thematic data for the country extent in the CRS of the thematic data
 
+# for (i in seq(from = 1,
+#               to = nrow(df_raster_data),
+#               by = 1)) {
+#   
+#   temp_crs <- crs(get(paste0("rast_", df_raster_data[i, 12])))
+#   assign("vect_subdiv_temp_crs", terra::project(vect_subdiv, temp_crs))
+#   assign("vect_subdiv_temp_crs_extent", terra::ext(vect_subdiv_temp_crs))
+#     
+#   assign(
+#     paste0("rast_", df_raster_data[i, 12], "_roughcrop"),
+#     crop(get(paste0("rast_", df_raster_data[i, 12])),
+#       vect_subdiv_temp_crs_extent)
+#   )  
+# }
+
+# do a rough crop of the thematic data for the country extent in the CRS of the thematic data
+
 for (i in seq(from = 1,
               to = nrow(df_raster_data),
               by = 1)) {
   
   temp_crs <- crs(get(paste0("rast_", df_raster_data[i, 12])))
-  assign("vect_subdiv_temp_crs", terra::project(vect_subdiv, temp_crs))
-  assign("vect_subdiv_temp_crs_extent", terra::ext(vect_subdiv_temp_crs))
-    
-  assign(
-    paste0("rast_", df_raster_data[i, 12], "_roughcrop"),
-    crop(get(paste0("rast_", df_raster_data[i, 12])),
-      vect_subdiv_temp_crs_extent)
-  )  
+  assign("vect_subdiv_temp_crs",
+         terra::project(vect_subdiv, temp_crs))
+  assign("vect_subdiv_temp_crs_extent",
+         terra::ext(vect_subdiv_temp_crs))
+  
+  rast_roughcrop_filename <-
+    paste0("spatial_data/input/rast_", df_raster_data[i, 12], "_roughcrop.tif")
+  
+  writeRaster(
+    crop(get(paste0(
+      "rast_", df_raster_data[i, 12]
+    )),
+    vect_subdiv_temp_crs_extent),
+    here(rast_roughcrop_filename),
+    overwrite = TRUE
+  )
+  
+  assign(paste0("rast_", df_raster_data[i, 12], "_roughcrop"),
+         rast(here(rast_roughcrop_filename)))
+      
+
+  gc()
 }
 
+ 
 ```
 
 
@@ -870,7 +908,7 @@ for (i in seq(from = 1,
       rbind(df_raster_data_single, df_raster_data[i,])
   }
   
-    
+  gc()    
 
 #  plot_raster
 #  terra::plot(rast_mask_proj, title = "") # this is needed (even if it is not actually plotted) to enable the plot of the raster
@@ -1176,6 +1214,7 @@ df_onset <- as.data.frame(rast_onset_crop_rsmp, xy=TRUE, cells=TRUE, na.rm=NA)
 df_onset <- mutate(df_onset, onset = as.integer(onset))
 }
 ```
+</div>
 
 <div class="fold o">   
 ```{r i1_sowing_dates_sos_transpose, cache = TRUE, cache.whatever=params$Agg,  out.width="100%", warning=FALSE,  eval=sos_crit_i1}
@@ -2464,7 +2503,7 @@ for (i in seq_len(nrow(df_raster_data_soil))) {
   assign(
     paste0("rast_", df_raster_data_soil[i, 12], "_rsmp"),
     get(paste0("rast_", df_raster_data_soil[i, 12], "_rsmp")) %>% app(function(x) {
-      sum((x) / 6)
+      sum((x) / n_band)
     })
   )
   
@@ -2897,7 +2936,7 @@ fn_create_rb <- function(lower_conc_values, weights, rb_conc_name) {
   n <- length(lower_conc_values)
   weights[is.na(weights)] <- (1/n) # replace NA values in weights with values that sum to 1
   
-  rb <- reduce(lower_conc_values, crossing)
+  rb <- reduce(lower_conc_values, crossing) %>% unique() # added 09/03/2024
   n_rb <- nrow(rb)
   cat(paste("str(rb) =", str(rb), "\n"))
   cat(paste("Number of rules =", n_rb, "\n"))
@@ -3284,7 +3323,8 @@ for (i in hierarchy_level_max:1) {
       
       print(x)
       
-      assign(paste0("rbs_", conc_name), eval(parse(text = x)))
+      assign(paste0("rbs_", conc_name), eval(parse(text = x)),
+             .GlobalEnv)
       #print(get(paste0("rbs_", conc_name)))
       
       # # evaluate the rule base stack
@@ -3521,7 +3561,7 @@ Logic: For the two top hierarchy level rule-bases produce classified maps with l
                    paste0("rast_clas_fao_cat", fpm_plot_title))
                   
                             
-          ggplot() +
+         g <-  ggplot() +
             geom_spatraster(data = rast_clas_fao_cat, na.rm = TRUE, aes(fill = FAO)) +
             scale_fill_manual(
               name = paste0("FAO\n", fpm_plot_title, "\n", params$INN1),
@@ -3534,7 +3574,8 @@ Logic: For the two top hierarchy level rule-bases produce classified maps with l
                 N2 = rgb(227, 26, 28, maxColorValue = 255)
               )
             )
-          
+         g
+         add_subdiv_proj_simple_plot(g)
 
                   
         } # end of classify_maps_FAO function
@@ -3634,7 +3675,7 @@ Logic: For the two top hierarchy level rule-bases produce classified maps with l
           mutate(across(everything(), ~ replace_na(.x, 0)))
         
         cat("DEBUG LIMITS df_limits_w_score")
-        print(df_limits_w_score)
+        #print(df_limits_w_score)
         
         w_score_max_index <-
           matrix(apply(df_limits_w_score, 1 , which.max))
