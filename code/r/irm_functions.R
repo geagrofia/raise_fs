@@ -743,7 +743,7 @@ output_vect <- function(results_vect, data_file_prefix) {
   
   writeVector(
     project(results_vect,
-            wkt_geo),
+            "epsg:4326"),
     filename = (here(vector_filename)),
     filetype="geojson",
     overwrite = TRUE)
@@ -1734,7 +1734,7 @@ classify_maps_FAO <-
     output_vect(vect_clas_fao_cat, vect_filename)
     
     # project to geo for display in leaflet
-    vect_clas_fao_cat_geo <- project(vect_clas_fao_cat, wkt_geo)
+    vect_clas_fao_cat_geo <- project(vect_clas_fao_cat, "epsg:4326")
     
     # convert to sf until leaflet properly accepts spatvector
     sf_clas_fao_cat_geo <- st_as_sf(vect_clas_fao_cat_geo)
@@ -1925,7 +1925,7 @@ classify_maps_limits <-
   v_limits_max <<- df_limits_max %>% na.omit %>% st_as_sf(coords = c("x", "y"))
   # str(v_limits_max)
   
-  rast_limits_max <- rasterize(v_limits_max, rast_mask_proj, field = "w_score_max_index")
+  rast_limits_max <<- rasterize(v_limits_max, rast_mask_proj, field = "w_score_max_index")
   #cat("rast_limits_max \n")
   #print(rast_limits_max)
   
@@ -1936,12 +1936,40 @@ classify_maps_limits <-
   df_map_code_cat <<- unique(df_map_code[c("w_score_max_index", "map_code")])
   #str(df_map_code_cat)
   
-  levels(rast_limits_max) <- df_map_code_cat
+  levels(rast_limits_max) <<- df_map_code_cat
   
-  rast_limits_max_FAO <-  concats(rast_clas_fao_brick$FAO, rast_limits_max)
-  names(rast_limits_max_FAO) <- c('FAO_limit')
+  #rast_limits_max_FAO_2 <<-  ifel(rast_clas_fao_brick$FAO == "S1", rast_clas_fao_brick$FAO, concats(rast_clas_fao_brick$FAO, rast_limits_max))
+  rast_limits_max_FAO <<-  concats(rast_clas_fao_brick$FAO, rast_limits_max)
+  
+  
+   # replace all S1 limits with just a S1 class
+  # Extract the levels of the raster
+  lvl <<- levels(rast_limits_max_FAO)[[1]]
+  #cats1 <<- cats(rast_limits_max_FAO)
+  lvl1 <<- lvl
+  
+  # Replace categories starting with "S1" with "X"
+  lvl$FAO_map_code <<- ifelse(grepl("^S1", lvl$FAO_map_code), "S1", lvl$FAO_map_code)
+
+  # Assign the new levels back to the raster
+  levels(rast_limits_max_FAO) <<- lvl
+  cats2 <<- cats(rast_limits_max_FAO)  
+  
+  lvlunique <<- lvl %>% distinct(FAO_map_code, .keep_all = TRUE)
+  lvlunique$ID2 <<- seq.int(nrow(lvlunique))  
+  
+  rast_limits_max_FAO2 <<-  subst(rast_limits_max_FAO, lvlunique$ID, lvlunique$ID2, others=NULL, raw=TRUE)
+  rast_limits_max_FAO3 <<- rast_limits_max_FAO2
+  
+  lvlunique$ID <<- lvlunique$ID2
+  lvlunique <- lvlunique[,1:2]
+  levels(rast_limits_max_FAO3) <<- lvlunique
+  droplevels(rast_limits_max_FAO3, level=NULL, layer=1)
+  
+  names(rast_limits_max_FAO3) <<- c('FAO_limit')
   #cat("rast_limits_max_FAO \n")
   #print(rast_limits_max_FAO)
+ 
   
   # how many suitability levels?
   FAO_levels <<- unique(rast_clas_fao_brick$FAO)
@@ -1949,13 +1977,13 @@ classify_maps_limits <-
  # print(str(FAO_levels))
   
   # how many limits levels?
-  FAO_limit_levels <<- unique(droplevels(pull(rast_limits_max_FAO, FAO_limit)))
+  FAO_limit_levels <<- unique(droplevels(pull(rast_limits_max_FAO3, FAO_limit)))
   #cat(length(FAO_limit_levels), " FAO_limit_levels \n")
   #print(str(FAO_limit_levels))
   
   # how many limits levels?
   df_FAO_limit_levels <<-
-    unique(rast_limits_max_FAO$FAO_limit)
+    unique(rast_limits_max_FAO3$FAO_limit)
   
   df_FAO_limit_levels_test <<-    df_FAO_limit_levels # this line just for debugging
   
@@ -2027,17 +2055,17 @@ classify_maps_limits <-
   test_FAO_colours <<- pull(df_FAO_limit_levels_order, hsv_eval)
   
   # save raster
-  assign(paste0("rast_limits_max_FAO_", fpm_plot_title), rast_limits_max_FAO,
+  assign(paste0("rast_limits_max_FAO_", fpm_plot_title), rast_limits_max_FAO3,
          .GlobalEnv)
   
   # add raster to list
   list_rast_limits_max_FAO <<- append(list_rast_limits_max_FAO, paste0("rast_limits_max_FAO_", fpm_plot_title))
   
-  output_geotiff(rast_limits_max_FAO, paste0("FAO_limits_", stack_code, "_", innovation))
+  output_geotiff(rast_limits_max_FAO3, paste0("FAO_limits_", stack_code, "_", innovation))
   
   
   g2 <- ggplot() +
-    geom_spatraster(data = rast_limits_max_FAO, aes(fill = FAO_limit), na.rm = TRUE) +
+    geom_spatraster(data = rast_limits_max_FAO3, aes(fill = FAO_limit), na.rm = TRUE) +
     scale_fill_manual(
       name = paste0("FAO limitations\n", fpm_plot_title, "\n", innovation),
       na.value = "transparent",
@@ -2049,10 +2077,10 @@ classify_maps_limits <-
   
   # convert the spatraster (showing the FAO suitability limitations classes)
   
-  vect_limits_max_FAO <- as.polygons(rast_limits_max_FAO, dissolve=FALSE)
+  vect_limits_max_FAO <- as.polygons(rast_limits_max_FAO3, dissolve=FALSE)
   
   # project to geo for display in leaflet
-  vect_limits_max_FAO_geo <- project(vect_limits_max_FAO, wkt_geo)
+  vect_limits_max_FAO_geo <- project(vect_limits_max_FAO, "epsg:4326")
   
   # convert to sf until leaflet properly accepts spatvector
   sf_limits_max_FAO_geo <- st_as_sf(vect_limits_max_FAO_geo)

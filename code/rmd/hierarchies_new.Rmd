@@ -16,20 +16,20 @@ params:
   SYS: comparison
   Agg: 1
   MASK: 5000
-  INN1: oil_palm_P1
+  INN1: a_coffee_ssp585elev
   RES1: 3
   SOS1: 0
-  FAOCLASS1: 2
-  LIMITS1: 2
+  FAOCLASS1: 1
+  LIMITS1: 1
   SUBDIV1: NAME_1
   TRIAD1: Adoption
   TRIBA1: Aptitude
   TRISE1: Feasible
-  INN2: oil_palm_new
+  INN2: NA
   RES2: 3
   SOS2: 0
-  FAOCLASS2: 2
-  LIMITS2: 2
+  FAOCLASS2: 1
+  LIMITS2: 1
   SUBDIV2: NAME_1
   TRIAD2: Adoption
   TRIBA2: Aptitude
@@ -3331,15 +3331,26 @@ for (i in 1:length(list_rast_clas_FAO_cat))   {
     group_by(ID) %>%
     count(FAO, wt = (area * weight), .drop = FALSE)
   
+  # get the names of the FAO classes
+  FAO <- as.vector(unique(df_extr_summary_i1$FAO))
+  FAO <- FAO[!is.na(FAO)]
+  
+  df_extr_summary_i1_pivot <- df_extr_summary_i1 %>% pivot_wider(names_from = FAO, values_from = n)
+  
   # join the summary data frame to the original subdivision data spatvector
   vect_subdiv_extr_i1 <<-
-    left_join(vect_subdiv_i1, df_extr_summary_i1, by = 'ID')
+    left_join(vect_subdiv_i1, df_extr_summary_i1_pivot, by = 'ID')
+    
+      # save as geojson and csv files
+  output_vect(vect_subdiv_extr_i1, paste0(subdiv_criteria_name_i1, "_FAO_area_", params$INN1)) # save as a geojson file
+  output_csv(as_tibble(vect_subdiv_extr_i1), paste0(subdiv_criteria_name_i1, "_FAO_area_", params$INN1)) # save as a csv file 
   
+
   # loop through each existing class type 
-  for (class_type in unique(vect_subdiv_extr_i1$FAO)) {
+  for (class_type in FAO) {
     
     # Get the current iteration number
-    j_i1 <- match(class_type, unique(vect_subdiv_extr_i1$FAO))
+    j_i1 <- match(class_type, FAO)
 
     # get the palette using the iteration number
     colour_index_i1 <- j_i1
@@ -3349,8 +3360,9 @@ for (i in 1:length(list_rast_clas_FAO_cat))   {
     result_i1 <- palettes_i1[colour_index_mod_i1]
     
     # Filter the joined data for the current limitation
+    # Filter the joined data for the current limitation
     filtered_data_i1 <-
-      vect_subdiv_extr_i1[vect_subdiv_extr_i1$FAO == class_type,]
+      vect_subdiv_extr_i1 %>% select(any_of(class_type))
     #print(filtered_data)
     
     if (nrow(filtered_data_i1) == 0) {next} 
@@ -3358,7 +3370,7 @@ for (i in 1:length(list_rast_clas_FAO_cat))   {
   
     # Create a ggplot for count value per subdivision for the current class type using the palette from above
     subdiv_plot_i1 <- ggplot() +
-      geom_spatvector(data = filtered_data_i1, aes(group = params$SUBDIV1, fill = n)) +
+      geom_spatvector(data = filtered_data_i1, aes(group = params$SUBDIV1, fill = eval(parse(text = FAO[j_i1])))) +
       labs(
         title = paste(subdiv_criteria_name_i1, "\nClass = ", class_type),
         fill = "Area (ha)"
@@ -3440,15 +3452,31 @@ for (i in 1:length(list_rast_limits_max_FAO))   {
     group_by(ID) %>%
     count(FAO_limit, wt = (area * weight), .drop = FALSE)
   
-  # join the summary data frame to the original subdivision data spatvector
-  vect_subdiv_extr_i1 <<-
-    left_join(vect_subdiv_i1, df_extr_summary_i1, by = 'ID')
+  # get the names of the FAO limitations
+  FAO_limits <- as.vector(unique(df_extr_summary_i1$FAO_limit))
+    FAO_limits <- FAO_limits[!is.na(FAO_limits)]
+    
+  # pivot wider to give a column for each limit
+  df_extr_summary_i1_pivot <- df_extr_summary_i1 %>% pivot_wider(names_from = FAO_limit, values_from = n)
   
+    # join the summary data frame to the original subdivision data spatvector
+  vect_subdiv_extr_i1 <<-
+    left_join(vect_subdiv_i1, df_extr_summary_i1_pivot, by = 'ID')
+  
+  # join the summary data frame to the subdivision area data frame
+  vect_subdiv_extr_i1 <<-
+    left_join(vect_subdiv_extr_i1, df_subdiv_area_i1, by = 'ID')
+
+      # save as geojson and csv files
+  output_vect(vect_subdiv_extr_i1, paste0(subdiv_criteria_name_i1, "_FAO_limits_area_", params$INN1)) # save as a geojson file
+  output_csv(as_tibble(vect_subdiv_extr_i1), paste0(subdiv_criteria_name_i1, "_FAO_limits_area_", params$INN1)) # save as a csv file 
+  
+
   # loop through each existing limitation type 
-  for (limitation_type_i1 in unique(vect_subdiv_extr_i1$FAO_limit)) {
+  for (limitation_type_i1 in FAO_limits) {
     
     # Get the current iteration number
-    j <- match(limitation_type_i1, unique(vect_subdiv_extr_i1$FAO_limit))
+    j_i1 <- match(limitation_type_i1, FAO_limits)
 
     # get the palette using the iteration number
     colour_index_i1 <- j_i1
@@ -3459,7 +3487,7 @@ for (i in 1:length(list_rast_limits_max_FAO))   {
     
     # Filter the joined data for the current limitation
     filtered_data_i1 <-
-      vect_subdiv_extr_i1[vect_subdiv_extr_i1$FAO_limit == limitation_type_i1,]
+      vect_subdiv_extr_i1 %>% select(any_of(limitation_type_i1))
     #print(filtered_data)
     if (nrow(filtered_data_i1) == 0) {next} 
     
@@ -3467,7 +3495,7 @@ for (i in 1:length(list_rast_limits_max_FAO))   {
     
     # Create a ggplot for count value per subdivision for the current limitation type using the palette from above
     subdiv_plot_i1 <- ggplot() +
-      geom_spatvector(data = filtered_data_i1, aes(group = params$SUBDIV1, fill = n)) +
+      geom_spatvector(data = filtered_data_i1, aes(group = params$SUBDIV1, fill = eval(parse(text = FAO_limits[j_i1])))) +
       labs(
         title = paste(subdiv_criteria_name_i1, "\nLimit = ", limitation_type_i1),
         fill = "Area (ha)"
@@ -3537,22 +3565,34 @@ for (i in 1:length(list_rast_clas_FAO_cat))   {
     group_by(ID) %>%
     count(FAO, wt = (area * weight), .drop = FALSE)
   
+    # get the names of the FAO classes
+  FAO <- as.vector(unique(df_extr_summary_i1$FAO))
+  FAO <- FAO[!is.na(FAO)]
+  
+    df_extr_summary_i1_pivot <- df_extr_summary_i1 %>% pivot_wider(names_from = FAO, values_from = n)
+  
   # join the summary data frame to the original subdivision data spatvector
   vect_subdiv_extr_i1 <<-
-    left_join(vect_subdiv_i1, df_extr_summary_i1, by = 'ID')
+    left_join(vect_subdiv_i1, df_extr_summary_i1_pivot, by = 'ID')
   
    # join the summary data frame to the subdivision area data frame
   vect_subdiv_extr_i1 <<-
     left_join(vect_subdiv_extr_i1, df_subdiv_area_i1, by = 'ID') 
   
-  vect_subdiv_extr_i1 <<-
-    mutate(vect_subdiv_extr_i1, area_pc = (n/ha)*100) 
+  # vect_subdiv_extr_i1 <<- vect_subdiv_extr_i1 %>%
+  #    select(ID, ha, any_of(FAO)) %>% mutate(across(any_of(FAO), ~ (.x / ha) * 100)) 
   
+    vect_subdiv_extr_i1 <<- vect_subdiv_extr_i1 %>% mutate(across(any_of(FAO), ~ (.x / ha) * 100)) #this includes all columns from vect_subdiv_extr_i1 A Farrow 22/05/2024
+      
+      # save as geojson and csv files
+  output_vect(vect_subdiv_extr_i1, paste0(subdiv_criteria_name_i1, "_FAO_pc_", params$INN1)) # save as a geojson file
+  output_csv(as_tibble(vect_subdiv_extr_i1), paste0(subdiv_criteria_name_i1, "_FAO_pc_", params$INN1)) # save as a csv file 
+
   # loop through each existing class type 
-  for (class_type in unique(vect_subdiv_extr_i1$FAO)) {
+  for (class_type in FAO) {
     
     # Get the current iteration number
-    j_i1 <- match(class_type, unique(vect_subdiv_extr_i1$FAO))
+    j_i1 <- match(class_type, FAO)
 
     # get the palette using the iteration number
     colour_index_i1 <- j_i1
@@ -3563,7 +3603,7 @@ for (i in 1:length(list_rast_clas_FAO_cat))   {
     
     # Filter the joined data for the current limitation
     filtered_data_i1 <-
-      vect_subdiv_extr_i1[vect_subdiv_extr_i1$FAO == class_type,]
+      vect_subdiv_extr_i1 %>% select(any_of(class_type))
     #print(filtered_data)
     if (nrow(filtered_data_i1) == 0) {next} 
 
@@ -3572,7 +3612,7 @@ for (i in 1:length(list_rast_clas_FAO_cat))   {
     filtered_data_global_i1 <<- filtered_data_i1
       
     subdiv_plot_i1 <- ggplot() +
-      geom_spatvector(data = filtered_data_i1, aes(group = params$SUBDIV1, fill = area_pc)) +
+      geom_spatvector(data = filtered_data_i1, aes(group = params$SUBDIV1, fill = eval(parse(text = FAO[j_i1])))) +
       labs(
         title = paste(subdiv_criteria_name_i1, "\nClass = ", class_type),
         fill = "Area (%)"
@@ -3638,7 +3678,6 @@ for (i in 1:length(list_rast_limits_max_FAO))   {
   # get the cellsize for each raster
   rast_to_plot_cellsize_i1 <- cellSize(rast_to_plot_i1, unit = "ha")
   
-  
   # extract the raster limitations to a data frame using the subdivisions
   df_extr_i1 <-
     terra::extract(rast_to_plot_i1, vect_subdiv_i1, na.rm = TRUE, ID = T, weights = T)
@@ -3654,22 +3693,36 @@ for (i in 1:length(list_rast_limits_max_FAO))   {
     group_by(ID) %>%
     count(FAO_limit, wt = (area * weight), .drop = FALSE)
   
+  # get the names of the FAO limitations
+  FAO_limits <- as.vector(unique(df_extr_summary_i1$FAO_limit))
+    FAO_limits <- FAO_limits[!is.na(FAO_limits)]
+  
+  # pivot wider to give a column for each limit
+  df_extr_summary_i1_pivot <- df_extr_summary_i1 %>% pivot_wider(names_from = FAO_limit, values_from = n)
+  
   # join the summary data frame to the original subdivision data spatvector
   vect_subdiv_extr_i1 <<-
-    left_join(vect_subdiv_i1, df_extr_summary_i1, by = 'ID')
+    left_join(vect_subdiv_i1, df_extr_summary_i1_pivot, by = 'ID')
   
   # join the summary data frame to the subdivision area data frame
   vect_subdiv_extr_i1 <<-
     left_join(vect_subdiv_extr_i1, df_subdiv_area_i1, by = 'ID')
   
-  vect_subdiv_extr_i1 <<-
-    mutate(vect_subdiv_extr_i1, area_pc = (n / ha) * 100)  
+  # vect_subdiv_extr_i1 <<- vect_subdiv_extr_i1 %>%
+  #    select(ID, ha, any_of(FAO_limits)) %>% mutate(across(any_of(FAO_limits), ~ (.x / ha) * 100))
   
+      vect_subdiv_extr_i1 <<- vect_subdiv_extr_i1 %>% mutate(across(any_of(FAO_limits), ~ (.x / ha) * 100)) #this includes all columns from vect_subdiv_extr_i1 A Farrow 22/05/2024
+      
+
+  # save as geojson and csv files
+  output_vect(vect_subdiv_extr_i1, paste0(subdiv_criteria_name_i1, "_FAO_limits_pc_", params$INN1)) # save as a geojson file
+  output_csv(as_tibble(vect_subdiv_extr_i1), paste0(subdiv_criteria_name_i1, "_FAO_limits_pc_", params$INN1)) # save as a csv file 
+
   # loop through each existing limitation type 
-  for (limitation_type_i1 in unique(vect_subdiv_extr_i1$FAO_limit)) {
-    
+  for (limitation_type_i1 in FAO_limits) {
+   
     # Get the current iteration number
-    j_i1 <- match(limitation_type_i1, unique(vect_subdiv_extr_i1$FAO_limit))
+    j_i1 <- match(limitation_type_i1, FAO_limits)
 
     # get the palette using the iteration number
     colour_index_i1 <- j_i1
@@ -3680,13 +3733,13 @@ for (i in 1:length(list_rast_limits_max_FAO))   {
     
     # Filter the joined data for the current limitation
     filtered_data_i1 <-
-      vect_subdiv_extr_i1[vect_subdiv_extr_i1$FAO_limit == limitation_type_i1,]
+      vect_subdiv_extr_i1 %>% select(any_of(limitation_type_i1))
     #print(filtered_data)
     if (nrow(filtered_data_i1) == 0) {next} 
     
     # Create a ggplot for count value per subdivision for the current limitation type using the palette from above
     subdiv_plot_i1 <- ggplot() +
-      geom_spatvector(data = filtered_data_i1, aes(group = params$SUBDIV1, fill = area_pc)) +
+      geom_spatvector(data = filtered_data_i1, aes(group = params$SUBDIV1, fill = eval(parse(text = FAO_limits[j_i1])))) +
       labs(
         title = paste(subdiv_criteria_name_i1, "\nLimit = ", limitation_type_i1),
         fill = "Area (%)"
@@ -3740,15 +3793,61 @@ eval(str2expression(yield_expr_i1))
 # str(df_irm_i1$yieldpc)
 if (summarise(df_irm_i1, Average = mean(yieldpc, na.rm = T)) > 0) {
 
-# df_irm_i1 <- dplyr::select(df_irm_i1,-yield)
+  # df_irm_i1 <- dplyr::select(df_irm_i1,-yield)
+  
+  vect_yieldpc_i1 <- select(df_irm_i1, x, y, yieldpc) %>% na.omit %>% vect(geom = c("x", "y"))
+  
+  rast_yieldpc_i1 <- rasterize(vect_yieldpc_i1, rast_mask_proj_i1, field =
+                                 "yieldpc")
+  names(rast_yieldpc_i1) <- c('yieldpc')
+  
+  # get the cellsize for each raster
+  rast_yield_pc_cellsize_i1 <- cellSize(rast_yieldpc_i1, unit = "ha")
+  
+  # export
+  output_geotiff(rast_yieldpc_i1, paste0("yieldpc_", params$INN1))
+  
+  # extract the yield raster to a data frame using the subdivisions
+  df_extr_i1 <-
+    terra::extract(
+      rast_yieldpc_i1,
+      vect_subdiv_i1,
+      na.rm = TRUE,
+      ID = T,
+      weights = T
+    )
+  
+  # extract the raster cellsize to a data frame using the subdivisions
+  df_extr_cellsize_i1 <-
+    terra::extract(
+      rast_yield_pc_cellsize_i1,
+      vect_subdiv_i1,
+      na.rm = TRUE,
+      ID = T,
+      weights = T
+    )
+  
+  df_extr_i1 <- mutate(df_extr_i1, df_extr_cellsize_i1)
+  
+  # summarise the yield for each subdivision raster ID
+  df_extr_summary_i1 <- df_extr_i1 %>%
+    group_by(ID) %>%
+    summarise(yieldpc = weighted.mean(yieldpc, (area * weight), na.rm = TRUE))
+  
 
-vect_yieldpc_i1 <- select(df_irm_i1, x, y, yieldpc) %>% na.omit %>% vect(geom = c("x", "y"))
-
-rast_yieldpc_i1 <- rasterize(vect_yieldpc_i1, rast_mask_proj_i1, field="yieldpc")
-names(rast_yieldpc_i1) <- c('yieldpc')
-
-# export
-output_geotiff(rast_yieldpc_i1, paste0("yieldpc_", params$INN1))
+  # join the summary data frame to the original subdivision data spatvector
+  vect_subdiv_extr_i1 <<-
+    left_join(vect_subdiv_i1, df_extr_summary_i1, by = 'ID')
+  
+  # join the summary data frame to the subdivision area data frame
+  vect_subdiv_extr_i1 <<-
+    left_join(vect_subdiv_extr_i1, df_subdiv_area_i1, by = 'ID')
+  
+  # save as geojson and csv files
+  output_vect(vect_subdiv_extr_i1, paste0("yieldpc_", params$INN1)) # save as a geojson file
+  output_csv(as_tibble(vect_subdiv_extr_i1),
+             paste0("yieldpc_", params$INN1)) # save as a csv file
+  
 
 #  dy <- rast_yield %>%
 #    as.data.frame(xy = TRUE) %>%
@@ -3827,9 +3926,53 @@ if (summarise(df_irm_i1, Average = mean(yield, na.rm = T)) > 0) {
   
   rast_yield_i1 <- rasterize(vect_yield_i1, rast_mask_proj_i1, field = "yield")
   names(rast_yield_i1) <-  c('yield')
-
-# export
-output_geotiff(rast_yield_i1, paste0("yield_", params$INN1))
+  
+  # export
+  output_geotiff(rast_yield_i1, paste0("yield_", params$INN1))
+  
+  # get the cellsize for each raster
+  rast_yield_cellsize_i1 <- cellSize(rast_yield_i1, unit = "ha")
+  
+  # extract the yield raster to a data frame using the subdivisions
+  df_extr_i1 <-
+    terra::extract(
+      rast_yield_i1,
+      vect_subdiv_i1,
+      na.rm = TRUE,
+      ID = T,
+      weights = T
+    )
+  
+  # extract the raster cellsize to a data frame using the subdivisions
+  df_extr_cellsize_i1 <-
+    terra::extract(
+      rast_yield_cellsize_i1,
+      vect_subdiv_i1,
+      na.rm = TRUE,
+      ID = T,
+      weights = T
+    )
+  
+  df_extr_i1 <- mutate(df_extr_i1, df_extr_cellsize_i1)
+  
+  # summarise the yield for each subdivision raster ID
+  df_extr_summary_i1 <- df_extr_i1 %>%
+    group_by(ID) %>%
+    summarise(yield = weighted.mean(yield, (area * weight), na.rm = TRUE))
+  
+  # join the summary data frame to the original subdivision data spatvector
+  vect_subdiv_extr_i1 <<-
+    left_join(vect_subdiv_i1, df_extr_summary_i1, by = 'ID')
+  
+  # join the summary data frame to the subdivision area data frame
+  vect_subdiv_extr_i1 <<-
+    left_join(vect_subdiv_extr_i1, df_subdiv_area_i1, by = 'ID')
+  
+  # save as geojson and csv files
+  output_vect(vect_subdiv_extr_i1, paste0("yield_", params$INN1)) # save as a geojson file
+  output_csv(as_tibble(vect_subdiv_extr_i1),
+             paste0("yield_", params$INN1)) # save as a csv file 
+  
 
 #dyd <- dByd %>%
 #  as.data.frame(xy = TRUE) %>%
@@ -3880,7 +4023,7 @@ The IRM script converts yield proportion to production using the yield values fo
 
 #yield_tab %>% kable(digits = 3) %>% kable_styling("striped", full_width = T)  %>%  scroll_box(height = "150px")
 
-df_irm_i1$production <- df_irm_i1$yieldpc *  Stat_factor_ha_i1
+df_irm_i1$production <- df_irm_i1$yield *  Stat_factor_ha_i1
 
 if (summarise(df_irm_i1, Average = mean(production, na.rm = T)) > 0) {
   vect_production_i1 <-
@@ -3893,6 +4036,48 @@ if (summarise(df_irm_i1, Average = mean(production, na.rm = T)) > 0) {
   # export
   output_geotiff(rast_production_i1, paste0("production_", params$INN1))
   
+  # get the cellsize for each raster
+  rast_production_cellsize_i1 <- cellSize(rast_production_i1, unit = "ha")
+  
+  # extract the production raster to a data frame using the subdivisions
+  df_extr_i1 <-
+    terra::extract(
+      rast_production_i1,
+      vect_subdiv_i1,
+      na.rm = TRUE,
+      ID = T,
+      weights = T
+    )
+  
+  # extract the raster cellsize to a data frame using the subdivisions
+  df_extr_cellsize_i1 <-
+    terra::extract(
+      rast_production_cellsize_i1,
+      vect_subdiv_i1,
+      na.rm = TRUE,
+      ID = T,
+      weights = T
+    )
+  
+  df_extr_i1 <- mutate(df_extr_i1, df_extr_cellsize_i1)
+  
+  # summarise the production for each subdivision raster ID
+  df_extr_summary_i1 <- df_extr_i1 %>%
+    group_by(ID) %>%
+    summarise(production = sum(production * weight, na.rm = TRUE))
+  
+  # join the summary data frame to the original subdivision data spatvector
+  vect_subdiv_extr_i1 <<-
+    left_join(vect_subdiv_i1, df_extr_summary_i1, by = 'ID')
+  
+  # join the summary data frame to the subdivision area data frame
+  vect_subdiv_extr_i1 <<-
+    left_join(vect_subdiv_extr_i1, df_subdiv_area_i1, by = 'ID')
+  
+  # save as geojson and csv files
+  output_vect(vect_subdiv_extr_i1, paste0("production_", params$INN1)) # save as a geojson file
+  output_csv(as_tibble(vect_subdiv_extr_i1),
+             paste0("production_", params$INN1)) # save as a csv file  
   #  dp <- dBp %>%
   #    as.data.frame(xy = TRUE) %>%
   #    na.omit
@@ -7100,10 +7285,20 @@ for (i in 1:length(list_rast_clas_FAO_cat))   {
   df_extr_summary_i2 <- df_extr_i2 %>%
     group_by(ID) %>%
     count(FAO, wt = (area * weight), .drop = FALSE)
+    
+  # get the names of the FAO classes
+  FAO <- as.vector(unique(df_extr_summary_i2$FAO))
+  FAO <- FAO[!is.na(FAO)]
+  
+  df_extr_summary_i2_pivot <- df_extr_summary_i2 %>% pivot_wider(names_from = FAO, values_from = n)
   
   # join the summary data frame to the original subdivision data spatvector
   vect_subdiv_extr_i2 <<-
-    left_join(vect_subdiv_i2, df_extr_summary_i2, by = 'ID')
+    left_join(vect_subdiv_i2, df_extr_summary_i2_pivot, by = 'ID')
+  
+      # save as geojson and csv files
+  output_vect(vect_subdiv_extr_i2, paste0(subdiv_criteria_name_i2, "_FAO_area_", params$INN2)) # save as a geojson file
+  output_csv(as_tibble(vect_subdiv_extr_i2), paste0(subdiv_criteria_name_i2, "_FAO_area_", params$INN2)) # save as a csv file 
   
   # loop through each existing class type 
   for (class_type in unique(vect_subdiv_extr_i2$FAO)) {
@@ -7120,7 +7315,7 @@ for (i in 1:length(list_rast_clas_FAO_cat))   {
     
     # Filter the joined data for the current limitation
     filtered_data_i2 <-
-      vect_subdiv_extr_i2[vect_subdiv_extr_i2$FAO == class_type,]
+      vect_subdiv_extr_i2 %>% select(any_of(class_type))
     #print(filtered_data)
     
     if (nrow(filtered_data_i2) == 0) {next} 
@@ -7128,7 +7323,7 @@ for (i in 1:length(list_rast_clas_FAO_cat))   {
   
     # Create a ggplot for count value per subdivision for the current class type using the palette from above
     subdiv_plot_i2 <- ggplot() +
-      geom_spatvector(data = filtered_data_i2, aes(group = params$SUBDIV2, fill = n)) +
+      geom_spatvector(data = filtered_data_i2, aes(group = params$SUBDIV2, fill = eval(parse(text = FAO[j_i2])))) +
       labs(
         title = paste(subdiv_criteria_name_i2, "\nClass = ", class_type),
         fill = "Area (ha)"
@@ -7209,16 +7404,32 @@ for (i in 1:length(list_rast_limits_max_FAO))   {
   df_extr_summary_i2 <- df_extr_i2 %>%
     group_by(ID) %>%
     count(FAO_limit, wt = (area * weight), .drop = FALSE)
+
+# get the names of the FAO limitations
+  FAO_limits <- as.vector(unique(df_extr_summary_i2$FAO_limit))
+  FAO_limits <- FAO_limits[!is.na(FAO_limits)]
   
+  
+  # pivot wider to give a column for each limit
+  df_extr_summary_i2_pivot <- df_extr_summary_i2 %>% pivot_wider(names_from = FAO_limit, values_from = n)
+    
   # join the summary data frame to the original subdivision data spatvector
   vect_subdiv_extr_i2 <<-
-    left_join(vect_subdiv_i2, df_extr_summary_i2, by = 'ID')
+    left_join(vect_subdiv_i2, df_extr_summary_i2_pivot, by = 'ID')
+  
+  # join the summary data frame to the subdivision area data frame
+  vect_subdiv_extr_i2 <<-
+    left_join(vect_subdiv_extr_i2, df_subdiv_area_i2, by = 'ID')
+      
+    # save as geojson and csv files
+  output_vect(vect_subdiv_extr_i2, paste0(subdiv_criteria_name_i2, "_FAO_limits_area_", params$INN2)) # save as a geojson file
+  output_csv(as_tibble(vect_subdiv_extr_i2), paste0(subdiv_criteria_name_i2, "_FAO_limits_area_", params$INN2)) # save as a csv file 
   
   # loop through each existing limitation type 
-  for (limitation_type_i2 in unique(vect_subdiv_extr_i2$FAO_limit)) {
+  for (limitation_type_i2 in FAO_limits) {
     
     # Get the current iteration number
-    j <- match(limitation_type_i2, unique(vect_subdiv_extr_i2$FAO_limit))
+    j_i2 <- match(limitation_type_i2, FAO_limits)
 
     # get the palette using the iteration number
     colour_index_i2 <- j_i2
@@ -7229,7 +7440,7 @@ for (i in 1:length(list_rast_limits_max_FAO))   {
     
     # Filter the joined data for the current limitation
     filtered_data_i2 <-
-      vect_subdiv_extr_i2[vect_subdiv_extr_i2$FAO_limit == limitation_type_i2,]
+      vect_subdiv_extr_i2 %>% select(any_of(limitation_type_i2))
     #print(filtered_data)
     if (nrow(filtered_data_i2) == 0) {next} 
     
@@ -7237,7 +7448,7 @@ for (i in 1:length(list_rast_limits_max_FAO))   {
     
     # Create a ggplot for count value per subdivision for the current limitation type using the palette from above
     subdiv_plot_i2 <- ggplot() +
-      geom_spatvector(data = filtered_data_i2, aes(group = params$SUBDIV2, fill = n)) +
+      geom_spatvector(data = filtered_data_i2, aes(group = params$SUBDIV2, fill = eval(parse(text = FAO_limits[j_i2])))) +
       labs(
         title = paste(subdiv_criteria_name_i2, "\nLimit = ", limitation_type_i2),
         fill = "Area (ha)"
@@ -7307,16 +7518,28 @@ for (i in 1:length(list_rast_clas_FAO_cat))   {
     group_by(ID) %>%
     count(FAO, wt = (area * weight), .drop = FALSE)
   
+    # get the names of the FAO limitations
+  FAO <- as.vector(unique(df_extr_summary_i2$FAO))
+  FAO <- FAO[!is.na(FAO)]
+ 
+    df_extr_summary_i2_pivot <- df_extr_summary_i2 %>% pivot_wider(names_from = FAO, values_from = n)
+  
   # join the summary data frame to the original subdivision data spatvector
   vect_subdiv_extr_i2 <<-
-    left_join(vect_subdiv_i2, df_extr_summary_i2, by = 'ID')
+    left_join(vect_subdiv_i2, df_extr_summary_i2_pivot, by = 'ID')
   
    # join the summary data frame to the subdivision area data frame
   vect_subdiv_extr_i2 <<-
     left_join(vect_subdiv_extr_i2, df_subdiv_area_i2, by = 'ID') 
   
-  vect_subdiv_extr_i2 <<-
-    mutate(vect_subdiv_extr_i2, area_pc = (n/ha)*100) 
+  # vect_subdiv_extr_i2 <<- vect_subdiv_extr_i2 %>%
+  #    select(ID, ha, any_of(FAO)) %>% mutate(across(any_of(FAO), ~ (.x / ha) * 100)) 
+  
+  vect_subdiv_extr_i2 <<- vect_subdiv_extr_i2 %>% mutate(across(any_of(FAO), ~ (.x / ha) * 100)) #this includes all columns from vect_subdiv_extr_i1 A Farrow 22/05/2024
+  
+    # save as geojson and csv files
+  output_vect(vect_subdiv_extr_i2, paste0(subdiv_criteria_name_i2, "_FAO_pc_", params$INN2)) # save as a geojson file
+  output_csv(as_tibble(vect_subdiv_extr_i2), paste0(subdiv_criteria_name_i2, "_FAO_pc_", params$INN2)) # save as a csv file
   
   # loop through each existing class type 
   for (class_type in unique(vect_subdiv_extr_i2$FAO)) {
@@ -7333,7 +7556,7 @@ for (i in 1:length(list_rast_clas_FAO_cat))   {
     
     # Filter the joined data for the current limitation
     filtered_data_i2 <-
-      vect_subdiv_extr_i2[vect_subdiv_extr_i2$FAO == class_type,]
+      vect_subdiv_extr_i2 %>% select(any_of(class_type))
     #print(filtered_data)
     if (nrow(filtered_data_i2) == 0) {next} 
 
@@ -7342,7 +7565,7 @@ for (i in 1:length(list_rast_clas_FAO_cat))   {
     filtered_data_global_i2 <<- filtered_data_i2
       
     subdiv_plot_i2 <- ggplot() +
-      geom_spatvector(data = filtered_data_i2, aes(group = params$SUBDIV2, fill = area_pc)) +
+      geom_spatvector(data = filtered_data_i2, aes(group = params$SUBDIV2, fill = eval(parse(text = FAO[j_i2])))) +
       labs(
         title = paste(subdiv_criteria_name_i2, "\nClass = ", class_type),
         fill = "Area (%)"
@@ -7424,22 +7647,35 @@ for (i in 1:length(list_rast_limits_max_FAO))   {
     group_by(ID) %>%
     count(FAO_limit, wt = (area * weight), .drop = FALSE)
   
+  # get the names of the FAO limitations
+  FAO_limits <- as.vector(unique(df_extr_summary_i2$FAO_limit))
+    FAO_limits <- FAO_limits[!is.na(FAO_limits)]
+    
+  # pivot wider to give a column for each limit
+  df_extr_summary_i2_pivot <- df_extr_summary_i2 %>% pivot_wider(names_from = FAO_limit, values_from = n)
+  
   # join the summary data frame to the original subdivision data spatvector
   vect_subdiv_extr_i2 <<-
-    left_join(vect_subdiv_i2, df_extr_summary_i2, by = 'ID')
+    left_join(vect_subdiv_i2, df_extr_summary_i2_pivot, by = 'ID')
   
   # join the summary data frame to the subdivision area data frame
   vect_subdiv_extr_i2 <<-
     left_join(vect_subdiv_extr_i2, df_subdiv_area_i2, by = 'ID')
   
-  vect_subdiv_extr_i2 <<-
-    mutate(vect_subdiv_extr_i2, area_pc = (n / ha) * 100)  
+  # vect_subdiv_extr_i2 <<- vect_subdiv_extr_i2 %>%
+  #    select(ID, ha, any_of(FAO_limits)) %>% mutate(across(any_of(FAO_limits), ~ (.x / ha) * 100))
+  
+  vect_subdiv_extr_i2 <<- vect_subdiv_extr_i2 %>% mutate(across(any_of(FAO_limits), ~ (.x / ha) * 100)) #this includes all columns from vect_subdiv_extr_i1 A Farrow 22/05/2024
+  
+  # save as geojson and csv files
+  output_vect(vect_subdiv_extr_i2, paste0(subdiv_criteria_name_i2, "_FAO_limits_pc_", params$INN2)) # save as a geojson file
+  output_csv(as_tibble(vect_subdiv_extr_i2), paste0(subdiv_criteria_name_i2, "_FAO_limits_pc_", params$INN2)) # save as a csv file 
   
   # loop through each existing limitation type 
-  for (limitation_type_i2 in unique(vect_subdiv_extr_i2$FAO_limit)) {
+  for (limitation_type_i2 in FAO_limits) {
     
     # Get the current iteration number
-    j_i2 <- match(limitation_type_i2, unique(vect_subdiv_extr_i2$FAO_limit))
+    j_i2 <- match(limitation_type_i2, FAO_limits)
 
     # get the palette using the iteration number
     colour_index_i2 <- j_i2
@@ -7450,13 +7686,13 @@ for (i in 1:length(list_rast_limits_max_FAO))   {
     
     # Filter the joined data for the current limitation
     filtered_data_i2 <-
-      vect_subdiv_extr_i2[vect_subdiv_extr_i2$FAO_limit == limitation_type_i2,]
+      vect_subdiv_extr_i2 %>% select(any_of(limitation_type_i2))
     #print(filtered_data)
     if (nrow(filtered_data_i2) == 0) {next} 
     
     # Create a ggplot for count value per subdivision for the current limitation type using the palette from above
     subdiv_plot_i2 <- ggplot() +
-      geom_spatvector(data = filtered_data_i2, aes(group = params$SUBDIV2, fill = area_pc)) +
+      geom_spatvector(data = filtered_data_i2, aes(group = params$SUBDIV2, fill = eval(parse(text = FAO_limits[j_i2])))) +
       labs(
         title = paste(subdiv_criteria_name_i2, "\nLimit = ", limitation_type_i2),
         fill = "Area (%)"
@@ -7519,6 +7755,51 @@ names(rast_yieldpc_i2) <- c('yieldpc')
 
 # export
 output_geotiff(rast_yieldpc_i2, paste0("yieldpc_", params$INN2))
+
+# get the cellsize for each raster
+rast_yield_pc_cellsize_i2 <- cellSize(rast_yieldpc_i2, unit = "ha")
+
+# extract the yield raster to a data frame using the subdivisions
+df_extr_i2 <-
+  terra::extract(
+    rast_yieldpc_i2,
+    vect_subdiv_i2,
+    na.rm = TRUE,
+    ID = T,
+    weights = T
+  )
+
+# extract the raster cellsize to a data frame using the subdivisions
+df_extr_cellsize_i2 <-
+  terra::extract(
+    rast_yield_pc_cellsize_i2,
+    vect_subdiv_i2,
+    na.rm = TRUE,
+    ID = T,
+    weights = T
+  )
+
+df_extr_i2 <- mutate(df_extr_i2, df_extr_cellsize_i2)
+
+# summarise the yield for each subdivision raster ID
+df_extr_summary_i2 <- df_extr_i2 %>%
+  group_by(ID) %>%
+  summarise(yieldpc = weighted.mean(yieldpc, (area * weight), na.rm = TRUE))
+
+
+# join the summary data frame to the original subdivision data spatvector
+vect_subdiv_extr_i2 <<-
+  left_join(vect_subdiv_i2, df_extr_summary_i2, by = 'ID')
+
+# join the summary data frame to the subdivision area data frame
+vect_subdiv_extr_i2 <<-
+  left_join(vect_subdiv_extr_i2, df_subdiv_area_i2, by = 'ID')
+
+# save as geojson and csv files
+output_vect(vect_subdiv_extr_i2, paste0("yieldpc_", params$INN2)) # save as a geojson file
+output_csv(as_tibble(vect_subdiv_extr_i2),
+           paste0("yieldpc_", params$INN2)) # save as a csv file
+
 
 #  dy <- rast_yield %>%
 #    as.data.frame(xy = TRUE) %>%
@@ -7601,6 +7882,50 @@ if (summarise(df_irm_i2, Average = mean(yield, na.rm = T)) > 0) {
 # export
 output_geotiff(rast_yield_i2, paste0("yield_", params$INN2))
 
+  
+  # get the cellsize for each raster
+  rast_yield_cellsize_i2 <- cellSize(rast_yield_i2, unit = "ha")
+  
+  # extract the yield raster to a data frame using the subdivisions
+  df_extr_i2 <-
+    terra::extract(
+      rast_yield_i2,
+      vect_subdiv_i2,
+      na.rm = TRUE,
+      ID = T,
+      weights = T
+    )
+  
+  # extract the raster cellsize to a data frame using the subdivisions
+  df_extr_cellsize_i2 <-
+    terra::extract(
+      rast_yield_cellsize_i2,
+      vect_subdiv_i2,
+      na.rm = TRUE,
+      ID = T,
+      weights = T
+    )
+  
+  df_extr_i2 <- mutate(df_extr_i2, df_extr_cellsize_i2)
+  
+  # summarise the yield for each subdivision raster ID
+  df_extr_summary_i2 <- df_extr_i2 %>%
+    group_by(ID) %>%
+    summarise(yield = weighted.mean(yield, (area * weight), na.rm = TRUE))
+  
+  # join the summary data frame to the original subdivision data spatvector
+  vect_subdiv_extr_i2 <<-
+    left_join(vect_subdiv_i2, df_extr_summary_i2, by = 'ID')
+  
+  # join the summary data frame to the subdivision area data frame
+  vect_subdiv_extr_i2 <<-
+    left_join(vect_subdiv_extr_i2, df_subdiv_area_i2, by = 'ID')
+  
+  # save as geojson and csv files
+  output_vect(vect_subdiv_extr_i2, paste0("yield_", params$INN2)) # save as a geojson file
+  output_csv(as_tibble(vect_subdiv_extr_i2),
+             paste0("yield_", params$INN2)) # save as a csv file 
+  
 #dyd <- dByd %>%
 #  as.data.frame(xy = TRUE) %>%
 #  na.omit
@@ -7650,7 +7975,7 @@ The IRM script converts yield proportion to production using the yield values fo
 
 #yield_tab %>% kable(digits = 3) %>% kable_styling("striped", full_width = T)  %>%  scroll_box(height = "150px")
 
-df_irm_i2$production <- df_irm_i2$yieldpc *  Stat_factor_ha_i2
+df_irm_i2$production <- df_irm_i2$yield *  Stat_factor_ha_i2
 
 if (summarise(df_irm_i2, Average = mean(production, na.rm = T)) > 0) {
   vect_production_i2 <-
@@ -7662,6 +7987,50 @@ if (summarise(df_irm_i2, Average = mean(production, na.rm = T)) > 0) {
   
   # export
   output_geotiff(rast_production_i2, paste0("production_", params$INN2))
+  
+
+  # get the cellsize for each raster
+  rast_production_cellsize_i2 <- cellSize(rast_production_i2, unit = "ha")
+  
+  # extract the production raster to a data frame using the subdivisions
+  df_extr_i2 <-
+    terra::extract(
+      rast_production_i2,
+      vect_subdiv_i2,
+      na.rm = TRUE,
+      ID = T,
+      weights = T
+    )
+  
+  # extract the raster cellsize to a data frame using the subdivisions
+  df_extr_cellsize_i2 <-
+    terra::extract(
+      rast_production_cellsize_i2,
+      vect_subdiv_i2,
+      na.rm = TRUE,
+      ID = T,
+      weights = T
+    )
+  
+  df_extr_i2 <- mutate(df_extr_i2, df_extr_cellsize_i2)
+  
+  # summarise the production for each subdivision raster ID
+  df_extr_summary_i2 <- df_extr_i2 %>%
+    group_by(ID) %>%
+    summarise(production = sum(production * weight, na.rm = TRUE))
+  
+  # join the summary data frame to the original subdivision data spatvector
+  vect_subdiv_extr_i2 <<-
+    left_join(vect_subdiv_i2, df_extr_summary_i2, by = 'ID')
+  
+  # join the summary data frame to the subdivision area data frame
+  vect_subdiv_extr_i2 <<-
+    left_join(vect_subdiv_extr_i2, df_subdiv_area_i2, by = 'ID')
+  
+  # save as geojson and csv files
+  output_vect(vect_subdiv_extr_i2, paste0("production_", params$INN2)) # save as a geojson file
+  output_csv(as_tibble(vect_subdiv_extr_i2),
+             paste0("production_", params$INN2)) # save as a csv file   
   
   #  dp <- dBp %>%
   #    as.data.frame(xy = TRUE) %>%
@@ -7830,7 +8199,7 @@ for (j in 1:length(rb_i12)) {
   rast_filename_rb_i12_whichmax <- 
     as.character(paste(
       "spatial_data/output/FAO_",
-      rb_i12[j], params$INN1, "_", params$INN2,
+      rb_i12[j], "_", params$INN1, "_", params$INN2,
       "_whichmax_optimal.tif",
       sep = ""
     ))
@@ -7838,7 +8207,76 @@ for (j in 1:length(rb_i12)) {
   
   writeRaster(get(paste0("rast_FAO_", rb_i12[j], "_whichmax")), here(rast_filename_rb_i12_whichmax), overwrite = TRUE)
   
+  # classify values and export
+  ## from-to-becomes
+  # classify the optimal values into five groups
+  # all values >= 0 and <= 0.25 become N2, etc.
+  v_clas_fao <- c(-Inf, 0.25, 5, 0.25, 0.4, 4, 0.4, 0.6, 3, 0.6, 0.85, 2, 0.85, Inf, 1)
+  m_clas_fao <- matrix(v_clas_fao, ncol = 3, byrow = TRUE)
   
+  assign(
+    paste0("rast_FAO_", rb_i12[j], "_bin"),
+    classify(get(paste0(
+      "rast_FAO_", rb_i12[j], "_max"
+    )), m_clas_fao, include.lowest = TRUE))
+    
+    assign(paste0("rast_FAO_", rb_i12[j], "_cat"), get(paste0(
+      "rast_FAO_", rb_i12[j], "_bin"
+    )))
+    
+    df_clas_fao <-
+      data.frame(id = 1:5, FAO = c("S1", "S2", "S3", "N1", "N2"))
+    
+    expr_levels <-
+      parse(text = paste0("levels(rast_FAO_", rb_i12[j], "_cat) <- df_clas_fao"))
+    
+    #print(expr_levels)
+    eval(expr_levels)
+    
+    # plot the raster
+    
+    print(paste0("rast_FAO_", rb_i12[j], "_whichmax"))
+    plot(get(paste0("rast_FAO_", rb_i12[j], "_whichmax")), main = paste0("_whichmax ", rb_i12[j]))
+    
+    
+    assign(
+      paste0("rast_FAO_", rb_i12[j], "_brick"),
+      rast(list(get(
+        paste0("rast_FAO_", rb_i12[j], "_max")
+      ), get(
+        paste0("rast_FAO_", rb_i12[j], "_bin")
+      ), get(
+        paste0("rast_FAO_", rb_i12[j], "_cat")
+      ))))
+      
+      names_brick <- c('optimal', 'bin', 'FAO')
+      
+      expr_names <-
+        parse(text = paste0("names(rast_FAO_", rb_i12[j], "_brick) <- names_brick"))
+      
+      eval(expr_names)
+      
+      rast_filename_rb_i12_brick <-
+        as.character(
+          paste(
+            "spatial_data/output/FAO_",
+            rb_i12[j],
+            "_",
+            params$INN1,
+            "_",
+            params$INN2,
+            "_brick.tif",
+            sep = ""
+          )
+        )
+      print(rast_filename_rb_i12_brick)
+      
+      writeRaster(get(paste0(
+        "rast_FAO_", rb_i12[j], "_brick"
+      )), here(rast_filename_rb_i12_brick), overwrite = TRUE
+      )
+  
+    
   # get the limitations rasters
   # get the output rasters for innovation 1
   
@@ -8002,7 +8440,7 @@ for (j in 1:length(rb_i12)) {
     rast_filename_rb_i12_FAO_limits_whichmax <-
       as.character(paste(
         "spatial_data/output/FAO_limits_",
-        rb_i12[j], params$INN1, "_", params$INN2,
+        rb_i12[j], "_", params$INN1, "_", params$INN2,
         "_whichmax.tif",
         sep = ""
       ))
@@ -8017,87 +8455,1032 @@ for (j in 1:length(rb_i12)) {
 ```
 
 
-## Yield comparison
+###Sub-division statistics
+
+This section gets the statistics for each sub-division, taking into account the dynamically created limitations for adoption, suitability and feasibility.
+
+
+The existing function expects arguments showing:
+
+1) the number of maps to produce - one per class (of whatever output)
+2) a vector of the variables (classes) that need to be mapped (1 and 2 are linked and 1 is not really necessary)
+3) a palette of colours with the same number of colours as classes - these are 
+
+The palettes in the current IRM do not match with the any of the colours used in the classified maps.
+Instead they are just a distinct colour.
+
+The variables and colour palette names are currently hard coded. The names of the palettes are from the ggplot2 package but derive from colorbrewer, all palettes are sequential. There are 18 named sequential palettes, they can be referenced by name or as an index from the list.
+
+The index works as long as the values do not exceed 18, so need to wrap.
+
+### Area
+
+#### FAO Classes
+
+```{r compare_subdiv_area_FAO, results = 'asis', out.width="100%"}
+
+# create a list of valid names of colorbrewer palettes for sequential data
+palettes_i12 <-
+  c("Blues",
+    "YlGn",
+    "Greys",
+    "Oranges",
+    "YlOrRd"
+  )
+
+
+# loop through the comparison FAO class rasters created above
+for (i in length(rb_i12):1)   {
+  # get the name of the criteria from the raster name - this is used in the plotting
+  subdiv_criteria_name_i12 <- rb_i12[i]
+
+  cat("\n\n\n")
+  cat("###", subdiv_criteria_name_i12, "\n") # add headings
+  cat("\n\n\n")
+  
+  rast_filename_rb_i12_max <-
+    as.character(
+      paste(
+        "spatial_data/output/FAO_",
+        rb_i12[i],
+        "_",
+        params$INN1,
+        "_",
+        params$INN2,
+        "_brick.tif",
+        sep = ""
+      )
+    )
+  print(rast_filename_rb_i12_max)
+  
+  # get the raster for which statistics are derived for each limitation
+  rast_to_plot_i12 <- rast(here(rast_filename_rb_i12_max), lyrs = 3)
+  
+  # get the cellsize for each raster
+  rast_to_plot_cellsize_i12 <- cellSize(rast_to_plot_i12, unit = "ha")
+  
+  # extract the raster class to a data frame using the subdivisions
+  df_extr_i12 <-
+    terra::extract(rast_to_plot_i12, vect_subdiv_i1, na.rm = TRUE, ID = T, weights = T)
+  
+    # extract the raster cellsize to a data frame using the subdivisions
+  df_extr_cellsize_i12 <-
+    terra::extract(rast_to_plot_cellsize_i12, vect_subdiv_i1, na.rm = TRUE, ID = T, weights = T)
+  
+  df_extr_i12 <- mutate(df_extr_i12, df_extr_cellsize_i12)
+  
+   # summarise the class for each subdivision raster ID
+  df_extr_summary_i12 <- df_extr_i12 %>%
+    group_by(ID) %>%
+    count(FAO, wt = (area * weight), .drop = FALSE)
+  
+  # get the names of the FAO limitations
+  FAO <- as.vector(unique(df_extr_summary_i12$FAO))
+  FAO <- FAO[!is.na(FAO)]
+    
+  df_extr_summary_i12_pivot <- df_extr_summary_i12 %>% pivot_wider(names_from = FAO, values_from = n)
+  
+  # join the summary data frame to the original subdivision data spatvector
+  vect_subdiv_extr_i12 <<-
+    left_join(vect_subdiv_i1, df_extr_summary_i12_pivot, by = 'ID')
+  
+  # save as geojson and csv files
+  output_vect(
+    vect_subdiv_extr_i12,
+    paste0(
+      subdiv_criteria_name_i12,
+      "_FAO_area_",
+      params$INN1,
+      "_",
+      params$INN2
+    )
+  ) # save as a geojson file
+  output_csv(
+    as_tibble(vect_subdiv_extr_i12),
+    paste0(
+      subdiv_criteria_name_i12,
+      "_FAO_area_",
+      params$INN1,
+      "_",
+      params$INN2
+    )
+  ) # save as a csv file 
+  
+    # loop through each existing class type 
+  for (class_type in FAO) {
+    
+    # Get the current iteration number
+    j_i12 <- match(class_type, FAO)
+
+    # get the palette using the iteration number
+    colour_index_i12 <- j_i12
+    colour_index_mod_i12 <- (colour_index_i12 %% 18)
+    colour_index_mod_i12 <-
+      ifelse(colour_index_mod_i12 == 0, 18, colour_index_mod_i12)
+    result_i12 <- palettes_i12[colour_index_mod_i12]
+    
+    # Filter the joined data for the current limitation
+    filtered_data_i12 <-
+      vect_subdiv_extr_i12 %>% select(any_of(class_type))
+    #print(filtered_data)
+    
+    if (nrow(filtered_data_i12) == 0) {next} 
+
+  
+    # Create a ggplot for count value per subdivision for the current class type using the palette from above
+    subdiv_plot_i12 <- ggplot() +
+      geom_spatvector(data = filtered_data_i12, aes(group = params$SUBDIV1, fill = eval(parse(text = FAO[j_i12])))) +
+      labs(
+        title = paste(subdiv_criteria_name_i12, "\nClass = ", class_type),
+        fill = "Area (ha)"
+      ) +
+      scale_fill_distiller(
+        type = "seq",
+        palette = result_i12,
+        direction = 1,
+        limits = c(0, max_area_i1),
+        guide = "legend", labels = comma
+      ) 
+    
+    print(subdiv_plot_i12)
+  }
+}  
+
+
+```
+
+#### FAO Limitations
+
+
+NEW VERSION
+```{r compare_subdiv_area_FAOlimits, results = 'asis', out.width="100%"}
+
+# create a list of valid names of colorbrewer palettes for sequential data
+palettes_i12 <-
+  c(
+    "Blues",
+    "BuGn",
+    "BuPu",
+    "GnBu",
+    "Greens",
+    "Greys",
+    "Oranges",
+    "OrRd",
+    "PuBu",
+    "PuBuGn",
+    "PuRd",
+    "Purples",
+    "RdPu",
+    "Reds",
+    "YlGn",
+    "YlGnBu",
+    "YlOrBr",
+    "YlOrRd"
+  )
+
+
+# loop through the comparison FAO limitation rasters created above
+for (i in length(rb_i12):1)   {
+  # get the name of the criteria from the raster name - this is used in the plotting
+  subdiv_criteria_name_i12 <- rb_i12[i]
+
+  cat("\n\n\n")
+  cat("###", subdiv_criteria_name_i12, "\n") # add headings
+  cat("\n\n\n")
+  
+  rast_filename_rb_i12_max_limits <-
+    as.character(
+      paste(
+        "spatial_data/output/FAO_limits_",
+        rb_i12[i],
+        "_",
+        params$INN1,
+        "_",
+        params$INN2,
+        "_whichmax.tif",
+        sep = ""
+      )
+    )
+  print(rast_filename_rb_i12_max_limits)
+  # get the raster for which statistics are derived for each limitation
+  rast_to_plot_i12 <- rast(here(rast_filename_rb_i12_max_limits), lyrs = 1)
+  
+  # get the cellsize for each raster
+  rast_to_plot_cellsize_i12 <- cellSize(rast_to_plot_i12, unit = "ha")
+    
+  # extract the raster limitations to a data frame using the subdivisions
+  
+  df_extr_i12 <-
+    terra::extract(rast_to_plot_i12, vect_subdiv_i1, na.rm = TRUE, ID = T, weights = T)
+  
+    # extract the raster cellsize to a data frame using the subdivisions
+  df_extr_cellsize_i12 <-
+    terra::extract(rast_to_plot_cellsize_i12, vect_subdiv_i1, na.rm = TRUE, ID = T, weights = T)
+  
+  df_extr_i12 <- mutate(df_extr_i12, df_extr_cellsize_i12)
+  
+   # summarise the limitations for each subdivision raster ID
+  df_extr_summary_i12 <- df_extr_i12 %>%
+    group_by(ID) %>%
+    count(FAO_limit, wt = (area * weight), .drop = FALSE)
+
+# get the names of the FAO limitations
+  FAO_limits <- as.vector(unique(df_extr_summary_i12$FAO_limit))
+    FAO_limits <- FAO_limits[!is.na(FAO_limits)]
+  
+  # pivot wider to give a column for each limit
+  df_extr_summary_i12_pivot <- df_extr_summary_i12 %>% pivot_wider(names_from = FAO_limit, values_from = n)
+    
+  # join the summary data frame to the original subdivision data spatvector
+  vect_subdiv_extr_i12 <<-
+    left_join(vect_subdiv_i1, df_extr_summary_i12_pivot, by = 'ID')
+  
+  # join the summary data frame to the subdivision area data frame
+  vect_subdiv_extr_i12 <<-
+    left_join(vect_subdiv_extr_i12, df_subdiv_area_i1, by = 'ID')
+      
+  # save as geojson and csv files
+  output_vect(
+    vect_subdiv_extr_i12,
+    paste0(
+      subdiv_criteria_name_i12,
+      "_FAO_limits_area_",
+      params$INN1,
+      "_",
+      params$INN2
+    )
+  ) # save as a geojson file
+  output_csv(
+    as_tibble(vect_subdiv_extr_i12),
+    paste0(
+      subdiv_criteria_name_i12,
+      "_FAO_limits_area_",
+      params$INN1,
+      "_",
+      params$INN2
+    )
+  ) # save as a csv file 
+  
+  # loop through each existing limitation type 
+  for (limitation_type_i12 in FAO_limits) {
+    
+    # Get the current iteration number
+    j_i12 <- match(limitation_type_i12, FAO_limits)
+
+    # get the palette using the iteration number
+    colour_index_i12 <- j_i12
+    colour_index_mod_i12 <- (colour_index_i12 %% 18)
+    colour_index_mod_i12 <-
+      ifelse(colour_index_mod_i12 == 0, 18, colour_index_mod_i12)
+    result_i12 <- palettes_i12[colour_index_mod_i12]
+    
+    # Filter the joined data for the current limitation
+    filtered_data_i12 <-
+      vect_subdiv_extr_i12 %>% select(any_of(limitation_type_i12))
+    #print(filtered_data)
+    if (nrow(filtered_data_i12) == 0) {next} 
+    
+
+    
+    # Create a ggplot for count value per subdivision for the current limitation type using the palette from above
+    subdiv_plot_i12 <- ggplot() +
+      geom_spatvector(data = filtered_data_i12, aes(group = params$SUBDIV1, fill = eval(parse(text = FAO_limits[j_i12])))) +
+      labs(
+        title = paste(subdiv_criteria_name_i12, "\nLimit = ", limitation_type_i12),
+        fill = "Area (ha)"
+      ) +
+      scale_fill_distiller(
+        type = "seq",
+        palette = result_i12,
+        direction = 1,
+        limits = c(0, max_area_i1),
+        guide = "legend", labels = comma
+      ) 
+    
+    print(subdiv_plot_i12)
+  }
+}  
+
+```
+
+
+```{r , results = 'asis', out.width="100%"}
+# 
+# # create a list of valid names of colorbrewer palettes for sequential data
+# palettes_i12 <-
+#   c(
+#     "Blues",
+#     "BuGn",
+#     "BuPu",
+#     "GnBu",
+#     "Greens",
+#     "Greys",
+#     "Oranges",
+#     "OrRd",
+#     "PuBu",
+#     "PuBuGn",
+#     "PuRd",
+#     "Purples",
+#     "RdPu",
+#     "Reds",
+#     "YlGn",
+#     "YlGnBu",
+#     "YlOrBr",
+#     "YlOrRd"
+#   )
+# 
+# 
+# # loop through the limitation rasters created above
+# 
+# for (i in 1:length(list_rast_limits_max_FAO))   {
+#   # get the name of the criteria from the raster name - this is used in the plotting
+#   subdiv_criteria_name_i12 <- list_rast_limits_max_FAO[i]
+#   subdiv_criteria_name_i12 <-
+#     sub(paste0(".*", "FAO_"), "", subdiv_criteria_name_i12)
+#   
+#   cat("\n\n\n")
+#   cat("###", subdiv_criteria_name_i12, "\n") # add headings
+#   cat("\n\n\n")
+#   
+#   # get the raster for which statistics are derived for each limitation
+#   rast_to_plot_i12 <- get(paste0(list_rast_limits_max_FAO[i]))
+#   
+#   # get the cellsize for each raster
+#   rast_to_plot_cellsize_i12 <- cellSize(rast_to_plot_i12, unit = "ha")
+#   
+#   
+#   # extract the raster limitations to a data frame using the subdivisions
+#   df_extr_i12 <-
+#     terra::extract(rast_to_plot_i12, vect_subdiv_i1, na.rm = TRUE, ID = T, weights = T)
+#   
+#     # extract the raster cellsize to a data frame using the subdivisions
+#   df_extr_cellsize_i12 <-
+#     terra::extract(rast_to_plot_cellsize_i12, vect_subdiv_i1, na.rm = TRUE, ID = T, weights = T)
+#   
+#   df_extr_i12 <- mutate(df_extr_i12, df_extr_cellsize_i12)
+#   
+#    # summarise the limitations for each subdivision raster ID
+#   df_extr_summary_i12 <- df_extr_i12 %>%
+#     group_by(ID) %>%
+#     count(FAO_limit, wt = (area * weight), .drop = FALSE)
+# 
+# # get the names of the FAO limitations
+#   FAO_limits <- as.vector(unique(df_extr_summary_i12$FAO_limit))
+#     FAO_limits <- FAO_limits[!is.na(FAO_limits)]
+#   
+#   # pivot wider to give a column for each limit
+#   df_extr_summary_i12_pivot <- df_extr_summary_i12 %>% pivot_wider(names_from = FAO_limit, values_from = n)
+#     
+#   # join the summary data frame to the original subdivision data spatvector
+#   vect_subdiv_extr_i12 <<-
+#     left_join(vect_subdiv_i1, df_extr_summary_i12_pivot, by = 'ID')
+#   
+#   # join the summary data frame to the subdivision area data frame
+#   vect_subdiv_extr_i12 <<-
+#     left_join(vect_subdiv_extr_i12, df_subdiv_area_i1, by = 'ID')
+#       
+#   # save as geojson and csv files
+#   output_vect(
+#     vect_subdiv_extr_i12,
+#     paste0(
+#       subdiv_criteria_name_i12,
+#       "_FAO_limits_area_",
+#       params$INN1,
+#       "_",
+#       params$INN2
+#     )
+#   ) # save as a geojson file
+#   output_csv(
+#     as_tibble(vect_subdiv_extr_i12),
+#     paste0(
+#       subdiv_criteria_name_i12,
+#       "_FAO_limits_area_",
+#       params$INN1,
+#       "_",
+#       params$INN2
+#     )
+#   ) # save as a csv file 
+#   
+#   # loop through each existing limitation type 
+#   for (limitation_type_i12 in FAO_limits) {
+#     
+#     # Get the current iteration number
+#     j_i12 <- match(limitation_type_i12, FAO_limits)
+# 
+#     # get the palette using the iteration number
+#     colour_index_i12 <- j_i12
+#     colour_index_mod_i12 <- (colour_index_i12 %% 18)
+#     colour_index_mod_i12 <-
+#       ifelse(colour_index_mod_i12 == 0, 18, colour_index_mod_i12)
+#     result_i12 <- palettes_i2[colour_index_mod_i12]
+#     
+#     # Filter the joined data for the current limitation
+#     filtered_data_i12 <-
+#       vect_subdiv_extr_i12 %>% select(any_of(limitation_type_i12))
+#     #print(filtered_data)
+#     if (nrow(filtered_data_i12) == 0) {next} 
+#     
+# 
+#     
+#     # Create a ggplot for count value per subdivision for the current limitation type using the palette from above
+#     subdiv_plot_i12 <- ggplot() +
+#       geom_spatvector(data = filtered_data_i12, aes(group = params$SUBDIV1, fill = eval(parse(text = FAO_limits[j_i12])))) +
+#       labs(
+#         title = paste(subdiv_criteria_name_i12, "\nLimit = ", limitation_type_i12),
+#         fill = "Area (ha)"
+#       ) +
+#       scale_fill_distiller(
+#         type = "seq",
+#         palette = result_i12,
+#         direction = 1,
+#         limits = c(0, max_area_i1),
+#         guide = "legend", labels = comma
+#       ) 
+#     
+#     print(subdiv_plot_i12)
+#   }
+# }  
+# 
+
+```
+
+### Percentage
+
+#### FAO Classes
+
+```{r compare_subdiv_pc_FAO, results = 'asis', out.width="100%"}
+
+# create a list of valid names of colorbrewer palettes for sequential data
+palettes_i12 <-
+  c("Blues",
+    "YlGn",
+    "Greys",
+    "Oranges",
+    "YlOrRd"
+  )
+
+
+# loop through the comparison FAO class rasters created above
+for (i in length(rb_i12):1)   {
+  # get the name of the criteria from the raster name - this is used in the plotting
+  subdiv_criteria_name_i12 <- rb_i12[i]
+  
+  cat("\n\n\n")
+  cat("###", subdiv_criteria_name_i12, "\n") # add headings
+  cat("\n\n\n")
+  
+  rast_filename_rb_i12_max <-
+    as.character(
+      paste(
+        "spatial_data/output/FAO_",
+        rb_i12[i],
+        "_",
+        params$INN1,
+        "_",
+        params$INN2,
+        "_brick.tif",
+        sep = ""
+      )
+    )
+  print(rast_filename_rb_i12_max)
+  
+  # get the raster for which statistics are derived for each limitation
+  rast_to_plot_i12 <- rast(here(rast_filename_rb_i12_max), lyrs = 3)
+  
+  # get the cellsize for each raster
+  rast_to_plot_cellsize_i12 <- cellSize(rast_to_plot_i12, unit = "ha")
+  
+  # extract the raster class to a data frame using the subdivisions
+  df_extr_i12 <-
+    terra::extract(rast_to_plot_i12, vect_subdiv_i1, na.rm = TRUE, ID = T, weights = T)
+  
+    # extract the raster cellsize to a data frame using the subdivisions
+  df_extr_cellsize_i12 <-
+    terra::extract(rast_to_plot_cellsize_i12, vect_subdiv_i1, na.rm = TRUE, ID = T, weights = T)
+  
+  df_extr_i12 <- mutate(df_extr_i12, df_extr_cellsize_i12)
+  
+   # summarise the class for each subdivision raster ID
+  df_extr_summary_i12 <- df_extr_i12 %>%
+    group_by(ID) %>%
+    count(FAO, wt = (area * weight), .drop = FALSE)
+  
+  # get the names of the FAO limitations
+  FAO <- as.vector(unique(df_extr_summary_i12$FAO))
+  FAO <- FAO[!is.na(FAO)]
+  
+  df_extr_summary_i12_pivot <- df_extr_summary_i12 %>% pivot_wider(names_from = FAO, values_from = n)
+  
+  # join the summary data frame to the original subdivision data spatvector
+  vect_subdiv_extr_i12 <<-
+    left_join(vect_subdiv_i1, df_extr_summary_i12_pivot, by = 'ID')
+  
+   # join the summary data frame to the subdivision area data frame
+  vect_subdiv_extr_i12 <<-
+    left_join(vect_subdiv_extr_i12, df_subdiv_area_i2, by = 'ID') 
+  
+  # vect_subdiv_extr_i12 <<- vect_subdiv_extr_i12 %>%
+  #    select(ID, ha, any_of(FAO)) %>% mutate(across(any_of(FAO), ~ (.x / ha) * 100)) 
+ 
+  vect_subdiv_extr_i12 <<- vect_subdiv_extr_i12 %>% mutate(across(any_of(FAO), ~ (.x / ha) * 100)) #this includes all columns from vect_subdiv_extr_i1 A Farrow 22/05/2024
+  
+# save as geojson and csv files
+  output_vect(
+    vect_subdiv_extr_i12,
+    paste0(
+      subdiv_criteria_name_i12,
+      "_FAO_pc_",
+      params$INN1,
+      "_",
+      params$INN2
+    )
+  ) # save as a geojson file
+  output_csv(
+    as_tibble(vect_subdiv_extr_i12),
+    paste0(
+      subdiv_criteria_name_i12,
+      "_FAO_pc_",
+      params$INN1,
+      "_",
+      params$INN2
+    )
+  ) # save as a csv file 
+  
+    # loop through each existing class type 
+  for (class_type in FAO) {
+    
+    # Get the current iteration number
+    j_i12 <- match(class_type, FAO)
+
+    # get the palette using the iteration number
+    colour_index_i12 <- j_i12
+    colour_index_mod_i12 <- (colour_index_i12 %% 18)
+    colour_index_mod_i12 <-
+      ifelse(colour_index_mod_i12 == 0, 18, colour_index_mod_i12)
+    result_i12 <- palettes_i12[colour_index_mod_i12]
+    
+    # Filter the joined data for the current limitation
+    filtered_data_i12 <-
+      vect_subdiv_extr_i12 %>% select(any_of(class_type))
+    #print(filtered_data)
+    
+    if (nrow(filtered_data_i12) == 0) {next} 
+
+  
+    # Create a ggplot for count value per subdivision for the current class type using the palette from above
+    subdiv_plot_i12 <- ggplot() +
+      geom_spatvector(data = filtered_data_i12, aes(group = params$SUBDIV1, fill = eval(parse(text = FAO[j_i12])))) +
+      labs(
+        title = paste(subdiv_criteria_name_i12, "\nClass = ", class_type),
+        fill = "Area (%)"
+      ) +
+      scale_fill_distiller(
+        type = "seq",
+        palette = result_i12,
+        direction = 1,
+        limits = c(0, 101),
+        guide = "legend", labels = comma
+      ) 
+    
+    print(subdiv_plot_i12)
+  }
+}  
+
+
+```
+
+#### FAO Limitations
+
+
+```{r compare_subdiv_pc_FAOlimits, results = 'asis', out.width="100%"}
+
+# create a list of valid names of colorbrewer palettes for sequential data
+palettes_i12 <-
+  c(
+    "Blues",
+    "BuGn",
+    "BuPu",
+    "GnBu",
+    "Greens",
+    "Greys",
+    "Oranges",
+    "OrRd",
+    "PuBu",
+    "PuBuGn",
+    "PuRd",
+    "Purples",
+    "RdPu",
+    "Reds",
+    "YlGn",
+    "YlGnBu",
+    "YlOrBr",
+    "YlOrRd"
+  )
+
+
+# loop through the comparison FAO limitation rasters created above
+for (i in length(rb_i12):1)   {
+  # get the name of the criteria from the raster name - this is used in the plotting
+  subdiv_criteria_name_i12 <- rb_i12[i]
+
+  cat("\n\n\n")
+  cat("###", subdiv_criteria_name_i12, "\n") # add headings
+  cat("\n\n\n")
+  
+  rast_filename_rb_i12_max_limits <-
+    as.character(
+      paste(
+        "spatial_data/output/FAO_limits_",
+        rb_i12[i],
+        "_",
+        params$INN1,
+        "_",
+        params$INN2,
+        "_whichmax.tif",
+        sep = ""
+      )
+    )
+  print(rast_filename_rb_i12_max_limits)
+  # get the raster for which statistics are derived for each limitation
+  rast_to_plot_i12 <- rast(here(rast_filename_rb_i12_max_limits), lyrs = 1)
+  
+  # get the cellsize for each raster
+  rast_to_plot_cellsize_i12 <- cellSize(rast_to_plot_i12, unit = "ha")
+    
+  # extract the raster limitations to a data frame using the subdivisions
+  
+  df_extr_i12 <-
+    terra::extract(rast_to_plot_i12, vect_subdiv_i1, na.rm = TRUE, ID = T, weights = T)
+  
+    # extract the raster cellsize to a data frame using the subdivisions
+  df_extr_cellsize_i12 <-
+    terra::extract(rast_to_plot_cellsize_i12, vect_subdiv_i1, na.rm = TRUE, ID = T, weights = T)
+  
+  df_extr_i12 <- mutate(df_extr_i12, df_extr_cellsize_i12)
+  
+   # summarise the limitations for each subdivision raster ID
+  df_extr_summary_i12 <- df_extr_i12 %>%
+    group_by(ID) %>%
+    count(FAO_limit, wt = (area * weight), .drop = FALSE)
+
+# get the names of the FAO limitations
+  FAO_limits <- as.vector(unique(df_extr_summary_i12$FAO_limit))
+    FAO_limits <- FAO_limits[!is.na(FAO_limits)]
+  
+  # pivot wider to give a column for each limit
+  df_extr_summary_i12_pivot <- df_extr_summary_i12 %>% pivot_wider(names_from = FAO_limit, values_from = n)
+    
+  # join the summary data frame to the original subdivision data spatvector
+  vect_subdiv_extr_i12 <<-
+    left_join(vect_subdiv_i1, df_extr_summary_i12_pivot, by = 'ID')
+  
+  # join the summary data frame to the subdivision area data frame
+  vect_subdiv_extr_i12 <<-
+    left_join(vect_subdiv_extr_i12, df_subdiv_area_i1, by = 'ID')
+  
+  # vect_subdiv_extr_i12 <<- vect_subdiv_extr_i12 %>%
+  #    select(ID, ha, any_of(FAO_limits)) %>% mutate(across(any_of(FAO_limits), ~ (.x / ha) * 100))
+  
+  vect_subdiv_extr_i12 <<- vect_subdiv_extr_i12 %>% mutate(across(any_of(FAO_limits), ~ (.x / ha) * 100)) #this includes all columns from vect_subdiv_extr_i1 A Farrow 22/05/2024
+  
+  # save as geojson and csv files
+  output_vect(
+    vect_subdiv_extr_i12,
+    paste0(
+      subdiv_criteria_name_i12,
+      "_FAO_limits_pc_",
+      params$INN1,
+      "_",
+      params$INN2
+    )
+  ) # save as a geojson file
+  output_csv(
+    as_tibble(vect_subdiv_extr_i12),
+    paste0(
+      subdiv_criteria_name_i12,
+      "_FAO_limits_pc_",
+      params$INN1,
+      "_",
+      params$INN2
+    )
+  ) # save as a csv file 
+  
+  # loop through each existing limitation type 
+  for (limitation_type_i12 in FAO_limits) {
+    
+    # Get the current iteration number
+    j_i12 <- match(limitation_type_i12, FAO_limits)
+
+    # get the palette using the iteration number
+    colour_index_i12 <- j_i12
+    colour_index_mod_i12 <- (colour_index_i12 %% 18)
+    colour_index_mod_i12 <-
+      ifelse(colour_index_mod_i12 == 0, 18, colour_index_mod_i12)
+    result_i12 <- palettes_i12[colour_index_mod_i12]
+    
+    # Filter the joined data for the current limitation
+    filtered_data_i12 <-
+      vect_subdiv_extr_i12 %>% select(any_of(limitation_type_i12))
+    #print(filtered_data)
+    if (nrow(filtered_data_i12) == 0) {next} 
+    
+    # Create a ggplot for count value per subdivision for the current limitation type using the palette from above
+    subdiv_plot_i12 <- ggplot() +
+      geom_spatvector(data = filtered_data_i12, aes(group = params$SUBDIV1, fill = eval(parse(text = FAO_limits[j_i12])))) +
+      labs(
+        title = paste(subdiv_criteria_name_i12, "\nLimit = ", limitation_type_i12),
+        fill = "Area (%)"
+      ) +
+      scale_fill_distiller(
+        type = "seq",
+        palette = result_i12,
+        direction = 1,
+        limits = c(0, 101),
+        guide = "legend", labels = comma
+      ) 
+    
+    print(subdiv_plot_i12)
+  }
+}  
+
+```
+
+```{r , results = 'asis', out.width="100%"}
+# 
+# # create a list of valid names of colorbrewer palettes for sequential data
+# palettes_i12 <-
+#   c(
+#     "Blues",
+#     "BuGn",
+#     "BuPu",
+#     "GnBu",
+#     "Greens",
+#     "Greys",
+#     "Oranges",
+#     "OrRd",
+#     "PuBu",
+#     "PuBuGn",
+#     "PuRd",
+#     "Purples",
+#     "RdPu",
+#     "Reds",
+#     "YlGn",
+#     "YlGnBu",
+#     "YlOrBr",
+#     "YlOrRd"
+#   )
+# 
+# 
+# # loop through the limitation rasters created above
+# 
+# for (i in 1:length(list_rast_limits_max_FAO))   {
+#   # get the name of the criteria from the raster name - this is used in the plotting
+#   subdiv_criteria_name_i12 <- list_rast_limits_max_FAO[i]
+#   subdiv_criteria_name_i12 <-
+#     sub(paste0(".*", "FAO_"), "", subdiv_criteria_name_i12)
+#   
+#   cat("\n\n\n")
+#   cat("###", subdiv_criteria_name_i12, "\n") # add headings
+#   cat("\n\n\n")
+#   
+#   # get the raster for which statistics are derived for each limitation
+#   rast_to_plot_i12 <- get(paste0(list_rast_limits_max_FAO[i]))
+#   
+#   # get the cellsize for each raster
+#   rast_to_plot_cellsize_i12 <- cellSize(rast_to_plot_i12, unit = "ha")
+#   
+#   
+#   # extract the raster limitations to a data frame using the subdivisions
+#   df_extr_i12 <-
+#     terra::extract(rast_to_plot_i12, vect_subdiv_i1, na.rm = TRUE, ID = T, weights = T)
+#   
+#     # extract the raster cellsize to a data frame using the subdivisions
+#   df_extr_cellsize_i12 <-
+#     terra::extract(rast_to_plot_cellsize_i12, vect_subdiv_i1, na.rm = TRUE, ID = T, weights =T)
+#   
+#   df_extr_i12 <- mutate(df_extr_i12, df_extr_cellsize_i12)
+#   
+#    # summarise the limitations for each subdivision raster ID
+#   df_extr_summary_i12 <- df_extr_i12 %>%
+#     group_by(ID) %>%
+#     count(FAO_limit, wt = (area * weight), .drop = FALSE)
+#   
+#   # get the names of the FAO limitations
+#   FAO_limits <- as.vector(unique(df_extr_summary_i12$FAO_limit))
+#     FAO_limits <- FAO_limits[!is.na(FAO_limits)]
+#     
+#   # pivot wider to give a column for each limit
+#   df_extr_summary_i12_pivot <- df_extr_summary_i12 %>% pivot_wider(names_from = FAO_limit, values_from = n)
+#   
+#   # join the summary data frame to the original subdivision data spatvector
+#   vect_subdiv_extr_i12 <<-
+#     left_join(vect_subdiv_i1, df_extr_summary_i12_pivot, by = 'ID')
+#   
+#   # join the summary data frame to the subdivision area data frame
+#   vect_subdiv_extr_i12 <<-
+#     left_join(vect_subdiv_extr_i12, df_subdiv_area_i1, by = 'ID')
+#   
+#   # vect_subdiv_extr_i12 <<- vect_subdiv_extr_i12 %>%
+#   #    select(ID, ha, any_of(FAO_limits)) %>% mutate(across(any_of(FAO_limits), ~ (.x / ha) * 100))
+#   
+#   vect_subdiv_extr_i12 <<- vect_subdiv_extr_i12 %>% mutate(across(any_of(FAO_limits), ~ (.x / ha) * 100)) #this includes all columns from vect_subdiv_extr_i1 A Farrow 22/05/2024
+#   
+#   # save as geojson and csv files
+#   output_vect(
+#     vect_subdiv_extr_i12,
+#     paste0(
+#       subdiv_criteria_name_i12,
+#       "_FAO_limits_pc_",
+#       params$INN1,
+#       "_",
+#       params$INN2
+#     )
+#   ) # save as a geojson file
+#   output_csv(
+#     as_tibble(vect_subdiv_extr_i12),
+#     paste0(
+#       subdiv_criteria_name_i12,
+#       "_FAO_limits_pc_",
+#       params$INN1,
+#       "_",
+#       params$INN2
+#     )
+#   ) # save as a csv file 
+#   
+#   # loop through each existing limitation type 
+#   for (limitation_type_i12 in FAO_limits) {
+#     
+#     # Get the current iteration number
+#     j_i12 <- match(limitation_type_i12, FAO_limits)
+# 
+#     # get the palette using the iteration number
+#     colour_index_i12 <- j_i12
+#     colour_index_mod_i12 <- (colour_index_i12 %% 18)
+#     colour_index_mod_i12 <-
+#       ifelse(colour_index_mod_i12 == 0, 18, colour_index_mod_i12)
+#     result_i12 <- palettes_i12[colour_index_mod_i12]
+#     
+#     # Filter the joined data for the current limitation
+#     filtered_data_i12 <-
+#       vect_subdiv_extr_i12 %>% select(any_of(limitation_type_i12))
+#     #print(filtered_data)
+#     if (nrow(filtered_data_i12) == 0) {next} 
+#     
+#     # Create a ggplot for count value per subdivision for the current limitation type using the palette from above
+#     subdiv_plot_i12 <- ggplot() +
+#       geom_spatvector(data = filtered_data_i12, aes(group = params$SUBDIV1, fill = eval(parse(text = FAO_limits[j_i12])))) +
+#       labs(
+#         title = paste(subdiv_criteria_name_i12, "\nLimit = ", limitation_type_i12),
+#         fill = "Area (%)"
+#       ) +
+#       scale_fill_distiller(
+#         type = "seq",
+#         palette = result_i12,
+#         direction = 1,
+#         limits = c(0, 101),
+#         guide = "legend", labels = comma
+#       ) 
+#     
+#     print(subdiv_plot_i12)
+#   }
+# }  
+
+```
+
+
+## Yield proportion comparison
 
 <div class="fold o"> 
-```{r classified compare_score_maps1, cache = TRUE, cache.whatever=params$Agg,  out.width="100%", message=FALSE, warning=FALSE, timeit = TRUE}
+```{r compare_yieldpc, cache = TRUE, cache.whatever=params$Agg,  out.width="100%", message=FALSE, warning=FALSE, timeit = TRUE}
 
-yield_pc_i1_df <-
-  df_irm_i1 %>% dplyr::select(yieldpc, x , y) %>% na.omit #%>% vect(geom = c("x", "y"))
+# yield as percentage of YW potential/water limited/nutrient limited
+df_yield_pc_i1 <-
+  df_irm_i1 %>% dplyr::select(yieldpc, x , y) %>% na.omit %>% #vect(geom = c("x", "y"))
+  dplyr::rename(yieldpc_i1 = yieldpc)
 
-yield_pc_i2_df <-
+
+df_yield_pc_i2 <-
   df_irm_i2 %>% dplyr::select(yieldpc) %>% na.omit %>%
   dplyr::rename(yieldpc_i2 = yieldpc)
 
-yield_pc_diff_df <- cbind(yield_pc_i1_df, yield_pc_i2_df)
+df_yield_pc_i12 <- cbind(df_yield_pc_i1, df_yield_pc_i2)
 
 # complementary score
 #yield_pc_diff_df$compl <-
 #  (yield_pc_diff_df$yieldpc + yield_pc_diff_df$yieldpc_i2)
 
 # relative difference score
-yield_pc_diff_df$diff <-
-  yield_pc_diff_df$yieldpc - yield_pc_diff_df$yieldpc_i2
+df_yield_pc_i12$diff <-
+  df_yield_pc_i12$yieldpc_i1 - df_yield_pc_i12$yieldpc_i2
 
 # absolute difference score
 #yield_pc_diff_df$absdiff <-
 #  abs(yield_pc_diff_df$yieldpc - yield_pc_diff_df$yieldpc_i2)
 
 # decimal difference score for plotting
-yield_pc_diff_df$diff_dec <- yield_pc_diff_df$diff / 100
+df_yield_pc_i12$diff_dec <- df_yield_pc_i12$diff / 100
+
+# max yield pc (when either innovation can be chosen)
+df_yield_pc_i12 <- df_yield_pc_i12 %>% rowwise() %>% mutate(rendement = max(c(yieldpc_i1, yieldpc_i2)))
 
 # max innovation name
-yield_pc_diff_df$max_inn_name <-
+df_yield_pc_i12$max_inn_name <-
   ifelse(
-    yield_pc_diff_df$yieldpc > yield_pc_diff_df$yieldpc_i2,
+    df_yield_pc_i12$yieldpc_i1 > df_yield_pc_i12$yieldpc_i2,
     paste(params$INN1),
     ifelse(
-      yield_pc_diff_df$yieldpc < yield_pc_diff_df$yieldpc_i2,
+      df_yield_pc_i12$yieldpc_i1 < df_yield_pc_i12$yieldpc_i2,
       paste(params$INN2) ,
       "equal"
     )
   )
 
 # max innovation id for plotting
-yield_pc_diff_df$max_inn_id <- as.integer(ifelse(
-  yield_pc_diff_df$yieldpc > yield_pc_diff_df$yieldpc_i2,
+df_yield_pc_i12$max_inn_id <- as.integer(ifelse(
+  df_yield_pc_i12$yieldpc_i1 > df_yield_pc_i12$yieldpc_i2,
   1,
-  ifelse(yield_pc_diff_df$yieldpc < yield_pc_diff_df$yieldpc_i2, 2 , 0)
+  ifelse(df_yield_pc_i12$yieldpc_i1 < df_yield_pc_i12$yieldpc_i2, 2 , 0)
 ))
 
-vect_yield_pc_diff <-
-  yield_pc_diff_df %>% na.omit %>% vect(geom = c("x", "y"))
+vect_yield_pc_i12 <-
+  df_yield_pc_i12 %>% na.omit %>% vect(geom = c("x", "y"))
 
-rast_yield_pc_diff <-
-  rasterize(vect_yield_pc_diff,
+rast_yield_pc_i12 <-
+  rasterize(vect_yield_pc_i12,
             rast_mask_proj_i1,
-            field = c("diff", "diff_dec", "max_inn_id"))
+            field = c("diff", "diff_dec", "rendement", "max_inn_id"))
 
-rast_yield_pc_diff_cat <- rast_yield_pc_diff
+rast_yield_pc_i12_cat <- rast_yield_pc_i12
 df_int <-
   data.frame(id = 0:2,
-             max_inn_id = c("equal", "potato", "superpotato"))
-levels(rast_yield_pc_diff_cat$max_inn_id) <- df_int
+             max_inn_id = c("equal", params$INN1, params$INN2))
+levels(rast_yield_pc_i12_cat$max_inn_id) <- df_int
 
-names(rast_yield_pc_diff_cat) <- c('difference', 'decimal difference', 'innovation')
+names(rast_yield_pc_i12_cat) <- c('difference', 'decimal difference', 'rendement' , 'innovation')
 
+# get the cellsize for each raster
+rast_yield_pc_cellsize_i12 <- cellSize(rast_yield_pc_i12_cat, unit = "ha")
+  
 # export
-output_geotiff(rast_yield_pc_diff_cat, paste0("difference_", params$INN1,"_", params$INN2))
+output_geotiff(rast_yield_pc_i12_cat, paste0("yieldpc_difference_", params$INN1,"_", params$INN2))
 
+# extract the yield raster to a data frame using the subdivisions
+df_extr_i12 <-
+  terra::extract(
+    rast_yield_pc_i12_cat$rendement,
+    vect_subdiv_i1,
+    na.rm = TRUE,
+    ID = T,
+    weights = T
+  )
 
-colour_breaks <- c(-1, 0, 1)
+# extract the raster cellsize to a data frame using the subdivisions
+df_extr_cellsize_i12 <-
+  terra::extract(
+    rast_yield_pc_cellsize_i12,
+    vect_subdiv_i1,
+    na.rm = TRUE,
+    ID = T,
+    weights = T
+  )
+
+df_extr_i12 <- mutate(df_extr_i12, df_extr_cellsize_i12)
+
+# summarise the yield for each subdivision raster ID
+df_extr_summary_i12 <- df_extr_i12 %>%
+  group_by(ID) %>%
+  summarise(rendement = weighted.mean(rendement, (area * weight), na.rm = TRUE))
+
+# join the summary data frame to the original subdivision data spatvector
+vect_subdiv_extr_i12 <<-
+  left_join(vect_subdiv_i1, df_extr_summary_i12, by = 'ID')
+
+# join the summary data frame to the subdivision area data frame
+vect_subdiv_extr_i12 <<-
+  left_join(vect_subdiv_extr_i12, df_subdiv_area_i1, by = 'ID')
+
+# save as geojson and csv files
+output_vect(vect_subdiv_extr_i12,
+            paste0("yieldpc_diff_", params$INN1, "_", params$INN2)) # save as a geojson file
+output_csv(
+  as_tibble(vect_subdiv_extr_i12),
+  paste0("yieldpc_diff_", params$INN1, "_", params$INN2)
+) # save as a csv file 
+  
+
+colour_breaks <- c(-100, 0, 100)
 colours <- c("#004D40", "#FFC107", "#D81B60")
 
 gc <- ggplot() +
-  geom_spatraster(data = rast_yield_pc_diff,
+  geom_spatraster(data = rast_yield_pc_i12_cat,
                   na.rm = TRUE,
-                  aes(fill = diff_dec, alpha = after_stat(abs(value)))) +
+                  aes(fill = difference, alpha = after_stat(abs(value)))) +
   scale_fill_gradientn(
     name = "most suitable\ninnovation",
     na.value = "transparent",
-    limits  = c(-1, 1),
+    limits  = c(-100, 100),
     colours = colours[c(1, seq_along(colours), length(colours))],
-    breaks = c(-1, 0, 1),
+    breaks = c(-100, 0, 100),
     labels = c(paste(params$INN2), "equal", paste(params$INN1))
   ) +
   scale_alpha(guide = 'none')
@@ -8112,27 +9495,71 @@ gc2
 </div>
 
 <div class="fold o">
-```{r classified combine_score_maps1, cache = TRUE, cache.whatever=params$Agg, out.width="100%", message=FALSE, warning=FALSE, timeit = TRUE}
+```{r compl_yieldpc, cache = TRUE, cache.whatever=params$Agg, out.width="100%", message=FALSE, warning=FALSE, timeit = TRUE}
 
 if (params$SYS != "comparison") {
       
 #complementary score
-yield_pc_diff_df$compl <-
-  (yield_pc_diff_df$yieldpc + yield_pc_diff_df$yieldpc_i2)
+df_yield_pc_i12$compl <-
+  (df_yield_pc_i12$yieldpc_i1 + df_yield_pc_i12$yieldpc_i2)
 
-vect_yield_pc_diff <-
-  yield_pc_diff_df %>% na.omit %>% vect(geom = c("x", "y"))
+vect_yield_pc_i12 <-
+  df_yield_pc_i12 %>% na.omit %>% vect(geom = c("x", "y"))
 
 rast_yield_pc_compl <-
-  rasterize(vect_yield_pc_diff,
+  rasterize(vect_yield_pc_i12,
             rast_mask_proj_i1,
             field = c("compl"))
 
 names(rast_yield_pc_compl) <- c('complementary')
 
 # export
-output_geotiff(rast_yield_pc_compl, paste0("complementary_", params$INN1,"_", params$INN2))
+output_geotiff(rast_yield_pc_compl, paste0("yieldpc_complementary_", params$INN1,"_", params$INN2))
         
+
+# extract the yield raster to a data frame using the subdivisions
+df_extr_i12 <-
+  terra::extract(
+    rast_yield_pc_compl$complementary ,
+    vect_subdiv_i1,
+    na.rm = TRUE,
+    ID = T,
+    weights = T
+  )
+
+# extract the raster cellsize to a data frame using the subdivisions
+df_extr_cellsize_i12 <-
+  terra::extract(
+    rast_yield_pc_cellsize_i12,
+    vect_subdiv_i1,
+    na.rm = TRUE,
+    ID = T,
+    weights = T
+  )
+
+df_extr_i12 <- mutate(df_extr_i12, df_extr_cellsize_i12)
+
+# summarise the yield for each subdivision raster ID
+df_extr_summary_i12 <- df_extr_i12 %>%
+  group_by(ID) %>%
+  summarise(complementary = weighted.mean(complementary, (area * weight)))
+
+# join the summary data frame to the original subdivision data spatvector
+vect_subdiv_extr_i12 <<-
+  left_join(vect_subdiv_i1, df_extr_summary_i12, by = 'ID')
+
+# join the summary data frame to the subdivision area data frame
+vect_subdiv_extr_i12 <<-
+  left_join(vect_subdiv_extr_i12, df_subdiv_area_i1, by = 'ID')
+
+# save as geojson and csv files
+output_vect(vect_subdiv_extr_i12,
+            paste0("yieldpc_compl_", params$INN1, "_", params$INN2)) # save as a geojson file
+output_csv(
+  as_tibble(vect_subdiv_extr_i12),
+  paste0("yieldpc_compl_", params$INN1, "_", params$INN2)
+) # save as a csv file 
+
 
 gcsum <- ggplot() +
   geom_spatraster(data = rast_yield_pc_compl,
@@ -8144,6 +9571,238 @@ gcsum <- ggplot() +
     colours = hcl.colors(palette = "PiYG", 10, rev = FALSE),
     guide = "legend") +
   labs(fill = "Combined yield %")
+
+
+
+  gcsum2 <- add_subdiv_proj_simple_plot(gcsum, vect_subdiv_i1)
+  
+gcsum2
+
+}
+```
+</div>
+
+## Yield comparison
+
+<div class="fold o"> 
+```{r compare_yield, cache = TRUE, cache.whatever=params$Agg,  out.width="100%", message=FALSE, warning=FALSE, timeit = TRUE}
+
+
+# yield as YW potential/water limited/nutrient limited or YI when intercrop
+df_yield_i1 <-
+  df_irm_i1 %>% dplyr::select(x , y, yield) %>% na.omit %>% #vect(geom = c("x", "y"))
+  dplyr::rename(yield_i1 = yield)
+
+df_yield_i2 <-
+  df_irm_i2 %>% dplyr::select(yield) %>% na.omit %>%
+  dplyr::rename(yield_i2 = yield)
+
+df_yield_i12 <- cbind(df_yield_i1, df_yield_i2)
+
+# relative difference score
+df_yield_i12$diff <-
+  df_yield_i12$yield_i1 - df_yield_i12$yield_i2
+
+# max yield (when either innovation can be chosen)
+df_yield_i12 <- df_yield_i12 %>% rowwise() %>% mutate(max = max(c(yield_i1, yield_i2)))
+
+
+# max innovation name
+df_yield_i12$max_inn_name <-
+  ifelse(
+    df_yield_i12$yield_i1 > df_yield_i12$yield_i2,
+    paste(params$INN1),
+    ifelse(
+      df_yield_i12$yield_i1 < df_yield_i12$yield_i2,
+      paste(params$INN2) ,
+      "equal"
+    )
+  )
+
+# max innovation id for plotting
+df_yield_i12$max_inn_id <- as.integer(ifelse(
+  df_yield_i12$yield_i1 > df_yield_i12$yield_i2,
+  1,
+  ifelse(df_yield_i12$yield_i1 < df_yield_i12$yield_i2, 2 , 0)
+))
+
+vect_yield_i12 <-
+  df_yield_i12 %>% na.omit %>% vect(geom = c("x", "y"))
+
+rast_yield_i12 <-
+  rasterize(vect_yield_i12,
+            rast_mask_proj_i1,
+            field = c("diff", "max", "max_inn_id"))
+
+rast_yield_i12_cat <- rast_yield_i12
+df_int <-
+  data.frame(id = 0:2,
+             max_inn_id = c("equal", params$INN1, params$INN2))
+levels(rast_yield_i12_cat$max_inn_id) <- df_int
+
+names(rast_yield_i12_cat) <- c('difference', 'max_yield', 'innovation')
+
+# get the cellsize for each raster
+rast_yield_cellsize_i12 <- cellSize(rast_yield_i12_cat, unit = "ha")
+  
+# export
+output_geotiff(rast_yield_i12_cat, paste0("yield_difference_", params$INN1,"_", params$INN2))
+
+# extract the yield raster to a data frame using the subdivisions
+df_extr_i12 <-
+  terra::extract(
+    rast_yield_i12_cat,
+    vect_subdiv_i1,
+    na.rm = TRUE,
+    ID = T,
+    weights = T
+  )
+
+# extract the raster cellsize to a data frame using the subdivisions
+df_extr_cellsize_i12 <-
+  terra::extract(
+    rast_yield_cellsize_i12,
+    vect_subdiv_i1,
+    na.rm = TRUE,
+    ID = T,
+    weights = T
+  )
+
+df_extr_i12 <- mutate(df_extr_i12, df_extr_cellsize_i12)
+
+# summarise the yield for each subdivision raster ID
+df_extr_summary_i12 <- df_extr_i12 %>%
+  group_by(ID) %>%
+  summarise(difference = weighted.mean(difference, (area * weight), na.rm = TRUE))
+
+# summarise the yield for each subdivision raster ID
+df_extr_summary_i12a <- df_extr_i12 %>%
+  group_by(ID) %>%
+  summarise(max_yield = weighted.mean(max_yield, (area * weight), na.rm = TRUE))
+
+df_extr_summary_i12$max_yield <- df_extr_summary_i12a$max_yield
+
+# join the summary data frame to the original subdivision data spatvector
+vect_subdiv_extr_i12 <<-
+  left_join(vect_subdiv_i1, df_extr_summary_i12, by = 'ID')
+
+# join the summary data frame to the subdivision area data frame
+vect_subdiv_extr_i12 <<-
+  left_join(vect_subdiv_extr_i12, df_subdiv_area_i1, by = 'ID')
+
+# save as geojson and csv files
+output_vect(vect_subdiv_extr_i12,
+            paste0("yield_diff_", params$INN1, "_", params$INN2)) # save as a geojson file
+output_csv(
+  as_tibble(vect_subdiv_extr_i12),
+  paste0("yield_diff_", params$INN1, "_", params$INN2)
+) # save as a csv file 
+  
+max_yield_i12 <- max(df_yield_values_i2$YW, df_yield_values_i2$YI, df_yield_values_i2$YW, df_yield_values_i2$YI, na.rm = T)
+
+colour_breaks <- c(-max_yield_i12, 0, max_yield_i12)
+colours <- c("#004D40", "#FFC107", "#D81B60")
+
+gc <- ggplot() +
+  geom_spatraster(data = rast_yield_i12,
+                  na.rm = TRUE,
+                  aes(fill = diff, alpha = after_stat(abs(value)))) +
+  scale_fill_gradientn(
+    name = "most suitable\ninnovation (yield)",
+    na.value = "transparent",
+    limits  = c(-max_yield_i12, max_yield_i12),
+    colours = colours[c(1, seq_along(colours), length(colours))],
+    breaks = c(-max_yield_i12, 0, max_yield_i12),
+    labels = c(paste(params$INN2), "equal", paste(params$INN1))
+  ) +
+  scale_alpha(guide = 'none')
+
+
+gc2 <- add_subdiv_proj_simple_plot(gc, vect_subdiv_i1)
+
+gc2
+
+
+```
+</div>
+
+<div class="fold o">
+```{r compl_yield, cache = TRUE, cache.whatever=params$Agg, out.width="100%", message=FALSE, warning=FALSE, timeit = TRUE}
+
+if (params$SYS != "comparison") {
+      
+#complementary score
+df_yield_i12$compl <-
+  (df_yield_i12$yield_i1 + df_yield_i12$yield_i2)
+
+vect_yield_i12 <-
+  df_yield_i12 %>% na.omit %>% vect(geom = c("x", "y"))
+
+rast_yield_compl <-
+  rasterize(vect_yield_i12,
+            rast_mask_proj_i1,
+            field = c("compl"))
+
+names(rast_yield_compl) <- c('complementary')
+
+# export
+output_geotiff(rast_yield_compl, paste0("yield_complementary_", params$INN1,"_", params$INN2))
+        
+
+# extract the yield raster to a data frame using the subdivisions
+df_extr_i12 <-
+  terra::extract(
+    rast_yield_compl$complementary ,
+    vect_subdiv_i1,
+    na.rm = TRUE,
+    ID = T,
+    weights = T
+  )
+
+# extract the raster cellsize to a data frame using the subdivisions
+df_extr_cellsize_i12 <-
+  terra::extract(
+    rast_yield_cellsize_i12,
+    vect_subdiv_i1,
+    na.rm = TRUE,
+    ID = T,
+    weights = T
+  )
+
+df_extr_i12 <- mutate(df_extr_i12, df_extr_cellsize_i12)
+
+# summarise the yield for each subdivision raster ID
+df_extr_summary_i12 <- df_extr_i12 %>%
+  group_by(ID) %>%
+  summarise(complementary = weighted.mean(complementary, (area * weight)))
+
+# join the summary data frame to the original subdivision data spatvector
+vect_subdiv_extr_i12 <<-
+  left_join(vect_subdiv_i1, df_extr_summary_i12, by = 'ID')
+
+# join the summary data frame to the subdivision area data frame
+vect_subdiv_extr_i12 <<-
+  left_join(vect_subdiv_extr_i12, df_subdiv_area_i1, by = 'ID')
+
+# save as geojson and csv files
+output_vect(vect_subdiv_extr_i12,
+            paste0("yield_compl_", params$INN1, "_", params$INN2)) # save as a geojson file
+output_csv(
+  as_tibble(vect_subdiv_extr_i12),
+  paste0("yield_compl_", params$INN1, "_", params$INN2)
+) # save as a csv file 
+
+
+gcsum <- ggplot() +
+  geom_spatraster(data = rast_yield_compl,
+                  na.rm = TRUE,
+                  aes(fill = complementary)) +
+  scale_fill_stepsn(
+    na.value = "transparent",
+    n.breaks = 10,
+    colours = hcl.colors(palette = "PiYG", 10, rev = FALSE),
+    guide = "legend") +
+  labs(fill = "Combined yield kg/ha")
 
 
 
