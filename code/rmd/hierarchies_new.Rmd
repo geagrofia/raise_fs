@@ -15,13 +15,14 @@ params:
   INT: NA
   SYS: comparison
   Agg: 1
-  MASK: 5000
-  INN1: a_coffee_ssp585elev
+  MASK: 250
+  INN1: digalu_drytest
   RES1: 3
   SOS1: 0
   FAOCLASS1: 1
   LIMITS1: 1
-  SUBDIV1: NAME_1
+  CONCCLASS1: 7
+  SUBDIV1: RK_NAME
   TRIAD1: Adoption
   TRIBA1: Aptitude
   TRISE1: Feasible
@@ -30,6 +31,7 @@ params:
   SOS2: 0
   FAOCLASS2: 1
   LIMITS2: 1
+  CONCCLASS2: 1
   SUBDIV2: NAME_1
   TRIAD2: Adoption
   TRIBA2: Aptitude
@@ -924,7 +926,20 @@ for (i in seq(from = 1,
       #proj4_lam,
       as.character(df_raster_data_i1[i, 15]), rast_mask_proj_i1
     )
-  )  
+  )
+  
+  rast_prj_filename_i1 <-
+    paste0("spatial_data/input/rast_",
+           df_raster_data_i1[i, 12],
+           "_prj_i1.tif")
+  
+  writeRaster(get(
+    paste0(
+      "rast_",
+      df_raster_data_i1[i, 12],
+      "_prj_i1"
+    )
+  ), here(rast_prj_filename_i1), overwrite = TRUE)
   
   } else {
 
@@ -934,6 +949,19 @@ for (i in seq(from = 1,
     paste0("rast_", df_raster_data_i1[i, 12], "_prj_i1"),
     get(paste0("rast_", df_raster_data_i1[i, 12], "_roughcrop_i1"))
       )
+      rast_prj_filename_i1 <-
+    paste0("spatial_data/input/rast_",
+           df_raster_data_i1[i, 12],
+           "_prj_i1.tif")
+  
+  writeRaster(get(
+    paste0(
+      "rast_",
+      df_raster_data_i1[i, 12],
+      "_prj_i1"
+    )
+  ), here(rast_prj_filename_i1), overwrite = TRUE)
+  
   }
 
 # calculate aggregate factor for each criterion for both dimensions of the raster (these are the same for a square cell shape)
@@ -1008,6 +1036,19 @@ c_raster_data_rsmp_i1 <- append(c_raster_data_rsmp_i1, get(paste0("rast_", df_ra
     df_raster_data_single_i1 <-
       rbind(df_raster_data_single_i1, df_raster_data_i1[i,])
   }
+  
+  rast_rsmp_filename_i1 <-
+    paste0("spatial_data/input/rast_",
+           df_raster_data_i1[i, 12],
+           "_rsmp_i1.tif")
+  
+  writeRaster(get(
+    paste0(
+      "rast_",
+      df_raster_data_i1[i, 12],
+      "_rsmp_i1"
+    )
+  ), here(rast_rsmp_filename_i1), overwrite = TRUE)
   
   gc()    
 
@@ -3214,7 +3255,6 @@ for (i in hierarchy_level_max_i1:1) {
             vect_subdiv_i1,
             params$INN1
           )
-        
       }
       
       if (i <= params$LIMITS1) {
@@ -3232,7 +3272,22 @@ for (i in hierarchy_level_max_i1:1) {
             list_rast_limits_max_FAO,
             params$INN1
           )
-        
+      }
+      
+      if (i <= params$CONCCLASS1) {
+        CONC_leaflet_widget_i1 <<-
+          classify_maps_CONC(
+            n_i1,
+            fpm_conc_var_i1,
+            fpm_conc_name_i1,
+            df_irm_i1,
+            fpm_plot_title_i1,
+            df_one_many_i1,
+            rast_mask_proj_i1,
+            list_rast_clas_FAO_cat,
+            vect_subdiv_i1,
+            params$INN1
+          )
       }
       
       return(newList_i1)

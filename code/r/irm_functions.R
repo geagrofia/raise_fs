@@ -2114,3 +2114,390 @@ classify_maps_limits <-
   return(leaflet_widget)  
   
 }# end of classify_maps_limits function
+
+
+classify_maps_CONC <-
+  function(n,
+           fpm_conc_var,
+           fpm_conc_name,
+           df_data,
+           fpm_plot_title,
+           df_one_many,
+           rast_mask_proj,
+           list_rast_clas_FAO_cat,
+           vect_subdiv,
+           innovation) {
+    
+    df_plot <- df_data %>%
+      dplyr::select(unlist(as.character(noquote(fpm_conc_var)))) %>%
+      na.omit %>%
+      st_as_sf(coords = c("x", "y"))
+    
+    #cat("str(df_one_many) = ", str(df_one_many),"\n")
+    stack_code <<- unique(df_one_many[['rulebase_stack']])
+    cat("stack_code = ", stack_code, "\n")
+    
+    if ("optimal" %in% fpm_conc_name) {
+      # biophysical aptitude criteria
+      
+      cat("OPTIMAL")
+      print(match("optimal", fpm_conc_name))
+      opt_match <- match("optimal", fpm_conc_name)
+      opt_match_glob <<- opt_match
+      
+      #create raster using the 'optimal' layer
+      rast_plot_opt <-
+        rasterize(df_plot, rast_mask_proj, fpm_conc_var[[opt_match]])
+      names(rast_plot_opt) <- fpm_conc_name[[opt_match]]
+      
+      cat("SUBOPTIMAL")
+      print(match("suboptimal", fpm_conc_name))
+      subopt_match <- match("suboptimal", fpm_conc_name)
+      subopt_match_glob <<- subopt_match
+      
+      #create raster using the 'suboptimal' layer
+      rast_plot_subopt <-
+        rasterize(df_plot, rast_mask_proj, fpm_conc_var[[subopt_match]])
+      names(rast_plot_subopt) <- fpm_conc_name[[subopt_match]]
+      
+      rast_plot_opt_subopt <- rast(list(rast_plot_opt, rast_plot_subopt))
+   
+      # get max value and export
+      rast_plot_max <- which.max(rast_plot_opt_subopt)
+      names(rast_plot_max) <- c("class")
+      rast_opt_subopt_brick <- rast(list(rast_plot_opt, rast_plot_subopt, rast_plot_max))
+      #names(rast_opt_subopt_brick) <- c('high', 'moderate', 'low', 'class')
+      output_geotiff(rast_opt_subopt_brick, paste0("optsubopt", stack_code, "_", innovation))
+      
+      
+      # plot the max value
+      rast_plot_name <- names(rast_plot_max)
+      
+      # classify values and export
+      ## from-to-becomes
+      # classify the optimal values into five groups
+      # all values >= 0 and <= 0.25 become N2, etc.
+      
+      df_clas_opt <-
+        data.frame(id = 1:2, class = c("Optimal", "Suboptimal"))
+      levels(rast_plot_max) <- df_clas_opt
+      
+      # rast_clas_fao_brick <-
+      #   rast(list(rast_plot, rast_clas_fao_bin, rast_clas_fao_cat))
+      # names(rast_clas_fao_brick) <- c(rast_plot_name, 'bin', 'FAO')
+      # output_geotiff(rast_clas_fao_brick,
+      #                paste0("FAO_", stack_code, "_", innovation))
+      # 
+      # assign(paste0("rast_clas_fao_cat", fpm_plot_title),
+      #        rast_clas_fao_cat,
+      #        .GlobalEnv)
+      # 
+      # list_rast_clas_FAO_cat <<-
+      #   append(list_rast_clas_FAO_cat,
+      #          paste0("rast_clas_fao_cat", fpm_plot_title))
+      
+      g <-  ggplot() +
+        geom_spatraster(data = rast_plot_max, na.rm = TRUE, aes(fill = class)) +
+        scale_fill_manual(
+          name = paste0("Optimality\n", fpm_plot_title, "\n", innovation),
+          na.value = "transparent",
+          na.translate = F,
+          values = c(
+            Optimal = rgb(51, 160, 44, maxColorValue = 255),
+            Suboptimal = rgb(227, 26, 28, maxColorValue = 255)
+          )
+        )
+      add_subdiv_proj_simple_plot(g, vect_subdiv) %>% print()
+      
+      
+      ## leaflet maps
+      
+      # export class and optimal value as polygon
+      vect_clas_opt_cat <-
+        as.polygons(rast_plot_max, dissolve = F)
+      vect_filename <-
+        as.character(paste0("Optimality_", stack_code, "_", innovation))
+      output_vect(vect_clas_opt_cat, vect_filename)
+      
+      # project to geo for display in leaflet
+      vect_clas_opt_cat_geo <- project(vect_clas_opt_cat, "epsg:4326")
+      
+      # convert to sf until leaflet properly accepts spatvector
+      sf_clas_opt_cat_geo <- st_as_sf(vect_clas_opt_cat_geo)
+      
+      class_palette <- (c(
+        #Optimal =
+        rgb(178, 223, 138, maxColorValue = 255),
+        #Suboptimal =
+        rgb(227, 26, 28, maxColorValue = 255)
+        
+      ))
+      
+      
+      pal <-
+        colorFactor(class_palette,
+                    domain = c(1:2),
+                    na.color = "#808080")
+      
+      leaflet_widget <- leaflet(sf_clas_opt_cat_geo, width = "100%") %>%
+        addProviderTiles(providers$OpenStreetMap.HOT, group = "OSM (HOT)") %>%
+        addPolygons(
+          label = ~ stringr::str_c('class =', class),
+          labelOptions = labelOptions(direction = 'auto'),
+          color = "#03F",
+          weight = 1,
+          opacity = 0.5,
+          fill = layer,
+          fillColor = ~ pal(class),
+          fillOpacity = 0.2,
+          dashArray = NULL,
+          smoothFactor = 1,
+          noClip = FALSE,
+          popup = paste('Class  =', sf_clas_opt_cat_geo$class),
+          popupOptions = NULL,
+          highlightOptions = NULL,
+        )
+      
+      return(leaflet_widget)
+      
+      
+      
+    } else {
+      # socio-economic feasibility or adoption criteria
+      
+      cat("GOOD")
+      match_set <- c("good", "high")
+      print(match(match_set, fpm_conc_name))
+      good_match <- max(match(match_set, fpm_conc_name), na.rm = T)
+      good_match_glob <<- good_match
+      
+      #create raster using the 'good/high' layer
+      rast_plot_good <-
+        rasterize(df_plot, rast_mask_proj, fpm_conc_var[[good_match]])
+      names(rast_plot_good) <- fpm_conc_name[[good_match]]
+      
+      cat("POOR")
+      match_set <- c("poor", "bad", "low")
+      print(match(match_set, fpm_conc_name))
+      poor_match <- max(match(match_set, fpm_conc_name), na.rm = T)
+      poor_match_glob <<- poor_match
+      
+      #create raster using the 'poor/low' layer
+      rast_plot_poor <-
+        rasterize(df_plot, rast_mask_proj, fpm_conc_var[[poor_match]])
+      names(rast_plot_poor) <- fpm_conc_name[[poor_match]]
+      
+      
+      if (length(fpm_conc_name) == 3) {
+        # only run when a moderate conclusion
+        
+        cat("MODERATE")
+        match_set <- c("moderate", "medium")
+        print(match(match_set, fpm_conc_name))
+        moderate_match <- max(match(match_set, fpm_conc_name), na.rm = T)
+        moderate_match_glob <<- moderate_match
+        
+        #create raster using the 'good/high' layer
+        rast_plot_moderate <- rasterize(df_plot, rast_mask_proj, fpm_conc_var[[moderate_match]])
+        names(rast_plot_moderate) <- fpm_conc_name[[moderate_match]]
+        
+        rast_plot_gmp <- rast(list(rast_plot_good, rast_plot_moderate, rast_plot_poor))
+        
+        # get max value and export
+        rast_plot_max <- which.max(rast_plot_gmp)
+        names(rast_plot_max) <- c("class")
+        rast_gmp_brick <- rast(list(rast_plot_good, rast_plot_moderate, rast_plot_poor, rast_plot_max))
+        #names(rast_opt_subopt_brick) <- c('good', 'moderate', 'poor', 'class')
+        output_geotiff(rast_gmp_brick, paste0("gmp", stack_code, innovation))
+        
+        # plot the max value
+        rast_plot_name <- names(rast_plot_max)
+        
+        # classify values and export
+
+        df_clas_gmp <-
+          data.frame(id = 1:3, class = c("Good", "Moderate", "Poor"))
+        levels(rast_plot_max) <- df_clas_gmp
+        
+        # rast_clas_fao_brick <-
+        #   rast(list(rast_plot, rast_clas_fao_bin, rast_clas_fao_cat))
+        # names(rast_clas_fao_brick) <- c(rast_plot_name, 'bin', 'FAO')
+        # output_geotiff(rast_clas_fao_brick,
+        #                paste0("FAO_", stack_code, "_", innovation))
+        # 
+        # assign(paste0("rast_clas_fao_cat", fpm_plot_title),
+        #        rast_clas_fao_cat,
+        #        .GlobalEnv)
+        # 
+        # list_rast_clas_FAO_cat <<-
+        #   append(list_rast_clas_FAO_cat,
+        #          paste0("rast_clas_fao_cat", fpm_plot_title))
+        
+        g <-  ggplot() +
+          geom_spatraster(data = rast_plot_max, na.rm = TRUE, aes(fill = class)) +
+          scale_fill_manual(
+            name = paste0("Good-Moderate-Poor\n", fpm_plot_title, "\n", innovation),
+            na.value = "transparent",
+            na.translate = F,
+            values = c(
+              Good = rgb(51, 160, 44, maxColorValue = 255),
+              Moderate = rgb(255, 255, 153, maxColorValue = 255),
+              Poor = rgb(227, 26, 28, maxColorValue = 255)
+            )
+          )
+        add_subdiv_proj_simple_plot(g, vect_subdiv) %>% print()
+        
+        
+        ## leaflet maps
+        
+        # export class and optimal value as polygon
+        vect_clas_gmp_cat <-
+          as.polygons(rast_plot_max, dissolve = F)
+        vect_filename <-
+          as.character(paste0("Good-Moderate-Poor", stack_code, "_", innovation))
+        output_vect(vect_clas_gmp_cat, vect_filename)
+        
+        # project to geo for display in leaflet
+        vect_clas_gmp_cat_geo <- project(vect_clas_gmp_cat, "epsg:4326")
+        
+        # convert to sf until leaflet properly accepts spatvector
+        sf_clas_gmp_cat_geo <- st_as_sf(vect_clas_gmp_cat_geo)
+        
+        class_palette <- (c(
+          #Good =
+          rgb(178, 223, 138, maxColorValue = 255),
+          #Moderate = 
+          rgb(255, 255, 153, maxColorValue = 255),
+          #Poor =
+          rgb(227, 26, 28, maxColorValue = 255)
+          
+        ))
+        
+        
+        pal <-
+          colorFactor(class_palette,
+                      domain = c(1:3),
+                      na.color = "#808080")
+        
+        leaflet_widget <- leaflet(sf_clas_gmp_cat_geo, width = "100%") %>%
+          addProviderTiles(providers$OpenStreetMap.HOT, group = "OSM (HOT)") %>%
+          addPolygons(
+            label = ~ stringr::str_c('class =', class),
+            labelOptions = labelOptions(direction = 'auto'),
+            color = "#03F",
+            weight = 1,
+            opacity = 0.5,
+            fill = layer,
+            fillColor = ~ pal(class),
+            fillOpacity = 0.2,
+            dashArray = NULL,
+            smoothFactor = 1,
+            noClip = FALSE,
+            popup = paste('Class  =', sf_clas_gmp_cat_geo$class),
+            popupOptions = NULL,
+            highlightOptions = NULL,
+          )
+        
+        return(leaflet_widget)
+        
+      } else {
+        
+        rast_plot_gp <- rast(list(rast_plot_good, rast_plot_poor))
+        
+        # get max value and export
+        rast_plot_max <- which.max(rast_plot_gp)
+        names(rast_plot_max) <- c("class")
+        rast_gp_brick <- rast(list(rast_plot_good, rast_plot_poor, rast_plot_max))
+        #names(rast_opt_subopt_brick) <- c('high', 'moderate', 'low', 'class')
+        output_geotiff(rast_gp_brick, paste0("gp", stack_code, innovation))
+        
+        # plot the max value
+        rast_plot_name <- names(rast_plot_max)
+        
+        # classify values and export
+        
+        df_clas_gp <-
+          data.frame(id = 1:2, class = c("Good", "Poor"))
+        levels(rast_plot_max) <- df_clas_gp
+        
+        # rast_clas_fao_brick <-
+        #   rast(list(rast_plot, rast_clas_fao_bin, rast_clas_fao_cat))
+        # names(rast_clas_fao_brick) <- c(rast_plot_name, 'bin', 'FAO')
+        # output_geotiff(rast_clas_fao_brick,
+        #                paste0("FAO_", stack_code, "_", innovation))
+        # 
+        # assign(paste0("rast_clas_fao_cat", fpm_plot_title),
+        #        rast_clas_fao_cat,
+        #        .GlobalEnv)
+        # 
+        # list_rast_clas_FAO_cat <<-
+        #   append(list_rast_clas_FAO_cat,
+        #          paste0("rast_clas_fao_cat", fpm_plot_title))
+        
+        g <-  ggplot() +
+          geom_spatraster(data = rast_plot_max, na.rm = TRUE, aes(fill = class)) +
+          scale_fill_manual(
+            name = paste0("Good-Poor\n", fpm_plot_title, "\n", innovation),
+            na.value = "transparent",
+            na.translate = F,
+            values = c(
+              Good = rgb(51, 160, 44, maxColorValue = 255),
+              Poor = rgb(227, 26, 28, maxColorValue = 255)
+            )
+          )
+        add_subdiv_proj_simple_plot(g, vect_subdiv) %>% print()
+        
+        
+        ## leaflet maps
+        
+        # export class and optimal value as polygon
+        vect_clas_gp_cat <-
+          as.polygons(rast_plot_max, dissolve = F)
+        vect_filename <-
+          as.character(paste0("Good-Poor", stack_code, "_", innovation))
+        output_vect(vect_clas_gp_cat, vect_filename)
+        
+        # project to geo for display in leaflet
+        vect_clas_gp_cat_geo <- project(vect_clas_gp_cat, "epsg:4326")
+        
+        # convert to sf until leaflet properly accepts spatvector
+        sf_clas_gp_cat_geo <- st_as_sf(vect_clas_gp_cat_geo)
+        
+        class_palette <- (c(
+          #Good =
+          rgb(178, 223, 138, maxColorValue = 255),
+          #Poor =
+          rgb(227, 26, 28, maxColorValue = 255)
+          
+        ))
+        
+        
+        pal <-
+          colorFactor(class_palette,
+                      domain = c(1:2),
+                      na.color = "#808080")
+        
+        leaflet_widget <- leaflet(sf_clas_gp_cat_geo, width = "100%") %>%
+          addProviderTiles(providers$OpenStreetMap.HOT, group = "OSM (HOT)") %>%
+          addPolygons(
+            label = ~ stringr::str_c('class =', class),
+            labelOptions = labelOptions(direction = 'auto'),
+            color = "#03F",
+            weight = 1,
+            opacity = 0.5,
+            fill = layer,
+            fillColor = ~ pal(class),
+            fillOpacity = 0.2,
+            dashArray = NULL,
+            smoothFactor = 1,
+            noClip = FALSE,
+            popup = paste('Class  =', sf_clas_gp_cat_geo$class),
+            popupOptions = NULL,
+            highlightOptions = NULL,
+          )
+        
+        return(leaflet_widget)
+      
+      }
+    }
+  }
