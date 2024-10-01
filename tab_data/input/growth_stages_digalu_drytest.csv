@@ -1,0 +1,8 @@
+name,day,length,prec_criteria,temp_criteria,,,original,reason
+sow_date,185,,0,0,,,170,changed according to BFM which states 1st week of July for digalu
+est,,15,0,0,,,12.5,
+veg,,47,1,1,,,40,
+flw,,21,1,1,,,17.5,
+yld,,38,0,0,,,32.5,
+rip,,15,1,1,,,12.5,
+total,,136,1,1,,,115,changed according to BFM which states 5 month growing period for digalu and variety register which gives 128 days to maturity

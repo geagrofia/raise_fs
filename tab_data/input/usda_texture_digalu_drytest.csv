@@ -1,0 +1,14 @@
+USDA_Texture_Class,USDA_Texture_Code,USDA_Texture_Description,Suitability,IRM_Value
+1,Cl,clay,S1,1
+2,SiCl,silty clay,S1,1
+3,SaCl,sandy  clay,S1,1
+4,ClLo,clay loam,S1,1
+5,SiClLo,silty clay loam,S1,1
+6,SaClLo,sandy clay loam,S2,0.75
+7,Lo,loam,S1,1
+8,SiLo,silty loam,S1,1
+9,SaLo,sandy loam,S3,0.5
+10,Si,silt,S1,1
+11,LoSa,loamy sand,N1,0.33
+12,Sa,sand,N2,0.12
+255,NODATA,NA,NA,NA
