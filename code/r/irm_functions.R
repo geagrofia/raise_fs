@@ -50,6 +50,18 @@ load_vector_data <-
     return(vector_name)
   }
         
+
+select_location <-
+  function(division_data,
+           division_fieldname,
+           location_name) {
+    
+    expr <- paste0(division_fieldname , " == '", location_name, "'")
+    location <- tidyterra::filter(division_data, eval(parse(text=(expr))))
+    return(location)
+  }
+
+
 # temporary function to load vector data and re-project from WGS84 (default for geojson) to chosen coordinate reference system
 
 # where: data_file_prefix is the file prefix showing the theme

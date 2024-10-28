@@ -1,0 +1,1228 @@
+---
+title: Analysis of spatial accessibility to service locations using R
+author: "Atkilt Girma, Amanuel Zenebe, Andy Farrow, Dennis Walvoort and Herman Agricola"
+date: "`r Sys.Date()`"
+output:
+  html_document:  
+    code_folding: "hide"
+    theme: united
+    number_sections: no
+    toc: yes
+    toc_float: true
+    toc_depth: 6
+    css: js/style.css
+params:
+  EXT: Ethiopia
+  ZONVAR: Z_CODE
+  ZONCODE: 308
+  DIVVAR: W_CODE
+  DIVCODE: 30801
+  DIVNAME: W_NAME
+  MASK: 250
+  INN1: pearl_millet
+
+
+---
+
+```{r}
+# sets the style for the output
+```
+
+
+<style>
+pre {
+  overflow-x: auto;
+}
+pre code {
+  word-wrap: normal;
+  white-space: pre;
+}
+
+
+
+<style>
+body {
+text-align: justify}
+
+pre {
+  overflow-x: auto;
+}
+pre code {
+  word-wrap: normal;
+  white-space: pre;
+}
+</style>
+
+```{r parameter_description, echo=FALSE, message=FALSE, warning=FALSE}
+
+# EXT defines the extent of the general modelling usually a country - this is used to load the division dataset
+
+# ZONVAR this is the zonal variable within the EXT dataset
+
+# ZONCODE defines the extent of the accessibility model - this is a zonal code within the EXT dataset
+
+# DIVVAR this is the division variable within the EXT dataset
+
+# DIVCODE defines the extent of the model outputs - this is a division code within the EXT dataset
+
+# MASK defines the resolution of the mask in metres
+
+```
+
+```{r initialise01, message=FALSE, cache=FALSE, include=FALSE}
+for (package in c('raster', 'knitr','ggplot2','tiff',  'dismo', 'RColorBrewer', 'sp','gdistance','sf','stars', 'here','terra', 'tidyterra', 'tidyverse')) {
+    if (!require(package, character.only=T, quietly=T)) {
+        install.packages(package)
+        library(package, character.only=T, warn.conflicts=FALSE, quietly = TRUE, verbose=FALSE, logical.return = FALSE)
+    }
+}
+
+r_filename <- function(filename) {
+  here::here("code/r/", filename)
+}
+
+source(r_filename("irm_functions.R"))
+
+# set (chunk) options
+opts_chunk$set(comment = NA, dpi = 300, echo = FALSE)
+options(width = 250, dplyr.width = 120)
+```
+
+# Introduction
+
+Accessibility can be defined as the ability for interaction or contact with sites of economic or social opportunity, (Deichmann, 1997), however there are a multitude of ways in which this intuitive concept has been expressed in the literature. Goodall (1987) defines accessibility as the ease with which a location may be reached from other locations, and Geertman and Ritsema Van Eck (1995) state that the concept of accessibility can be used in rural development policy as an indicator of rural deprivation and as a variable on location analysis.
+
+Spatial accessibility is determined by geographic location in relation to target locations, and by the transportation facilities that are available to reach those destinations. Accessibility is also influenced by social factors such as knowledge and information and by economic factors since the use of transport and communication facilities is usually associated with some monetary cost. Although it is difficult to incorporate these economic factors explicitly in spatial models, the selective weighting of one market can imply the social and economic dimensions over another.
+
+In public planning, an important objective is the equal provision of services for all people and in all parts of a country. For example, the population of a country or region should have similar access to public services, independent from their location of residence. Poor infrastructure and consequently limited accessibility implies fewer opportunities for improving economic status, health or social standing. Ravallion (1997), for example, speaks of a “spatial poverty trap” that may prevent the poor from breaking out of local level constraints.
+
+Thus, herebelow, we demonstrate on how to compute spatial accessibility. The outputs of these will be used directly during IRM. The  script will output the following:
+
+1. "--_tran_intv.tif"  Access using transport to Kebele centres (FTC)
+2. "--_tran_inthv.tif" or "--_tran_zone.tif" Access using transport to Farmers union / zone center/
+3. "--_tran_intwv.tif" Access using transport to woreda centers
+4. "--_tran_market.tif" acces using transport to market centers
+
+5. "--_walk_intv.tif"  Access by walking to Kebele centres (FTC)
+6. "--_walk_inthv.tif" or "--_walk_zone.tif" Access by walking to Farmer Union /zone center/
+7. "--_walk_intwv.tif" Access by walking to woreda centers
+8. "--_walk_market.tif" access using walking to market centers
+
+NB: "-- is for a two digit character for the study woreda eg. "en" for endamekhoni
+
+
+```{r ins_figure1, echo=FALSE, fig.cap="Schematic workflow of the accessibility modelling", cache = TRUE, warning=FALSE, out.width= "100%"}
+
+
+knitr::include_graphics(here::here("spatial_data/input/Capture.JPG"))
+
+#options(rasterTmpDir='E:/temp/')
+
+```
+
+Figure 1: The schematic workflow for the accessibility modelling
+
+<style>
+div.blue { background-color:#e6f0ff; border-radius: 5px; padding: 20px;}
+</style>
+<div class = "blue">
+
+</div>
+
+
+
+# Read and prepare input datasets
+
+The input datasets required are loaded here: Zone boundary, Woreda boundary, road layer, land use land cover, slope, Farmers training center (FTC), woreda center, zone center, market center and  a mask layer. 
+
+Very important consideration is to know the input file formats. These input file formats need to be harmonized with the rest of the other files. For example, have them in to the same extent, projection, and resolution.
+
+Slope is derived from SRTM 30 meters (DEM). This initially is in geographic coordinate system. It is re-projected and read directly here from the previous R script.
+
+
+
+
+
+## Read input datasets
+
+### Vector datasets for mask, roads and target locations
+
+```{r include=FALSE}
+
+## Get the mask extent
+
+# load the divisions extent
+vect_ext <- load_vector_data(paste0("subdiv_", params$EXT))
+
+# select the location to be modelled
+vect_subdiv <- select_location(vect_ext, params$DIVVAR, params$DIVCODE)
+
+# select the zone to be modelled
+vect_div <- select_location(vect_ext, params$ZONVAR, params$ZONCODE)
+
+# get the bounding box for the zone to be modelled
+vect_div_extent <- ext(vect_div)
+
+
+## Get the target locations
+
+# load the FTC locations
+vect_FTC <- load_vector_data(paste0("FTC_", params$DIVCODE))
+
+# load the woreda locations
+vect_woredaC <- load_vector_data(paste0("woredaC_", params$DIVCODE))
+
+# load the zonal locations
+vect_zoneC <- load_vector_data(paste0("zoneC_", params$ZONCODE))
+
+
+# load the local market locations
+vect_localmarket <- load_vector_data(paste0("localmarket_", params$DIVCODE))
+
+# load the woreda market locations
+vect_woredamarket <- load_vector_data(paste0("woredamarket_", params$DIVCODE))
+
+# load the zone market locations
+vect_zonemarket <- load_vector_data(paste0("zonemarket_", params$ZONCODE))
+
+
+## Get the roads
+
+# load the roads
+vect_roads_ext <- load_vector_data(paste0("OSMRoads_", params$EXT))
+
+# clip the roads to the zone
+vect_roads_zone <- crop(vect_roads_ext, vect_div_extent)
+
+```
+
+
+### Raster datasets for slope and landcover
+
+```{r main, warning=FALSE, cache=TRUE, include=FALSE, out.width=500}
+
+## Get slope
+
+# load the slope data
+rast_slope <- load_raster_data("slope_srtm", rast_slope)
+
+# clip the slope to the zone
+rast_slope_zone <- crop(rast_slope, vect_div_extent)
+
+
+## Get landcover
+
+# load the landcover data
+rast_landcover <- load_raster_data("globcover", rast_landcover)
+
+# clip the landcover to the zone
+rast_landcover_zone <- crop(rast_landcover, vect_div_extent)
+
+```
+
+## Create coordinate reference system
+
+```{r include=FALSE}
+
+# set the output crs using WKT arguments
+
+wkt_geo <-  paste0( "
+  GEOGCRS[\"WGS 84 (with axis order normalized for visualization)\",
+          ENSEMBLE[\"World Geodetic System 1984 ensemble\",
+                   MEMBER[\"World Geodetic System 1984 (Transit)\",
+                          ID[\"EPSG\",1166]],
+                   MEMBER[\"World Geodetic System 1984 (G730)\",
+                          ID[\"EPSG\",1152]],
+                   MEMBER[\"World Geodetic System 1984 (G873)\",
+                          ID[\"EPSG\",1153]],
+                   MEMBER[\"World Geodetic System 1984 (G1150)\",
+                          ID[\"EPSG\",1154]],
+                   MEMBER[\"World Geodetic System 1984 (G1674)\",
+                          ID[\"EPSG\",1155]],
+                   MEMBER[\"World Geodetic System 1984 (G1762)\",
+                          ID[\"EPSG\",1156]],
+                   MEMBER[\"World Geodetic System 1984 (G2139)\",
+                          ID[\"EPSG\",1309]],
+                   ELLIPSOID[\"WGS 84\",6378137,298.257223563,
+                             LENGTHUNIT[\"metre\",1],
+                             ID[\"EPSG\",7030]],
+                   ENSEMBLEACCURACY[2.0],
+                   ID[\"EPSG\",6326]],
+          PRIMEM[\"Greenwich\",0,
+                 ANGLEUNIT[\"degree\",0.0174532925199433],
+                 ID[\"EPSG\",8901]],
+          CS[ellipsoidal,2],
+          AXIS[\"geodetic longitude (Lon)\",east,
+               ORDER[1],
+               ANGLEUNIT[\"degree\",0.0174532925199433,
+                         ID[\"EPSG\",9122]]],
+          AXIS[\"geodetic latitude (Lat)\",north,
+               ORDER[2],
+               ANGLEUNIT[\"degree\",0.0174532925199433,
+                         ID[\"EPSG\",9122]]],
+          USAGE[
+            SCOPE[\"Horizontal component of 3D system.\"],
+            AREA[\"World.\"],
+            BBOX[-90,-180,90,180]],
+          REMARK[\"Axis order reversed compared to EPSG:4326\"]]")
+
+
+# set the working crs using WKT arguments
+
+wkt_lea <-  paste0(
+    "PROJCRS[\"unknown\",
+    BASEGEOGCRS[\"unknown\",
+        DATUM[\"World Geodetic System 1984\",
+            ELLIPSOID[\"WGS 84\",6378137,298.257223563,
+                LENGTHUNIT[\"metre\",1]],
+            ID[\"EPSG\",6326]],
+        PRIMEM[\"Greenwich\",0,
+            ANGLEUNIT[\"degree\",0.0174532925199433],
+            ID[\"EPSG\",8901]]],
+    CONVERSION[\"unknown\",
+        METHOD[\"Lambert Azimuthal Equal Area\",
+            ID[\"EPSG\",9820]],
+        PARAMETER[\"Latitude of natural origin\",",
+vect_div_extent[3],
+    ",ANGLEUNIT[\"degree\",0.0174532925199433],
+            ID[\"EPSG\",8801]],
+        PARAMETER[\"Longitude of natural origin\",",
+vect_div_extent[1],
+    ",ANGLEUNIT[\"degree\",0.0174532925199433],
+            ID[\"EPSG\",8802]],
+        PARAMETER[\"False easting\",1000000,
+            LENGTHUNIT[\"metre\",1],
+            ID[\"EPSG\",8806]],
+        PARAMETER[\"False northing\",1000000,
+            LENGTHUNIT[\"metre\",1],
+            ID[\"EPSG\",8807]]],
+    CS[Cartesian,2],
+        AXIS[\"(E)\",east,
+            ORDER[1],
+            LENGTHUNIT[\"metre\",1,
+                ID[\"EPSG\",9001]]],
+        AXIS[\"(N)\",north,
+            ORDER[2],
+            LENGTHUNIT[\"metre\",1,
+                ID[\"EPSG\",9001]]]]"
+  )
+
+```
+
+## Project the layers to Lambert Equal Area projection
+
+
+```{r mask, cache = TRUE, warning=FALSE, out.width=1000}
+
+# project the location to be modelled
+vect_subdiv_lea <- terra::project(vect_subdiv, wkt_lea)
+
+# write to disk
+writeVector(vect_subdiv_lea, here::here("spatial_data/input/vect_subdiv_lea.geojson"), overwrite=T)
+
+
+# project the zone to be modelled
+vect_div_lea <- terra::project(vect_div, wkt_lea)
+
+# write to disk
+writeVector(vect_div_lea, here::here("spatial_data/input/vect_div_lea.geojson"), overwrite=T)
+
+
+# get the bounding box for the projected zone to be modelled
+vect_div_lea_extent <- ext(vect_div_lea)
+
+
+## Project the target locations
+
+# project the FTC locations
+vect_FTC_lea <- terra::project(vect_FTC, wkt_lea)
+plot(vect_div_lea_extent)
+plot(vect_subdiv_lea, add=T)
+plot(vect_FTC_lea, add=T)
+
+# write to disk
+writeVector(vect_FTC_lea, here::here("spatial_data/input/vect_FTC_lea.geojson"), overwrite=T)
+
+
+# project the woreda locations
+vect_woredaC_lea <- terra::project(vect_woredaC, wkt_lea)
+plot(vect_div_lea_extent)
+plot(vect_subdiv_lea, add=T)
+plot(vect_woredaC_lea, add=T)
+
+# write to disk
+writeVector(vect_woredaC_lea, here::here("spatial_data/input/vect_woredaC_lea.geojson"), overwrite=T)
+
+
+# project the zonal locations
+vect_zoneC_lea <- terra::project(vect_zoneC, wkt_lea)
+plot(vect_div_lea_extent)
+plot(vect_subdiv_lea, add=T)
+plot(vect_zoneC_lea, add=T)
+
+# write to disk
+writeVector(vect_zoneC_lea, here::here("spatial_data/input/vect_zoneC_lea.geojson"), overwrite=T)
+
+
+# project the local market locations
+vect_localmarket_lea <- terra::project(vect_localmarket, wkt_lea)
+plot(vect_div_lea_extent)
+plot(vect_subdiv_lea, add=T)
+plot(vect_localmarket_lea, add=T)
+
+# write to disk
+writeVector(vect_localmarket_lea, here::here("spatial_data/input/vect_localmarket_lea.geojson"), overwrite=T)
+
+
+# project the woreda market locations
+vect_woredamarket_lea <- terra::project(vect_woredamarket, wkt_lea)
+plot(vect_div_lea_extent)
+plot(vect_subdiv_lea, add=T)
+plot(vect_woredamarket_lea, add=T)
+
+# write to disk
+writeVector(vect_woredamarket_lea, here::here("spatial_data/input/vect_woredamarket_lea.geojson"), overwrite=T)
+
+
+# project the zone market locations
+vect_zonemarket_lea <- terra::project(vect_zonemarket, wkt_lea)
+plot(vect_div_lea_extent)
+plot(vect_subdiv_lea, add=T)
+plot(vect_zonemarket_lea, add=T)
+
+# write to disk
+writeVector(vect_zonemarket_lea, here::here("spatial_data/input/vect_zonemarket_lea.geojson"), overwrite=T)
+
+
+## Projct the roads
+
+# project the location to be modelled
+vect_roads_zone_lea <- terra::project(vect_roads_zone, wkt_lea)
+plot(vect_div_lea_extent)
+plot(vect_subdiv_lea, add=T)
+plot(vect_roads_zone_lea, add=T)
+
+# write to disk
+writeVector(vect_roads_zone_lea, here::here("spatial_data/input/vect_roads_zone_lea.geojson"), overwrite=T)
+
+
+## Project slope
+
+# project the location to be modelled - bilinear method
+rast_slope_zone_lea <- terra::project(rast_slope_zone, wkt_lea)
+plot(vect_div_lea_extent)
+plot(vect_subdiv_lea, add=T)
+plot(rast_slope_zone_lea, add=T)
+plot(vect_div_lea_extent, add=T)
+plot(vect_subdiv_lea, add=T)
+
+
+## Project landcover
+
+# project the landcover - nearest neighbour method
+rast_landcover_zone_lea <- terra::project(rast_landcover_zone, wkt_lea, method = 'near')
+plot(vect_div_lea_extent)
+plot(vect_subdiv_lea, add=T)
+plot(rast_landcover_zone_lea, add=T)
+plot(vect_div_lea_extent, add=T)
+plot(vect_subdiv_lea, add=T)
+
+
+
+# produce a mask raster for the modelling
+rast_mask <- rast(extent = vect_div_lea_extent, resolution = params$MASK, vals = c(1))
+plot(vect_div_lea_extent)
+plot(vect_subdiv_lea, add=T)
+plot(rast_mask, add=T)
+plot(vect_div_lea_extent, add=T)
+plot(vect_subdiv_lea, add=T)
+
+writeRaster(rast_mask, here::here("spatial_data/input/rast_mask.tif"), overwrite=T)
+
+rm(vect_div,vect_div_extent, vect_FTC, vect_localmarket, vect_roads_ext, vect_roads_zone, vect_woredaC, vect_subdiv, vect_zoneC, vect_zonemarket, rast_slope_zone, vect_woredamarket, rast_landcover_zone)
+
+gc()
+
+
+# 
+# #col = "transparent"
+# 
+# st_write(lulc_lea,here::here("output/lulc_lea.shp"), delete_dsn=TRUE)
+
+
+```
+
+
+
+## Generate slope and write to disk
+Slope is an important component in IRM. The landcover walking times assume a flat surface, but walking becomes more strenuous and takes longer when going up and down hills. Consequently, we will apply a multiplication factor to the surface. This factor has been derived from the literature and from experiments and has been used to create a global map of accessibility (Nelson, 2008).
+
+
+```{r slope generation, echo=FALSE, warning=FALSE, cache=TRUE, out.width=500}
+
+# #slo_in<-resample(srtm_lea)
+# 
+# slope_d <-terra::terrain(srtm_lea,v="slope", unit="degrees") ## create slope
+# #slope_d<-terra::rast(slope_d)
+# #slope_d <-terra::project(slope_d, mask_lea)
+# 
+# #slope_d<-as.SpatRaster(slope_d)
+# slope_r<-terra::resample(slope_d, mask_lea, method="near")
+# slope_r<-terra::project(slope_r,mask_lea)
+# 
+# slope_r_m<-mask(slope_r, mask_lea)
+# writeRaster(slope_r_m, here::here("output/slope_masked_laea.tif"), overwrite=T)
+# 
+# plot(slope_r_m, main="Slope in degrees")
+# plot(wo_lea, add=T, fill=F)
+# 
+# ## slope: compute same for zonal extent
+# slope_d_zo <-terra::terrain(srtm_lea_zo,v="slope", unit="degrees") ## create slope
+# 
+# 
+# slope_r_zo<-terra::resample(slope_d_zo, mask_lea_zo, method="near")
+# slope_r_zo<-terra::project(slope_r_zo,mask_lea_zo)
+# slope_r_zo_m<-mask(slope_r_zo, mask_lea_zo)
+# writeRaster(slope_r_zo_m, here::here("output/slope_zone_masked_laea.tif"), overwrite=T)
+# plot(slope_r_zo_m, main="Slope in degrees including zone center")
+# plot(wo_lea,add=T, fill=F)
+# 
+# 
+# #identical(crs(slope_r), crs(slope_r2)) # check if they are identical with projection
+# #identical(ext(slope_r),ext(slope_r2)) # check if they are identical with extent
+
+
+```
+
+## Resample
+
+<style>
+div.blue { background-color:#e6f0ff; border-radius: 5px; padding: 20px;}
+</style>
+<div class = "blue">
+
+</div>
+
+
+```{r resample, cache = TRUE, warning=FALSE, out.width=500}
+
+rast_slope_zone_lea_rsmp <- terra::resample(rast_slope_zone_lea, rast_mask, method = "bilinear")
+
+writeRaster(rast_slope_zone_lea, here::here("spatial_data/input/rast_slope_zone_lea_rsmp.tif"), overwrite=T)
+
+rast_landcover_zone_lea_rsmp <- terra::resample(rast_landcover_zone_lea, rast_mask, method = "near")
+
+writeRaster(rast_landcover_zone_lea_rsmp, here::here("spatial_data/input/rast_landcover_zone_lea_rsmp.tif"), overwrite=T)
+
+rm(rast_slope_zone_lea, rast_landcover_zone_lea)
+
+gc()
+
+```
+
+## Convert the road layer to raster and replace zero areas with NA
+For overlay operation the road layer has to be rasterized. In addition, areas that are outside the road should be treated as NA for later overlay with the landcover layer. When converting to raster, especially for coarse resolutiions, there is the possibility that when two classes of road are in the same raster cell then the less important road class is used. Therefore use the most appropriate function for rasterizing - most likely maximum or minimum.
+
+
+```{r Road_to_raster, cache=TRUE, warning=FALSE, out.width=500}
+
+#roq<-st_zm(ro1_lea) ### this basically changes to two dimentions
+#new
+
+# convert road max speed to time (in seconds) for the spatial resolution
+
+# the max speed in OSM sometimes reaches 400km/hr! Also the max speed is not the speed that a laden truck would reach so we need to modify the actual speeds based on the max speeds in the database
+
+# for vehicles
+# add a new variable called time
+# if max speed is 30kmh or below - then assume 30km/hr
+# if max speed is between 50kmh and 80kmh - then use the actual speed
+# if max speed is above 80kmh - then assume 80km/hr
+
+vect_roads_zone_lea_time_v <- vect_roads_zone_lea %>%
+  mutate(
+    time = case_when(
+      maxspeed <= 30 ~ as.integer((1 / ((
+        30 * 1000
+      ) / 3600)) * params$MASK),
+      maxspeed > 30 &
+        maxspeed < 80 ~ as.integer((1 / ((maxspeed * 1000) / 3600
+        )) * params$MASK),
+      maxspeed >= 80 ~ as.integer((1 / ((
+        80 * 1000
+      ) / 3600)) * params$MASK)
+    )
+  )
+
+# convert to raster - where geometries overlap we assume fastest speed (minimum time)
+
+rast_roads_zone_lea_time_v <- rasterize(vect_roads_zone_lea_time_v, field = "time", touches=TRUE, fun = min, rast_mask)
+plot(rast_roads_zone_lea_time_v, main="Rasterized road - vehicles")
+
+writeRaster(rast_roads_zone_lea_time_v, here::here("spatial_data/input/rast_roads_zone_lea_time_v.tif"), overwrite=T)
+
+# for walking
+# change the time variable to 5km/hr equivalent
+
+vect_roads_zone_lea_time_w <- vect_roads_zone_lea %>%
+  mutate(
+    time = as.integer((1 / ((5 * 1000) / 3600
+        )) * params$MASK)
+  )
+
+# convert to raster - where geometries overlap we assume fastest speed (minimum time)
+
+rast_roads_zone_lea_time_w <- rasterize(vect_roads_zone_lea_time_w, field = "time", touches=TRUE, fun = min, rast_mask)
+plot(rast_roads_zone_lea_time_w, main="Rasterized road - walking")
+
+writeRaster(rast_roads_zone_lea_time_w, here::here("spatial_data/input/rast_roads_zone_lea_time_w.tif"), overwrite=T)
+
+```
+
+
+## Reclassify land use land cover layer 
+The walking and travel is dependent on the landcover type. For example, lakes are barriers, walking on agricultural field and forest is not the same. Thus, land use land cover map was used in the model. Here, first the land use land cover was reclassified. The reclassify lookup table (word document is included herewith) maps the grid values to new reclassified values. The values in the table are those used to convert landcover to time (in seconds per 30m cell) which are an important component of the friction surfaces. the dflc file was entered in the first input lines above. 
+
+
+
+<style>
+div.blue { background-color:#e6f0ff; border-radius: 5px; padding: 20px;}
+</style>
+<div class = "blue">
+
+</div>
+
+```{r Land use land cover, echo=FALSE, warning=FALSE, cache=TRUE, out.width=500}
+
+##### land use land cover
+
+# classify values and export
+# is-becomes
+# if there are NA values convert these to a high time value ()
+
+v_clas_globcover_speed <- c(
+  190,  5.00,  12,  4.86,  16,  4.86,  141,  4.86,
+  143,  4.86,  150,  4.86,  151,  4.86,  152,  4.20,
+  42,  4.00,  50,  4.00,  60,  4.00,  20,  3.24,
+  21,  3.24,  30,  3.24,  31,  3.24,  32,  3.24,
+  41,  3.24,  70,  3.24,  90,  3.24,  91,  3.24,
+  92,  3.24,  100,  3.24,  101,  3.24,  110,  3.24,
+  120,  3.24,  130,  3.00,  131,  3.00,  134,  3.00,
+  140,  3.00,  200,  3.00,  201,  3.00,  202,  3.00,
+  203,  3.00,  11,  2.50,  13,  2.50,  14,  2.50,
+  15,  2.50,  160,  2.00,  161,  2.00,  162,  2.00,
+  170,  2.00,  180,  2.00,  181,  2.00,  185,  2.00,
+  40,  1.62,  220,  1.62,  210,  0.50, NA, 0.50)
+
+m_clas_globcover_speed <- matrix(v_clas_globcover_speed, ncol = 2, byrow = TRUE)
+
+rast_landcover_zone_lea_rsmp_rcl <- rast_landcover_zone_lea_rsmp %>% classify(m_clas_globcover_speed, include.lowest = TRUE)
+
+plot(rast_landcover_zone_lea_rsmp_rcl, main = "LULC speed reclassed")
+
+# convert landcover speed to time (in seconds) for the spatial resolution
+
+rast_landcover_zone_lea_rsmp_rcl_time <- ((1 / ((rast_landcover_zone_lea_rsmp_rcl * 1000) / 3600)) * params$MASK)
+
+plot(rast_landcover_zone_lea_rsmp_rcl_time, main = "LULC time reclassed")
+
+
+writeRaster(rast_landcover_zone_lea_rsmp_rcl_time, here::here("spatial_data/input/rast_landcover_zone_lea_rsmp_rcl_time.tif"), overwrite=T)
+
+```
+
+## Merge Road and land use land cover 
+
+The road layer and land use land cover layer are combined here. This will be used for the accessibility with vehicle and walk. 
+
+```{r road_lulc_merged, cache=FALSE, out.width=500}
+
+#### road and land use merge
+
+# Match the extent, resolution, and origin of raster2 to raster1
+# Get the extent of the bigger (zonal level extent)
+
+# load the roads for vehicles
+
+rast_roads_zone_lea_time_v <- load_raster_data("rast_roads_zone_lea_time_v", rast_roads_zone_lea_time_v)
+
+# load the roads for walking
+
+rast_roads_zone_lea_time_w <- load_raster_data("rast_roads_zone_lea_time_w", rast_roads_zone_lea_time_w)
+
+# load the land use
+
+rast_landcover_zone_lea_rsmp_rcl_time <- load_raster_data("rast_landcover_zone_lea_rsmp_rcl_time", rast_landcover_zone_lea_rsmp_rcl_time)
+
+
+# lulc_zo <-resample(lulc_lea_m,ror_wo_w,"near")
+# lulc_zo[is.na(lulc_zo)]<-43.2
+
+
+### vector of spatrasters for vehicles
+v_lulc_roads_v <- c(rast_roads_zone_lea_time_v, rast_landcover_zone_lea_rsmp_rcl_time)
+
+### vector of spatrasters for walking only
+v_lulc_roads_w <- c(rast_roads_zone_lea_time_w, rast_landcover_zone_lea_rsmp_rcl_time)
+
+### function for merging the landcover and roads
+f <- function(i) {ifelse(is.na(i[[1]]),i[[2]],i[[1]])}
+
+rast_landcover_zone_lea_rsmp_rcl_time_roads_v <- app(v_lulc_roads_v, f)
+rast_landcover_zone_lea_rsmp_rcl_time_roads_w <- app(v_lulc_roads_w, f)
+
+
+# ### for walking only
+# lc_ro<-c(ror_wo_w,lulc_zo) ## we used input for walking 
+# 
+# lc_ro_zo_w <- app(lc_ro, f) ### time by walking
+# 
+# ### for walking and driving. The difference is in the time input
+# lc_ro2<-c(ror_wo_d,lulc_zo)
+# lc_ro_zo_d <-app(lc_ro2,f)
+
+plot(rast_landcover_zone_lea_rsmp_rcl_time_roads_v, main="LULC and road merged (driving)")
+plot(rast_landcover_zone_lea_rsmp_rcl_time_roads_w, main="LULC and road merged (walking only)")
+
+
+writeRaster(rast_landcover_zone_lea_rsmp_rcl_time_roads_v, here::here("spatial_data/input/rast_landcover_zone_lea_rsmp_rcl_time_roads_v.tif"), overwrite=T)
+
+
+writeRaster(rast_landcover_zone_lea_rsmp_rcl_time_roads_w, here::here("spatial_data/input/rast_landcover_zone_lea_rsmp_rcl_time_roads_w.tif"), overwrite=T)
+
+```
+
+## Compute slope to m/m  and resample
+
+Slope was initially with degrees. To compute friction surface this needs to be converted in to meters rise to meters distance. 
+
+<style>
+div.blue { background-color:#e6f0ff; border-radius: 5px; padding: 20px;}
+</style>
+<div class = "blue">
+
+</div>
+
+```{r slope_mm, cache=FALSE, out.width=500}
+#slopemm<-slope/100
+
+rast_slope_zone_lea_rsmp_mm <- (tan((rast_slope_zone_lea_rsmp/360)*2*pi))
+rast_slope_zone_lea_rsmp_mm
+
+#slopem<-resample(slopem, masklea, method="bilinear") #make the same size
+
+plot(rast_slope_zone_lea_rsmp_mm, main="Slope m/m")
+
+writeRaster(rast_slope_zone_lea_rsmp_mm, here::here("spatial_data/input/rast_slope_zone_lea_rsmp_mm.tif"), overwrite=T)
+
+```
+
+# Convert targets to raster
+
+```{r targets_to_raster}
+
+rast_FTC_lea <- rasterize(vect_FTC_lea, rast_mask)
+plot(rast_FTC_lea, col=rainbow(4), main = "FTCs")
+writeRaster(rast_FTC_lea, here::here("spatial_data/input/rast_FTC_lea.tif"), overwrite=T)
+
+rast_woredaC_lea <- rasterize(vect_woredaC_lea, rast_mask)
+plot(rast_woredaC_lea, col=rainbow(4), main = "Woreda Centre")
+writeRaster(rast_woredaC_lea, here::here("spatial_data/input/rast_woredaC_lea.tif"), overwrite=T)
+
+rast_zoneC_lea <- rasterize(vect_zoneC_lea, rast_mask)
+plot(rast_zoneC_lea, col=rainbow(4), main = "Zone Centre")
+writeRaster(rast_zoneC_lea, here::here("spatial_data/input/rast_zoneC_lea.tif"), overwrite=T)
+
+rast_localmarket_lea <- rasterize(vect_localmarket_lea, rast_mask)
+plot(rast_localmarket_lea, col=rainbow(4), main = "Local Market")
+writeRaster(rast_localmarket_lea, here::here("spatial_data/input/rast_localmarket_lea.tif"), overwrite=T)
+
+rast_woredamarket_lea <- rasterize(vect_woredamarket_lea, rast_mask)
+plot(rast_woredamarket_lea, col=rainbow(4), main = "Woreda Market")
+writeRaster(rast_woredamarket_lea, here::here("spatial_data/input/rast_woredamarket_lea.tif"), overwrite=T)
+
+rast_zonemarket_lea <- rasterize(vect_zonemarket_lea, rast_mask)
+plot(rast_zonemarket_lea, col=rainbow(4), main = "Zone Market")
+writeRaster(rast_zonemarket_lea, here::here("spatial_data/input/rast_zonemarket_lea.tif"), overwrite=T)
+
+```
+
+
+
+
+# Accessibility modelling 
+
+## Re-read the input files from disk & check properties 
+
+Re-reading the files from disk is useful in case there will be a need to use other data sources for checkup or use as an input. This will provide flexibility for the modellers. 
+
+
+```{r re-read inputs, cache=TRUE, warning=FALSE, out.width=500}
+
+### re-read the input layers to separate acc mod from other input preparation
+
+
+# load the division boundaries
+vect_subdiv_lea  <- load_vector_data(paste0("vect_subdiv_lea"))
+vect_div_lea  <- load_vector_data(paste0("vect_div_lea"))
+
+# read the targets
+
+# load the FTC locations
+rast_FTC_lea <- load_raster_data("rast_FTC_lea", rast_FTC_lea)
+vect_FTC_lea  <- load_vector_data(paste0("vect_FTC_lea"))
+
+
+# load the woreda locations
+rast_woredaC_lea <- load_raster_data("rast_woredaC_lea", rast_woredaC_lea)
+vect_woredaC_lea  <- load_vector_data(paste0("vect_woredaC_lea"))
+
+# load the zonal locations
+rast_zoneC_lea <- load_raster_data("rast_zoneC_lea", rast_zoneC_lea)
+vect_zoneC_lea  <- load_vector_data(paste0("vect_zoneC_lea"))
+
+# load the local market locations
+rast_localmarket_lea <- load_raster_data("rast_localmarket_lea", rast_localmarket_lea)
+vect_localmarket_lea  <- load_vector_data(paste0("vect_localmarket_lea"))
+
+# load the woreda market locations
+rast_woredamarket_lea <- load_raster_data("rast_woredamarket_lea", rast_woredamarket_lea)
+vect_woredamarket_lea  <- load_vector_data(paste0("vect_woredamarket_lea"))
+
+# load the zone market locations
+rast_zonemarket_lea <- load_raster_data("rast_zonemarket_lea", rast_zonemarket_lea)
+vect_zonemarket_lea  <- load_vector_data(paste0("vect_zonemarket_lea"))
+
+
+
+## Get slope
+
+# load the slope (metre in metre) data
+rast_slope_zone_lea_rsmp_mm <- load_raster_data("rast_slope_zone_lea_rsmp_mm", rast_slope_zone_lea_rsmp_mm)
+
+
+## Get landcover/roads
+
+# load the merged road/landcover vehicles
+rast_landcover_zone_lea_rsmp_rcl_time_roads_v <- load_raster_data("rast_landcover_zone_lea_rsmp_rcl_time_roads_v", rast_landcover_zone_lea_rsmp_rcl_time_roads_v)
+
+# load the merged road/landcover walking
+rast_landcover_zone_lea_rsmp_rcl_time_roads_w <- load_raster_data("rast_landcover_zone_lea_rsmp_rcl_time_roads_w", rast_landcover_zone_lea_rsmp_rcl_time_roads_w)
+
+```
+
+## Plot of the input data sets
+
+```{r plot_all, fig.height=8, fig.width=10, warning=TRUE, cache=FALSE, out.width=800}
+
+#### plot the above in to one plot
+par(mfrow = c(3, 3))
+
+plot(
+  rast_landcover_zone_lea_rsmp_rcl_time_roads_v,
+  col = brewer.pal(10, "Set3"),
+  main = "Land use land cover and roads (seconds)",
+  axes = T
+)
+plot(vect_subdiv_lea, add = T);
+
+
+
+plot(rast_slope_zone_lea_rsmp_mm,
+     main = "Slope (m/m)",
+     axes = T)
+plot(vect_subdiv_lea, add = T);
+
+plot(rast_FTC_lea, main = "FTC", col=rainbow(4), axes = T);
+plot(vect_subdiv_lea, add = T);
+
+plot(rast_woredaC_lea, main = "woreda centre", col=rainbow(4), axes = T);
+plot(vect_subdiv_lea, add = T);
+
+plot(rast_zoneC_lea, main = "zone centre", col=rainbow(4), axes = T);
+plot(vect_div_lea, border = "light green", add = T);
+plot(vect_subdiv_lea, add = T);
+
+plot(rast_localmarket_lea, main = "local markets", col=rainbow(4), axes = T);
+plot(vect_subdiv_lea, add = T);
+
+plot(rast_woredamarket_lea, main = "woreda markets", col=rainbow(4), axes = T);
+plot(vect_subdiv_lea, add = T);
+
+plot(rast_zonemarket_lea, main = "zone markets", col=rainbow(4), axes = T);
+plot(vect_div_lea, border = "light green", add = T);
+plot(vect_subdiv_lea, add = T);
+
+
+```
+
+
+## Classify the road layer
+The road need to be classified using the road class and the time it takes to travel on a 30 meter pixel. On a 30 meter pixel on an asphalt road code 1 takes 2 seconds assuming 60km/hr.
+
+The resolution of the friction surface, and the modelling, can be set to 30 m. The value of each cell of the friction surface has been already calculated to show the time required in seconds to cross the cell. The cells with the lowest value show the time to travel 30m on a paved primary road, which is 2 seconds, assuming a speed of 60 km hr-1. Other roads have a lower speed and require longer to cross the cell. Roads will then be reclassified based on their time cost . Roads categorized as per the time cost (Farrow and Nelson, 2001). 
+
+The road network extracted from openstreet map (https://www.openstreetmap.org/) is not complete and up-to-date. This we need to check and digitize additional access roads (including all feeders). 
+
+At times there are also places where there is no road access. In such cases, walking distance and time cost will be considered until they reach the nearest road, and the drive distance and time cost are considered. The following data were used to classify the roads:
+
+<style>
+div.blue { background-color:#e6f0ff; border-radius: 5px; padding: 20px;}
+</style>
+<div class = "blue">
+
+</div>
+
+
+
+
+```{r Classify road, cache=FALSE, out.width=500}
+# 
+# ### rasterize road for the zone
+# ror_zo_w<-terra::rasterize(ro_leav, mask_lea_zo, field="Walk") # walk contains time for walking
+# ror_zo_w[ror_zo_w==0]<-NA
+# 
+# ror_zo_d<-terra::rasterize(ro_leav, mask_lea_zo, field="WD") # walk contains time for Drive
+# ror_zo_d[ror_zo_d==0]<-NA
+# 
+# 
+# 
+# ror_wo_w<-terra::mask(ror_zo_w, mask_lea_zo)
+# 
+# ror_wo_d<-terra::mask(ror_zo_d, mask_lea_zo)
+# 
+# 
+# plot(ror_zo_d, main="Reclassified zone road driving")
+# plot(ror_zo_w, main="Reclassified zone road walking")
+# 
+# plot(ror_wo_d, main="Reclassified woreda road driving")
+# plot(ror_wo_w, main="Reclassified woreda road walking")
+
+```
+
+
+
+
+
+
+## Friction surface with transport (walk and vehicle)
+The slope of the land surface is a factor that can slow down or speed up travel. There are a number of methods for determining the influence of slope on travel time. In our more recent modelling we have followed Nelson (2008) who refers to work by (van Wagtendonk and Benedict, 1980), and we apply the following factor:
+
+v = v0e-ks
+Where:
+v = off road foot-based velocity over the sloping terrain,
+v0 = the base speed of travel over flat terrain, which we get from the landcover,
+s = slope in gradient (metres per metre) and,
+k = a factor which defines the effect of slope on travel speed – estimated to be 3
+
+We calculated slope using the 30m SRTM elevation grid, giving a degrees rise or fall. We converted slope from degrees to vertical metres per horizontal metre. The metres-in-metre slope grid was multiplied by -3 and used as the power of the exponential function, and the inverse was used as the friction factor.  
+
+Slope affects both people walking as well as vehicular transport, therefore we apply the same factor to both the landcover and the road network.
+
+t = t0*eks
+
+
+
+```{r Friction_transport, cache=FALSE, out.width=500}
+
+#f3<-function(x,y) x/(exp(-3*y))
+f3<-function(i) {i[[1]]*(exp(3*i[[2]]))}
+
+stfv<-c(rast_landcover_zone_lea_rsmp_rcl_time_roads_v, rast_slope_zone_lea_rsmp_mm)
+stfw<-c(rast_landcover_zone_lea_rsmp_rcl_time_roads_w, rast_slope_zone_lea_rsmp_mm)
+
+rast_friction_v <-app(stfv, fun=f3)
+crs(rast_friction_v) <- wkt_lea
+
+rast_friction_w <-app(stfw, fun=f3)
+crs(rast_friction_w) <- wkt_lea
+
+
+writeRaster(rast_friction_v, here::here("spatial_data/input/rast_friction_v.tif"), overwrite=T)
+writeRaster(rast_friction_w, here::here("spatial_data/input/rast_friction_w.tif"), overwrite=T)
+
+#colorRamp(colors, bias = 1, space = c("rgb", "Lab"),
+#          interpolate = c("linear", "spline"), alpha = FALSE)
+
+
+colfunc <- colorRampPalette(heat.colors(20), bias=10)
+
+plot(rast_friction_v, col = colfunc(10000), main = "Friction surface from vehicle and walking")
+plot(rast_friction_w, col = colfunc(10000), main = "Friction surface from walking only")
+
+```
+
+
+## Accessibility to service locations by vehicle and walking
+
+Here below Accessibility to FTC by vehicle and walk, Accessibility to woreda by vehicle and walk, Accessibility to Zone by vehicle and walk maps are generated. The maps can be further reclassified into hours using the reclassify function of raster package. 
+
+```{r Transition_walk_vehicle, cache=FALSE, out.width=1000, fig.width=10, fig.height=10}
+
+# Apply the function to each cell of the friction matrix
+
+raster_friction_v <- as(rast_friction_v, "Raster")
+trans_v <- gdistance::transition(raster_friction_v, function(x)
+  1 / mean(x), 8) 
+#trans_v_gc <- geoCorrection(trans_v) #Correct 'TransitionLayer' objects taking into account local distances
+
+```
+
+
+```{r Access_service_walk_vehicle, cache=FALSE, out.width=1000, fig.width=10, fig.height=10}
+
+# set the graphical parameters to a 2 * 2 grid of plots
+par(mfrow=c(2,2))
+
+# transport to FTC location
+rast_cost_v_FTC <- gdistance::accCost(trans_v, geom(vect_FTC_lea)[, 3:4]) %>% rast()
+
+crs(rast_cost_v_FTC) <- wkt_lea
+writeRaster(rast_cost_v_FTC, here::here(paste0("spatial_data/input/rast_cost_v_FTC_", params$DIVCODE,".tif")), overwrite=T)
+
+rast_cost_v_FTC_hr <- rast_cost_v_FTC / 3600
+
+plot(rast_cost_v_FTC_hr,
+     col = brewer.pal(12, "Set3"),
+     axes = T,
+     main = "Vehicle and walking access to FTC location (hours)")
+plot(vect_FTC_lea, add = T)
+
+writeRaster(rast_cost_v_FTC_hr, here::here(paste0("spatial_data/input/rast_cost_v_FTC_hr_", params$DIVCODE,".tif")), overwrite=T)
+
+
+## transport to woreda location
+rast_cost_v_woredaC <- gdistance::accCost(trans_v, geom(vect_woredaC_lea)[, 3:4]) %>% rast()
+
+crs(rast_cost_v_woredaC) <- wkt_lea
+writeRaster(rast_cost_v_woredaC, here::here(paste0("spatial_data/input/rast_cost_v_woredaC_", params$DIVCODE,".tif")), overwrite=T)
+
+rast_cost_v_woredaC_hr <- rast_cost_v_woredaC / 3600
+
+plot(rast_cost_v_woredaC_hr,
+     col = brewer.pal(12, "Set3"),
+     axes = T,
+     main = "Vehicle and walking access to woreda centre location (hours)")
+plot(vect_woredaC_lea, add = T)
+
+writeRaster(rast_cost_v_woredaC_hr, here::here(paste0("spatial_data/input/rast_cost_v_woredaC_hr_", params$DIVCODE,".tif")), overwrite=T)
+
+
+## transport to zone location
+rast_cost_v_zoneC <- gdistance::accCost(trans_v, geom(vect_zoneC_lea)[, 3:4]) %>% rast()
+
+crs(rast_cost_v_zoneC) <- wkt_lea
+writeRaster(rast_cost_v_zoneC, here::here(paste0("spatial_data/input/rast_cost_v_zoneC_", params$DIVCODE,".tif")), overwrite=T)
+
+rast_cost_v_zoneC_hr <- rast_cost_v_zoneC / 3600
+
+plot(rast_cost_v_zoneC_hr,
+     col = brewer.pal(12, "Set3"),
+     axes = T,
+     main = "Vehicle and walking access to zone centre location (hours)")
+plot(vect_zoneC_lea, add = T)
+
+writeRaster(rast_cost_v_zoneC_hr, here::here(paste0("spatial_data/input/rast_cost_v_zoneC_hr_", params$DIVCODE,".tif")), overwrite=T)
+
+
+```
+
+## Accessibility to service locations by walking only
+
+Here below Accessibility to FTC by walking, Accessibility to woreda by walking, Accessibility to Zone by walking maps are generated. The maps can be further reclassified into hours using the reclassify function of raster package. 
+
+```{r Transition_walk, cache=FALSE, out.width=1000, fig.width=10, fig.height=10}
+
+# Apply the function to each cell of the friction matrix
+
+raster_friction_w <- as(rast_friction_w, "Raster")
+trans_w <- gdistance::transition(raster_friction_w, function(x)
+  1 / mean(x), 8) 
+#trans_w_gc <- geoCorrection(trans_w) #Correct 'TransitionLayer' objects taking into account local distances
+
+```
+
+
+```{r Access_service_walk, cache=FALSE, out.width=1000, fig.width=10, fig.height=10}
+
+# set the graphical parameters to a 2 * 2 grid of plots
+par(mfrow=c(2,2))
+
+# walking to FTC location
+rast_cost_w_FTC <- gdistance::accCost(trans_w, geom(vect_FTC_lea)[, 3:4]) %>% rast()
+
+crs(rast_cost_w_FTC) <- wkt_lea
+writeRaster(rast_cost_w_FTC, here::here(paste0("spatial_data/input/rast_cost_w_FTC_", params$DIVCODE,".tif")), overwrite=T)
+
+rast_cost_w_FTC_hr <- rast_cost_w_FTC / 3600
+
+plot(rast_cost_w_FTC_hr,
+     col = brewer.pal(12, "Set3"),
+     axes = T,
+     main = "Walking access to FTC location (hours)")
+plot(vect_FTC_lea, add = T)
+
+writeRaster(rast_cost_w_FTC_hr, here::here(paste0("spatial_data/input/rast_cost_w_FTC_hr_", params$DIVCODE,".tif")), overwrite=T)
+
+
+## walking to woreda location
+rast_cost_w_woredaC <- gdistance::accCost(trans_w, geom(vect_woredaC_lea)[, 3:4]) %>% rast()
+
+crs(rast_cost_w_woredaC) <- wkt_lea
+writeRaster(rast_cost_w_woredaC, here::here(paste0("spatial_data/input/rast_cost_w_woredaC_", params$DIVCODE,".tif")), overwrite=T)
+
+rast_cost_w_woredaC_hr <- rast_cost_w_woredaC / 3600
+
+plot(rast_cost_w_woredaC_hr,
+     col = brewer.pal(12, "Set3"),
+     axes = T,
+     main = "Walking access to woreda centre location (hours)")
+plot(vect_woredaC_lea, add = T)
+
+writeRaster(rast_cost_w_woredaC_hr, here::here(paste0("spatial_data/input/rast_cost_w_woredaC_hr_", params$DIVCODE,".tif")), overwrite=T)
+
+
+## walking to zone location
+rast_cost_w_zoneC <- gdistance::accCost(trans_w, geom(vect_zoneC_lea)[, 3:4]) %>% rast()
+
+crs(rast_cost_w_zoneC) <- wkt_lea
+writeRaster(rast_cost_w_zoneC, here::here(paste0("spatial_data/input/rast_cost_w_zoneC_", params$DIVCODE,".tif")), overwrite=T)
+
+rast_cost_w_zoneC_hr <- rast_cost_w_zoneC / 3600
+
+plot(rast_cost_w_zoneC_hr,
+     col = brewer.pal(12, "Set3"),
+     axes = T,
+     main = "Walking access to zone centre location (hours)")
+plot(vect_zoneC_lea, add = T)
+
+writeRaster(rast_cost_w_zoneC_hr, here::here(paste0("spatial_data/input/rast_cost_w_zoneC_hr_", params$DIVCODE,".tif")), overwrite=T)
+
+
+```
+
+## Accessibility to markets by vehicle and walking
+
+Here below Accessibility to local markets by vehicle and walk, Accessibility to woreda markets by vehicle and walk, Accessibility to Zone markets by vehicle and walk are generated. The maps can be further reclassified into hours using the reclassify function of raster package. 
+
+```{r Access_markets_walk_vehicle, cache=FALSE, out.width=1000, fig.width=10, fig.height=10}
+
+# set the graphical parameters to a 2 * 2 grid of plots
+par(mfrow=c(2,2))
+
+# transport to local market
+rast_cost_v_localmarket <- gdistance::accCost(trans_v, geom(vect_localmarket_lea)[, 3:4]) %>% rast()
+
+crs(rast_cost_v_localmarket) <- wkt_lea
+writeRaster(rast_cost_v_localmarket, here::here(paste0("spatial_data/input/rast_cost_v_localmarket_", params$DIVCODE,".tif")), overwrite=T)
+
+rast_cost_v_localmarket_hr <- rast_cost_v_localmarket / 3600
+
+plot(rast_cost_v_localmarket_hr,
+     col = brewer.pal(12, "Set3"),
+     axes = T,
+     main = "Vehicle and walking access to local market (hours)")
+plot(vect_localmarket_lea, add = T)
+
+writeRaster(rast_cost_v_localmarket_hr, here::here(paste0("spatial_data/input/rast_cost_v_localmarket_hr_", params$DIVCODE,".tif")), overwrite=T)
+
+
+## transport to woreda market
+rast_cost_v_woredamarket <- gdistance::accCost(trans_v, geom(vect_woredamarket_lea)[, 3:4]) %>% rast()
+
+crs(rast_cost_v_woredamarket) <- wkt_lea
+writeRaster(rast_cost_v_woredamarket, here::here(paste0("spatial_data/input/rast_cost_v_woredamarket_", params$DIVCODE,".tif")), overwrite=T)
+
+rast_cost_v_woredamarket_hr <- rast_cost_v_woredamarket / 3600
+
+plot(rast_cost_v_woredamarket_hr,
+     col = brewer.pal(12, "Set3"),
+     axes = T,
+     main = "Vehicle and walking access to woreda market (hours)")
+plot(vect_woredamarket_lea, add = T)
+
+writeRaster(rast_cost_v_woredamarket_hr, here::here(paste0("spatial_data/input/rast_cost_v_woredamarket_hr_", params$DIVCODE,".tif")), overwrite=T)
+
+
+## transport to zone market
+rast_cost_v_zonemarket <- gdistance::accCost(trans_v, geom(vect_zonemarket_lea)[, 3:4]) %>% rast()
+
+crs(rast_cost_v_zonemarket) <- wkt_lea
+writeRaster(rast_cost_v_zonemarket, here::here(paste0("spatial_data/input/rast_cost_v_zonemarket_", params$DIVCODE,".tif")), overwrite=T)
+
+rast_cost_v_zonemarket_hr <- rast_cost_v_zonemarket / 3600
+
+plot(rast_cost_v_zonemarket_hr,
+     col = brewer.pal(12, "Set3"),
+     axes = T,
+     main = "Vehicle and walking access to zone market (hours)")
+plot(vect_zonemarket_lea, add = T)
+
+writeRaster(rast_cost_v_zonemarket_hr, here::here(paste0("spatial_data/input/rast_cost_v_zonemarket_hr_", params$DIVCODE,".tif")), overwrite=T)
+
+
+```
+
+## Accessibility to markets by walking only
+
+Here below Accessibility to local markets by walking, Accessibility to woreda markets by walking, Accessibility to Zone markets by walking maps are generated. The maps can be further reclassified into hours using the reclassify function of raster package. 
+
+
+```{r Access_markets_walk, cache=FALSE, out.width=1000, fig.width=10, fig.height=10}
+
+# set the graphical parameters to a 2 * 2 grid of plots
+par(mfrow=c(2,2))
+
+# walking to local market
+rast_cost_w_localmarket <- gdistance::accCost(trans_w, geom(vect_localmarket_lea)[, 3:4]) %>% rast()
+
+crs(rast_cost_w_localmarket) <- wkt_lea
+writeRaster(rast_cost_w_localmarket, here::here(paste0("spatial_data/input/rast_cost_w_localmarket_", params$DIVCODE,".tif")), overwrite=T)
+
+rast_cost_w_localmarket_hr <- rast_cost_w_localmarket / 3600
+
+plot(rast_cost_w_localmarket_hr,
+     col = brewer.pal(12, "Set3"),
+     axes = T,
+     main = "Walking access to local market (hours)")
+plot(vect_localmarket_lea, add = T)
+
+writeRaster(rast_cost_w_localmarket_hr, here::here(paste0("spatial_data/input/rast_cost_w_localmarket_hr_", params$DIVCODE,".tif")), overwrite=T)
+
+
+## walking to woreda market
+rast_cost_w_woredamarket <- gdistance::accCost(trans_w, geom(vect_woredamarket_lea)[, 3:4]) %>% rast()
+
+crs(rast_cost_w_woredamarket) <- wkt_lea
+writeRaster(rast_cost_w_woredamarket, here::here(paste0("spatial_data/input/rast_cost_w_woredamarket_", params$DIVCODE,".tif")), overwrite=T)
+
+rast_cost_w_woredamarket_hr <- rast_cost_w_woredamarket / 3600
+
+plot(rast_cost_w_woredamarket_hr,
+     col = brewer.pal(12, "Set3"),
+     axes = T,
+     main = "Walking access to woreda market (hours)")
+plot(vect_woredamarket_lea, add = T)
+
+writeRaster(rast_cost_w_woredamarket_hr, here::here(paste0("spatial_data/input/rast_cost_w_woredamarket_hr_", params$DIVCODE,".tif")), overwrite=T)
+
+
+## walking to zone market
+rast_cost_w_zonemarket <- gdistance::accCost(trans_w, geom(vect_zonemarket_lea)[, 3:4]) %>% rast()
+
+crs(rast_cost_w_zonemarket) <- wkt_lea
+writeRaster(rast_cost_w_zonemarket, here::here(paste0("spatial_data/input/rast_cost_w_zonemarket_", params$DIVCODE,".tif")), overwrite=T)
+
+rast_cost_w_zonemarket_hr <- rast_cost_w_zonemarket / 3600
+
+plot(rast_cost_w_zonemarket_hr,
+     col = brewer.pal(12, "Set3"),
+     axes = T,
+     main = "Walking access to zone market (hours)")
+plot(vect_zonemarket_lea, add = T)
+
+writeRaster(rast_cost_w_zonemarket_hr, here::here(paste0("spatial_data/input/rast_cost_w_zonemarket_hr_", params$DIVCODE,".tif")), overwrite=T)
+
+
+```
+
