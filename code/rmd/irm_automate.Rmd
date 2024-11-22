@@ -24,9 +24,9 @@ params:
   INN1: pearl_millet
   RES1: 3
   SOS1: 0
-  FAOCLASS1: 1
-  LIMITS1: 1
-  CONCCLASS1: 7
+  FAOCLASS1: 3
+  LIMITS1: 3
+  CONCCLASS1: 3
   TRIAD1: Adoption
   TRIBA1: Aptitude
   TRISE1: Feasible
@@ -39,8 +39,6 @@ params:
   TRIAD2: Adoption
   TRIBA2: Aptitude
   TRISE2: Feasible
-
-
 ---
 
 ```{r}
@@ -366,7 +364,7 @@ df_requirements_i1 <- df_requirements_i1[complete.cases(df_requirements_i1$ruleb
 
 
 df_requirements_short_i1 <-
-  df_requirements_i1 %>% select(stack, criterion, weight, threshold, threshold2,	width,	width2)
+  df_requirements_i1 %>% dplyr::select(stack, criterion, weight, threshold, threshold2,	width,	width2)
 
 
 df_requirements_short_i1$stack[is.na(df_requirements_short_i1$stack)] <-
@@ -425,7 +423,7 @@ df_leaves_i1 <- ToDataFrameTypeCol(tree_plot_i1)
 df_leaves_criterion_i1 <- as.data.frame( df_leaves_i1[cbind(seq(nrow(df_leaves_i1)), max.col(!is.na(df_leaves_i1), ties.method = 'last'))])
 names(df_leaves_criterion_i1) <- c("criterion")
   
-df_leaves_i1 %>% select(- level_1) %>% kable(digits = 3, caption = "Criteria with spatial data") %>% kable_styling("striped", full_width = T) %>%  scroll_box(height = "500px")
+df_leaves_i1 %>% dplyr::select(- level_1) %>% kable(digits = 3, caption = "Criteria with spatial data") %>% kable_styling("striped", full_width = T) %>%  scroll_box(height = "500px")
 
 ```
 
@@ -602,7 +600,7 @@ plot(tree_plot_i1)
 ```{r i1_criteria_codes}
 
 df_requirements_short_i1 <-
-  df_requirements_i1 %>% select(rulebase_stack, rulebase_number, weight, threshold, threshold2,	width,	width2)
+  df_requirements_i1 %>% dplyr::select(rulebase_stack, rulebase_number, weight, threshold, threshold2,	width,	width2)
 
 
 df_requirements_short_i1$rulebase_stack[is.na(df_requirements_short_i1$rulebase_stack)] <-
@@ -2946,15 +2944,28 @@ apply(df_leaves_data_i1, 1, function(df_leaves_row_i1) {
     as.numeric(c((as.numeric(df_leaves_row_i1["threshold"]) - as.numeric(df_leaves_row_i1["width"])), (as.numeric(df_leaves_row_i1["threshold"]) + as.numeric(df_leaves_row_i1["width"]))))
   
   # construct the fuzzy partition
-  assign(
-    paste0("fp_", as.character(df_leaves_row_i1["rulebase_number"])),
-    LinearFuzzyPartition(
-      level = prop_levels_i1,
-      crossoverPoint = cross_points_i1,
-      transitionWidth = trans_width_i1
-    ),
-    .GlobalEnv
-  )
+  # get the type of fuzzy partition - linear or zadeh
+    
+  if(as.character(df_leaves_row_i1["fuzzy_partition"]) == "linear") {
+    assign(
+      paste0("fp_", as.character(df_leaves_row_i1["rulebase_number"])),
+      LinearFuzzyPartition(
+        level = prop_levels_i1,
+        crossoverPoint = cross_points_i1,
+        transitionWidth = trans_width_i1
+      ),
+      .GlobalEnv
+    )
+  } else {
+    assign(
+      paste0("fp_", as.character(df_leaves_row_i1["rulebase_number"])),
+      ZadehFuzzyPartition(
+        level = prop_levels_i1,
+        crossoverPoint = cross_points_i1,
+        transitionWidth = trans_width_i1
+      ),
+      .GlobalEnv)
+  }
   
   # construct the fuzzy partition plot
   plot_fp_i1 <- plot(
@@ -4286,12 +4297,15 @@ if (params$INN2 == "NA") {
   cat("# Session Information
       ")
   
+  knitr::current_input(dir = TRUE) 
+  
   si_1 <- sessionInfo()
-  si_1
+  
+  print(si_1)
   
   
-  cat(
-    "# Acknowledgements
+  cat("
+    # Acknowledgements
 
 Javascript code and css style used in this script by Martin Schmelzer
 
@@ -9213,11 +9227,9 @@ for (i in length(rb_i12):1)   {
   }
 }  
 
-
 ```
 
 #### FAO Limitations
-
 
 ```{r compare_subdiv_pc_FAOlimits, results = 'asis', out.width="100%"}
 
@@ -9514,7 +9526,6 @@ for (i in length(rb_i12):1)   {
 
 ```
 
-
 ## Yield proportion comparison
 
 <div class="fold o"> 
@@ -9657,7 +9668,6 @@ gc2 <- add_subdiv_proj_simple_plot(gc, vect_subdiv_i1)
 
 gc2
 
-
 ```
 </div>
 
@@ -9738,8 +9748,6 @@ gcsum <- ggplot() +
     colours = hcl.colors(palette = "PiYG", 10, rev = FALSE),
     guide = "legend") +
   labs(fill = "Combined yield %")
-
-
 
   gcsum2 <- add_subdiv_proj_simple_plot(gcsum, vect_subdiv_i1)
   
@@ -9889,7 +9897,6 @@ gc2 <- add_subdiv_proj_simple_plot(gc, vect_subdiv_i1)
 
 gc2
 
-
 ```
 </div>
 
@@ -9959,7 +9966,6 @@ output_csv(
   paste0("yield_compl_", params$INN1, "_", params$INN2)
 ) # save as a csv file 
 
-
 gcsum <- ggplot() +
   geom_spatraster(data = rast_yield_compl,
                   na.rm = TRUE,
@@ -9981,7 +9987,6 @@ gcsum2
 ```
 </div>
 
-
   
 ```{r}
 
@@ -9989,22 +9994,25 @@ if (params$INT == 1)
   shiny::setProgress(0.99, message = "Finished - just writing html file")  # set progress to 99%
 ```
   
+  
 # Session Information
   
 <div class="fold o"> 
 ```{r}
+
+knitr::current_input(dir = TRUE) 
 
 sessionInfo()
 
 ``` 
 </div>
 
+
 # Acknowledgements
 
 Javascript code and css style used in this script by Martin Schmelzer
 
 https://stackoverflow.com/questions/37755037/how-to-add-code-folding-to-output-chunks-in-rmarkdown-html-documents
-
 
 Timing for chunks by Yihui Xie
 https://stackoverflow.com/questions/24595280/timing-for-chunks

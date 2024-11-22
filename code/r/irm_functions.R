@@ -282,6 +282,7 @@ evaluate_lowest_rb <- function(theme_rbs_tbl, n_theme) {
   cond_data_list <- vector(mode = "list", length = 0)
   
   for (i in 1:n_theme) {
+    
     if (!is.na(theme_rbs_tbl[i, 18])) {
       # for those criteria with three proposition values
       # get  the 3 proposition levels

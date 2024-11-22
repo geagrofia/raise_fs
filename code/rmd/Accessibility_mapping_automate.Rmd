@@ -213,7 +213,7 @@ rast_slope_zone <- crop(rast_slope, vect_div_extent)
 ## Get landcover
 
 # load the landcover data
-rast_landcover <- load_raster_data("globcover", rast_landcover)
+rast_landcover <- load_raster_data("worldcover200_308", rast_landcover)
 
 # clip the landcover to the zone
 rast_landcover_zone <- crop(rast_landcover, vect_div_extent)
@@ -535,9 +535,9 @@ For overlay operation the road layer has to be rasterized. In addition, areas th
 
 # for vehicles
 # add a new variable called time
-# if max speed is 30kmh or below - then assume 30km/hr
-# if max speed is between 50kmh and 80kmh - then use the actual speed
-# if max speed is above 80kmh - then assume 80km/hr
+# if max speed is 30km/hr or below - then assume 30km/hr
+# if max speed is between 50km/hr and 80km/hr - then use the actual speed
+# if max speed is above 80km/hr - then assume 80km/hr
 
 vect_roads_zone_lea_time_v <- vect_roads_zone_lea %>%
   mutate(
@@ -600,23 +600,40 @@ div.blue { background-color:#e6f0ff; border-radius: 5px; padding: 20px;}
 # is-becomes
 # if there are NA values convert these to a high time value ()
 
-v_clas_globcover_speed <- c(
-  190,  5.00,  12,  4.86,  16,  4.86,  141,  4.86,
-  143,  4.86,  150,  4.86,  151,  4.86,  152,  4.20,
-  42,  4.00,  50,  4.00,  60,  4.00,  20,  3.24,
-  21,  3.24,  30,  3.24,  31,  3.24,  32,  3.24,
-  41,  3.24,  70,  3.24,  90,  3.24,  91,  3.24,
-  92,  3.24,  100,  3.24,  101,  3.24,  110,  3.24,
-  120,  3.24,  130,  3.00,  131,  3.00,  134,  3.00,
-  140,  3.00,  200,  3.00,  201,  3.00,  202,  3.00,
-  203,  3.00,  11,  2.50,  13,  2.50,  14,  2.50,
-  15,  2.50,  160,  2.00,  161,  2.00,  162,  2.00,
-  170,  2.00,  180,  2.00,  181,  2.00,  185,  2.00,
-  40,  1.62,  220,  1.62,  210,  0.50, NA, 0.50)
+### USING GLOBCOVER
 
-m_clas_globcover_speed <- matrix(v_clas_globcover_speed, ncol = 2, byrow = TRUE)
+# v_clas_globcover_speed <- c(
+#   190,  5.00,  12,  4.86,  16,  4.86,  141,  4.86,
+#   143,  4.86,  150,  4.86,  151,  4.86,  152,  4.20,
+#   42,  4.00,  50,  4.00,  60,  4.00,  20,  3.24,
+#   21,  3.24,  30,  3.24,  31,  3.24,  32,  3.24,
+#   41,  3.24,  70,  3.24,  90,  3.24,  91,  3.24,
+#   92,  3.24,  100,  3.24,  101,  3.24,  110,  3.24,
+#   120,  3.24,  130,  3.00,  131,  3.00,  134,  3.00,
+#   140,  3.00,  200,  3.00,  201,  3.00,  202,  3.00,
+#   203,  3.00,  11,  2.50,  13,  2.50,  14,  2.50,
+#   15,  2.50,  160,  2.00,  161,  2.00,  162,  2.00,
+#   170,  2.00,  180,  2.00,  181,  2.00,  185,  2.00,
+#   40,  1.62,  220,  1.62,  210,  0.50, NA, 0.50)
+# 
+# m_clas_globcover_speed <- matrix(v_clas_globcover_speed, ncol = 2, byrow = TRUE)
+# 
+# rast_landcover_zone_lea_rsmp_rcl <- rast_landcover_zone_lea_rsmp %>% classify(m_clas_globcover_speed, include.lowest = TRUE)
 
-rast_landcover_zone_lea_rsmp_rcl <- rast_landcover_zone_lea_rsmp %>% classify(m_clas_globcover_speed, include.lowest = TRUE)
+### USING WORLDCOVER
+
+v_clas_worldcover_speed <- c(
+  50,  5.00,  
+  60,  4.86,  
+  20,  3.00,  30,  3.00,  100,  3.00,  
+  40,  2.50,
+  90,  2.00,
+  10,  1.62,  70,  1.62,
+  80,  0.50, NA, 0.50)
+
+m_clas_worldcover_speed <- matrix(v_clas_worldcover_speed, ncol = 2, byrow = TRUE)
+
+rast_landcover_zone_lea_rsmp_rcl <- rast_landcover_zone_lea_rsmp %>% classify(m_clas_worldcover_speed, include.lowest = TRUE)
 
 plot(rast_landcover_zone_lea_rsmp_rcl, main = "LULC speed reclassed")
 
@@ -628,6 +645,9 @@ plot(rast_landcover_zone_lea_rsmp_rcl_time, main = "LULC time reclassed")
 
 
 writeRaster(rast_landcover_zone_lea_rsmp_rcl_time, here::here("spatial_data/input/rast_landcover_zone_lea_rsmp_rcl_time.tif"), overwrite=T)
+
+
+
 
 ```
 
