@@ -103,7 +103,7 @@ sfc_as_cols <- function(x, names = c("x","y")) {
 # the SpatRaster to be projected (x) and a template SpatRaster 
 # the resolution and crs from the template are used
 
-# optional arguments are the method (y) bilinear or ngb, mask
+# optional arguments are the method (y) bilinear or near, mask
 
 raster_project <- function(x, y, rast_mask_proj) {
   raster_proj <- terra::project(

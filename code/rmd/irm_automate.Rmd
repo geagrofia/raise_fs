@@ -17,11 +17,11 @@ params:
   Agg: 1
   MASK: 250
   EXT: Ethiopia
-  DIVCODE: W_CODE
-  LOCCODE: 30801
-  DIVNAME: W_NAME
-  SUBDIVNAME: RK_NAME
-  INN1: pearl_millet
+  DIVCODEVAR: W_CODE
+  DIVCODEVAL: 30801
+  DIVNAMEVAR: W_NAME
+  SUBDIVNAMEVAR: RK_NAME
+  INN1: pearl_millet_lu
   RES1: 3
   SOS1: 0
   FAOCLASS1: 3
@@ -196,6 +196,9 @@ knitr::knit_hooks$set(time_it = local({
 
 ```{r general_parameters, echo=FALSE, message=FALSE, warning=FALSE, results='asis'}
 
+
+
+
 cat("\n\n# General Parameters\n\n")
 
 
@@ -205,7 +208,8 @@ cat("</div>")
 
 cat("<div class='Agg'>")
 cat("Mask Resolution =", params$MASK)
-cat("\nSpatial Aggregation =", params$Agg)
+cat("\n\nSpatial Aggregation =", params$Agg)
+cat("\n\nFilename: ", knitr::current_input(dir = TRUE))
 cat("</div>")
 
 ```
@@ -220,6 +224,9 @@ cat("<div class='Agg'>")
 cat("\n\nSpatially Dynamic Growing Season = ", params$SOS1)
 cat("</div>")
 
+
+
+
 # season onset non-spatial?
 # this enables the script to skip the non relevant chunks when using console
 
@@ -233,6 +240,7 @@ if (params$SOS1 == 1){
 } else {sos_crit_i1 <- FALSE}
 
 ```
+
 
 # Basic Settings
 
@@ -716,7 +724,7 @@ wkt_geo <-  paste0( "
 vect_ext_i1 <- load_vector_data(paste0("subdiv_", params$EXT))
 
 # select the location to be modelled
-vect_subdiv_i1 <- select_location(vect_ext_i1, params$DIVCODE, params$LOCCODE)
+vect_subdiv_i1 <- select_location(vect_ext_i1, params$DIVCODEVAR, params$DIVCODEVAL)
 
 vect_subdiv_i1$ID <- seq.int(nrow(vect_subdiv_i1))# add an id field
 vect_subdiv_i1$id <- formatC(vect_subdiv_i1$ID, width = 2, format = "d", flag = "0") #format the id field
@@ -735,7 +743,7 @@ nudge_yval_i1 <-
   ((vect_subdiv_extent_i1[4] - vect_subdiv_extent_i1[3]) / (nrow(vect_subdiv_i1) * 2.5))
 
 vect_subdiv_pt_i1 <- centroids(vect_subdiv_i1)
-expr <- paste0("vect_subdiv_pt_i1$", params$SUBDIVNAME)
+expr <- paste0("vect_subdiv_pt_i1$", params$SUBDIVNAMEVAR)
 vect_subdiv_pt_i1$subdiv_label <- paste(vect_subdiv_pt_i1$id, "=", eval(parse(text=(expr))))
 vect_subdiv_pt_i1$subdiv_label <- factor(vect_subdiv_pt_i1$subdiv_label)
 
@@ -749,7 +757,7 @@ gsubdiv_i1
 <div class="fold o">   
 ```{r i1_spatialdataload_vector_02, cache = FALSE, out.width="100%", include = TRUE, echo=FALSE}
 
-vect_triangulation_i1 <- load_vector_data( paste0("triangulation_", params$LOCCODE,"_", params$INN1))
+vect_triangulation_i1 <- load_vector_data( paste0("triangulation_", params$DIVCODEVAL,"_", params$INN1))
 
 vect_triangulation_i1$ID <- seq.int(nrow(vect_triangulation_i1))# add an id field
 vect_triangulation_i1$id <- formatC(vect_triangulation_i1$ID, width = 2, format = "d", flag = "0") #format the id field
@@ -921,6 +929,13 @@ The properties of this map are shown below:
 
 if (params$Agg == 1){rast_mask_proj_i1 <- rast_subdiv_mask_proj_i1 } else {
   rast_mask_proj_i1 <- aggregate(rast_subdiv_mask_proj_i1, fact = params$Agg, na.rm=TRUE)}
+
+rast_mask_proj_filename_i1 <-
+  paste0("spatial_data/input/rast_mask_proj_i1.tif")
+
+writeRaster(rast_mask_proj_i1,
+            here(rast_mask_proj_filename_i1),
+            overwrite = TRUE)
 
 res_rast_mask_proj_comma_i1 <- scales::label_comma(accuracy = NULL)(res(rast_mask_proj_i1))
 
@@ -3548,7 +3563,7 @@ for (i in 1:length(list_rast_clas_FAO_cat))   {
   
     # Create a ggplot for count value per subdivision for the current class type using the palette from above
     subdiv_plot_i1 <- ggplot() +
-      geom_spatvector(data = filtered_data_i1, aes(group = params$SUBDIVNAME, fill = eval(parse(text = FAO[j_i1])))) +
+      geom_spatvector(data = filtered_data_i1, aes(group = params$SUBDIVNAMEVAR, fill = eval(parse(text = FAO[j_i1])))) +
       labs(
         title = paste(subdiv_criteria_name_i1, "\nClass = ", class_type),
         fill = "Area (ha)"
@@ -3673,7 +3688,7 @@ for (i in 1:length(list_rast_limits_max_FAO))   {
     
     # Create a ggplot for count value per subdivision for the current limitation type using the palette from above
     subdiv_plot_i1 <- ggplot() +
-      geom_spatvector(data = filtered_data_i1, aes(group = params$SUBDIVNAME, fill = eval(parse(text = FAO_limits[j_i1])))) +
+      geom_spatvector(data = filtered_data_i1, aes(group = params$SUBDIVNAMEVAR, fill = eval(parse(text = FAO_limits[j_i1])))) +
       labs(
         title = paste(subdiv_criteria_name_i1, "\nLimit = ", limitation_type_i1),
         fill = "Area (ha)"
@@ -3790,7 +3805,7 @@ for (i in 1:length(list_rast_clas_FAO_cat))   {
     filtered_data_global_i1 <<- filtered_data_i1
       
     subdiv_plot_i1 <- ggplot() +
-      geom_spatvector(data = filtered_data_i1, aes(group = params$SUBDIVNAME, fill = eval(parse(text = FAO[j_i1])))) +
+      geom_spatvector(data = filtered_data_i1, aes(group = params$SUBDIVNAMEVAR, fill = eval(parse(text = FAO[j_i1])))) +
       labs(
         title = paste(subdiv_criteria_name_i1, "\nClass = ", class_type),
         fill = "Area (%)"
@@ -3917,7 +3932,7 @@ for (i in 1:length(list_rast_limits_max_FAO))   {
     
     # Create a ggplot for count value per subdivision for the current limitation type using the palette from above
     subdiv_plot_i1 <- ggplot() +
-      geom_spatvector(data = filtered_data_i1, aes(group = params$SUBDIVNAME, fill = eval(parse(text = FAO_limits[j_i1])))) +
+      geom_spatvector(data = filtered_data_i1, aes(group = params$SUBDIVNAMEVAR, fill = eval(parse(text = FAO_limits[j_i1])))) +
       labs(
         title = paste(subdiv_criteria_name_i1, "\nLimit = ", limitation_type_i1),
         fill = "Area (%)"
@@ -4294,20 +4309,13 @@ if (summarise(df_irm_i1, Average = mean(production, na.rm = T)) > 0) {
 ```{r innovation_name_i2_check01, echo=FALSE, message=FALSE, warning=FALSE, results='asis'}
 
 if (params$INN2 == "NA") {
-  cat("# Session Information
-      ")
+  cat("# Session Information\n\n")
   
-  knitr::current_input(dir = TRUE) 
+  print( sessionInfo())
   
-  si_1 <- sessionInfo()
+  cat("\n\n# Acknowledgements\n\n")
   
-  print(si_1)
-  
-  
-  cat("
-    # Acknowledgements
-
-Javascript code and css style used in this script by Martin Schmelzer
+  cat("Javascript code and css style used in this script by Martin Schmelzer
 
 https://stackoverflow.com/questions/37755037/how-to-add-code-folding-to-output-chunks-in-rmarkdown-html-documents
 
@@ -8770,7 +8778,7 @@ for (i in length(rb_i12):1)   {
   
     # Create a ggplot for count value per subdivision for the current class type using the palette from above
     subdiv_plot_i12 <- ggplot() +
-      geom_spatvector(data = filtered_data_i12, aes(group = params$SUBDIVNAME, fill = eval(parse(text = FAO[j_i12])))) +
+      geom_spatvector(data = filtered_data_i12, aes(group = params$SUBDIVNAMEVAR, fill = eval(parse(text = FAO[j_i12])))) +
       labs(
         title = paste(subdiv_criteria_name_i12, "\nClass = ", class_type),
         fill = "Area (ha)"
@@ -8925,7 +8933,7 @@ for (i in length(rb_i12):1)   {
     
     # Create a ggplot for count value per subdivision for the current limitation type using the palette from above
     subdiv_plot_i12 <- ggplot() +
-      geom_spatvector(data = filtered_data_i12, aes(group = params$SUBDIVNAME, fill = eval(parse(text = FAO_limits[j_i12])))) +
+      geom_spatvector(data = filtered_data_i12, aes(group = params$SUBDIVNAMEVAR, fill = eval(parse(text = FAO_limits[j_i12])))) +
       labs(
         title = paste(subdiv_criteria_name_i12, "\nLimit = ", limitation_type_i12),
         fill = "Area (ha)"
@@ -9065,7 +9073,7 @@ for (i in length(rb_i12):1)   {
 #     
 #     # Create a ggplot for count value per subdivision for the current limitation type using the palette from above
 #     subdiv_plot_i12 <- ggplot() +
-#       geom_spatvector(data = filtered_data_i12, aes(group = params$SUBDIVNAME, fill = eval(parse(text = FAO_limits[j_i12])))) +
+#       geom_spatvector(data = filtered_data_i12, aes(group = params$SUBDIVNAMEVAR, fill = eval(parse(text = FAO_limits[j_i12])))) +
 #       labs(
 #         title = paste(subdiv_criteria_name_i12, "\nLimit = ", limitation_type_i12),
 #         fill = "Area (ha)"
@@ -9210,7 +9218,7 @@ for (i in length(rb_i12):1)   {
   
     # Create a ggplot for count value per subdivision for the current class type using the palette from above
     subdiv_plot_i12 <- ggplot() +
-      geom_spatvector(data = filtered_data_i12, aes(group = params$SUBDIVNAME, fill = eval(parse(text = FAO[j_i12])))) +
+      geom_spatvector(data = filtered_data_i12, aes(group = params$SUBDIVNAMEVAR, fill = eval(parse(text = FAO[j_i12])))) +
       labs(
         title = paste(subdiv_criteria_name_i12, "\nClass = ", class_type),
         fill = "Area (%)"
@@ -9365,7 +9373,7 @@ for (i in length(rb_i12):1)   {
     
     # Create a ggplot for count value per subdivision for the current limitation type using the palette from above
     subdiv_plot_i12 <- ggplot() +
-      geom_spatvector(data = filtered_data_i12, aes(group = params$SUBDIVNAME, fill = eval(parse(text = FAO_limits[j_i12])))) +
+      geom_spatvector(data = filtered_data_i12, aes(group = params$SUBDIVNAMEVAR, fill = eval(parse(text = FAO_limits[j_i12])))) +
       labs(
         title = paste(subdiv_criteria_name_i12, "\nLimit = ", limitation_type_i12),
         fill = "Area (%)"
@@ -9507,7 +9515,7 @@ for (i in length(rb_i12):1)   {
 #     
 #     # Create a ggplot for count value per subdivision for the current limitation type using the palette from above
 #     subdiv_plot_i12 <- ggplot() +
-#       geom_spatvector(data = filtered_data_i12, aes(group = params$SUBDIVNAME, fill = eval(parse(text = FAO_limits[j_i12])))) +
+#       geom_spatvector(data = filtered_data_i12, aes(group = params$SUBDIVNAMEVAR, fill = eval(parse(text = FAO_limits[j_i12])))) +
 #       labs(
 #         title = paste(subdiv_criteria_name_i12, "\nLimit = ", limitation_type_i12),
 #         fill = "Area (%)"
@@ -9999,8 +10007,6 @@ if (params$INT == 1)
   
 <div class="fold o"> 
 ```{r}
-
-knitr::current_input(dir = TRUE) 
 
 sessionInfo()
 
