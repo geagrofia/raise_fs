@@ -1,0 +1,30 @@
+"","1","2","3","4","5","6","7"
+"1","Likelihood of Adoption","Likelihood of Adoption","Biophysical Aptitude with Land Use","Land Use Aptitude",NA,NA,NA
+"2","Likelihood of Adoption","Likelihood of Adoption","Biophysical Aptitude with Land Use","Biophysical Aptitude","Climatic Aptitude","Precipitation Aptitude","Rainfall Total Growing Period"
+"3","Likelihood of Adoption","Likelihood of Adoption","Biophysical Aptitude with Land Use","Biophysical Aptitude","Climatic Aptitude","Precipitation Aptitude","Rainfall Month 1"
+"4","Likelihood of Adoption","Likelihood of Adoption","Biophysical Aptitude with Land Use","Biophysical Aptitude","Climatic Aptitude","Precipitation Aptitude","Rainfall Month 2"
+"5","Likelihood of Adoption","Likelihood of Adoption","Biophysical Aptitude with Land Use","Biophysical Aptitude","Climatic Aptitude","Precipitation Aptitude","Rainfall Month 3"
+"6","Likelihood of Adoption","Likelihood of Adoption","Biophysical Aptitude with Land Use","Biophysical Aptitude","Climatic Aptitude","Temperature Aptitude","Temp Mean Total Growing Period"
+"7","Likelihood of Adoption","Likelihood of Adoption","Biophysical Aptitude with Land Use","Biophysical Aptitude","Climatic Aptitude","Temperature Aptitude","Temp Max Total Growing Period"
+"8","Likelihood of Adoption","Likelihood of Adoption","Biophysical Aptitude with Land Use","Biophysical Aptitude","Climatic Aptitude","Temperature Aptitude","Temp Min Total Growing Period"
+"9","Likelihood of Adoption","Likelihood of Adoption","Biophysical Aptitude with Land Use","Biophysical Aptitude","Soil Physical Properties Aptitude","Soil Texture",NA
+"10","Likelihood of Adoption","Likelihood of Adoption","Biophysical Aptitude with Land Use","Biophysical Aptitude","Soil Physical Properties Aptitude","Soil Coarse Fragments",NA
+"11","Likelihood of Adoption","Likelihood of Adoption","Biophysical Aptitude with Land Use","Biophysical Aptitude","Soil Physical Properties Aptitude","Soil Depth",NA
+"12","Likelihood of Adoption","Likelihood of Adoption","Biophysical Aptitude with Land Use","Biophysical Aptitude","Soil Fertility Aptitude","Soil CEC",NA
+"13","Likelihood of Adoption","Likelihood of Adoption","Biophysical Aptitude with Land Use","Biophysical Aptitude","Soil Fertility Aptitude","Soil Exchangeable Bases",NA
+"14","Likelihood of Adoption","Likelihood of Adoption","Biophysical Aptitude with Land Use","Biophysical Aptitude","Soil Fertility Aptitude","Soil Base Saturation",NA
+"15","Likelihood of Adoption","Likelihood of Adoption","Biophysical Aptitude with Land Use","Biophysical Aptitude","Soil Fertility Aptitude","Soil pH-H2O",NA
+"16","Likelihood of Adoption","Likelihood of Adoption","Biophysical Aptitude with Land Use","Biophysical Aptitude","Soil Fertility Aptitude","Soil Organic Carbon",NA
+"17","Likelihood of Adoption","Likelihood of Adoption","Biophysical Aptitude with Land Use","Biophysical Aptitude","Landscape Aptitude","Slope",NA
+"18","Likelihood of Adoption","Likelihood of Adoption","Biophysical Aptitude with Land Use","Biophysical Aptitude","Landscape Aptitude","Drainage",NA
+"19","Likelihood of Adoption","Likelihood of Adoption","Socio-Economic Feasibility","Farm Production Feasibility","Crop and Farm Management","Access to Extension / Information","Access to Extension Officers at Kebele Centres"
+"20","Likelihood of Adoption","Likelihood of Adoption","Socio-Economic Feasibility","Farm Production Feasibility","Crop and Farm Management","Access to Extension / Information","Access to Extension Officers at Woreda centres"
+"21","Likelihood of Adoption","Likelihood of Adoption","Socio-Economic Feasibility","Farm Production Feasibility","Crop and Farm Management","Access to Farm Labour","Kebele Population Density"
+"22","Likelihood of Adoption","Likelihood of Adoption","Socio-Economic Feasibility","Farm Production Feasibility","Crop and Farm Management","Access to Farm Labour","Kebele average Household Size"
+"23","Likelihood of Adoption","Likelihood of Adoption","Socio-Economic Feasibility","Farm Production Feasibility","Access to Farm Inputs","Access to Seeds",NA
+"24","Likelihood of Adoption","Likelihood of Adoption","Socio-Economic Feasibility","Farm Production Feasibility","Access to Farm Inputs","Access to Land",NA
+"25","Likelihood of Adoption","Likelihood of Adoption","Socio-Economic Feasibility","Farm Production Feasibility","Access to Farm Inputs","Access to Fertilisers and Pesticides","Access to bags F/P at Local Farmer Group"
+"26","Likelihood of Adoption","Likelihood of Adoption","Socio-Economic Feasibility","Farm Production Feasibility","Access to Farm Inputs","Access to Fertilisers and Pesticides","Access to bulk F/P at Farmer Union"
+"27","Likelihood of Adoption","Likelihood of Adoption","Socio-Economic Feasibility","Market Access","Access to Local Market",NA,NA
+"28","Likelihood of Adoption","Likelihood of Adoption","Socio-Economic Feasibility","Market Access","Access to Regional Market",NA,NA
+"29","Likelihood of Adoption","Likelihood of Adoption","Socio-Economic Feasibility","Market Access","Access to Wholesalers",NA,NA
