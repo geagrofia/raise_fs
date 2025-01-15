@@ -1,221 +1,190 @@
 library(shiny)
 library(DT)
 
-# Sample parent data
-parent_data <- data.frame(
-  ParentID = 1:5,
-  conc_level_1 = c("poor", "low", "suboptimal", "low", "poor"),
-  conc_level_2 = c("moderate", "moderate", "optimal", "moderate", "moderate"),
-  conc_level_3 = c("good", "high", NA, "high", "good"),
+# Define the initial parent table
+initial_parent_data <- data.frame(
+  ID = 1:5,
+  conc_level_1 = c("poor", "low", "suboptimal", NA, NA),
+  conc_level_2 = c("moderate", "moderate", "optimal", NA, NA),
+  conc_level_3 = c("good", "high", NA, NA, NA),
   stringsAsFactors = FALSE
 )
 
-child_data <- data.frame(
-  ChildID = 1:15,
-  ParentID = rep(1:5, each = 3),
-  Details = paste("Detail", 1:15),
-  weight = rep(0, 15),
+# Define the initial child table
+initial_child_data <- data.frame(
+  Child_ID = c("Child_1", "Child_2", "Child_3", "Child_4", "Child_5", "Child_6", "Child_7", "Child_8", "Child_9", "Child_10", "Child_11", "Child_12", "Child_13"),
+  Parent_ID = c(1, 1, 2, 2, 3, 3, 3, 4, 4, 4, 5, 5, 5),
+  Weight = c(0.33, 0.33, 0.34, 0.5, 0.5, 0, 0, 0, 0, 0, 0, 0, 0),
   stringsAsFactors = FALSE
 )
 
-# UI
+# Define valid combinations
+valid_combinations <- data.frame(
+  combination = c("poor-moderate-good", "low-moderate-high", "suboptimal-optimal-NA"),
+  conc_level_1 = c("poor", "low", "suboptimal"),
+  conc_level_2 = c("moderate", "moderate", "optimal"),
+  conc_level_3 = c("good", "high", NA),
+  stringsAsFactors = FALSE
+)
+
+
 ui <- fluidPage(
-  titlePanel("Parent-Child Table with Validations"),
-  
-  tabsetPanel(
-    id = "tabs",
-    
-    # Screen 1: Edit Parent Table
-    tabPanel(
-      "Edit Parent Table",
-      DTOutput("edit_parent_table"),
-      actionButton("save_parent", "Save Parent Table"),
-      actionButton("go_to_child", "Next")
+  titlePanel("Edit Parent and Child Tables"),
+  sidebarLayout(
+    sidebarPanel(
+      uiOutput("dynamic_sidebar")  # Dynamic sidebar to switch between screens
     ),
-    
-    # Screen 2: Parent-Child Interaction
-    tabPanel(
-      "Parent-Child Tables",
-      sidebarLayout(
-        sidebarPanel(
-          h4("Parent Table"),
-          DTOutput("parent_table"),
-          br(),
-          h4("Selected Parent ID"),
-          verbatimTextOutput("selected_parent"),
-          h4("Editability Status"),
-          verbatimTextOutput("edit_status")
-        ),
-        
-        mainPanel(
-          h4("Child Table"),
-          DTOutput("child_table"),
-          actionButton("save_child", "Save Child Table")
-        )
+    mainPanel(
+      tabsetPanel(
+        id = "main_tabs",
+        tabPanel("Screen 1", DTOutput("parent_table")),
+        tabPanel("Screen 2", uiOutput("child_ui"))
       )
     )
   )
 )
 
-# Server
+
 server <- function(input, output, session) {
-  # Reactive value to store parent and child data
+  # Reactive Values for Parent and Child Tables
   rv <- reactiveValues(
-    parent_data = parent_data,
-    child_data = child_data
+    parent_data = initial_parent_data,   # Use the initial parent table
+    child_data = initial_child_data,    # Use the initial child table
+    saved_parent_data = NULL            # To store saved parent data
   )
   
-  # Screen 1: Edit Parent Table
-  output$edit_parent_table <- renderDT({
+  # Dynamic Sidebar
+  output$dynamic_sidebar <- renderUI({
+    if (input$main_tabs == "Screen 1") {
+      # Sidebar for Screen 1
+      tagList(
+        h4("Select a Combination"),
+        selectInput("combination_dropdown", "Combination", 
+                    choices = valid_combinations$combination, selected = NULL),
+        actionButton("apply_combination", "Apply to Selected Row"),
+        br(),
+        actionButton("save_parent_table", "Save Parent Table"),
+        actionButton("next_screen", "Go to Screen 2")
+      )
+    } else if (input$main_tabs == "Screen 2") {
+      # Sidebar for Screen 2
+      tagList(
+        actionButton("save_child_table", "Save Child Table"),
+        actionButton("back_to_screen1", "Back to Screen 1")
+      )
+    }
+  })
+  
+  # Render Parent Table
+  output$parent_table <- renderDT({
     datatable(
       rv$parent_data,
-      editable = list(target = "cell", columns = 2:4),
+      selection = "single",  # Allow selecting one row
       options = list(dom = 't', pageLength = 5)
     )
   })
   
-  # Validate and enforce constraints on parent table edits
-  observeEvent(input$edit_parent_table_cell_edit, {
-    info <- input$edit_parent_table_cell_edit
-    row <- info$row
-    col <- info$col
-    value <- info$value
+  # Apply Combination to Selected Row
+  observeEvent(input$apply_combination, {
+    selected_row <- input$parent_table_rows_selected
+    selected_combination <- input$combination_dropdown
     
-    # Handle updates to conc_level_1
-    if (col == 2) {  # conc_level_1 column
-      if (value %in% c("poor", "low", "suboptimal")) {
-        rv$parent_data[row, col] <- value
-        # Update dependent columns
-        if (value == "poor") {
-          rv$parent_data[row, "conc_level_2"] <- "moderate"
-          rv$parent_data[row, "conc_level_3"] <- "good"
-        } else if (value == "low") {
-          rv$parent_data[row, "conc_level_2"] <- "moderate"
-          rv$parent_data[row, "conc_level_3"] <- "high"
-        } else if (value == "suboptimal") {
-          rv$parent_data[row, "conc_level_2"] <- "optimal"
-          rv$parent_data[row, "conc_level_3"] <- NA
-        }
-      } else {
-        showNotification("Invalid value for conc_level_1. Allowed: poor, low, suboptimal.", type = "error")
-      }
+    if (!is.null(selected_row) && !is.null(selected_combination)) {
+      # Find combination details
+      combination_details <- valid_combinations[valid_combinations$combination == selected_combination, ]
+      
+      # Update the selected row
+      rv$parent_data[selected_row, "conc_level_1"] <- combination_details$conc_level_1
+      rv$parent_data[selected_row, "conc_level_2"] <- combination_details$conc_level_2
+      rv$parent_data[selected_row, "conc_level_3"] <- combination_details$conc_level_3
     }
   })
   
   # Save Parent Table
-  observeEvent(input$save_parent, {
+  observeEvent(input$save_parent_table, {
+    rv$saved_parent_data <- rv$parent_data
     showNotification("Parent table saved successfully!", type = "message")
   })
   
-  # Navigation to Screen 2
-  observeEvent(input$go_to_child, {
-    updateTabsetPanel(session, "tabs", selected = "Parent-Child Tables")
+  # Navigate to Screen 2
+  observeEvent(input$next_screen, {
+    if (is.null(rv$saved_parent_data)) {
+      showNotification("Please save the parent table before moving to the next screen.", type = "error")
+    } else {
+      updateTabsetPanel(session, "main_tabs", selected = "Screen 2")
+    }
   })
   
-  # Screen 2: Parent-Child Interaction
-  output$parent_table <- renderDT({
-    datatable(rv$parent_data, selection = "single")
+  # Back to Screen 1
+  observeEvent(input$back_to_screen1, {
+    updateTabsetPanel(session, "main_tabs", selected = "Screen 1")
   })
   
-  # Capture the selected parent ID
-  selected_parent_id <- reactive({
-    selected_row <- input$parent_table_rows_selected
+  # Screen 2 Logic (Child Table)
+  output$child_ui <- renderUI({
+    req(rv$saved_parent_data)
+    fluidPage(
+      h4("Parent and Child Tables"),
+      DTOutput("parent_table_screen2"),
+      DTOutput("child_table_screen2")
+    )
+  })
+  
+  # Parent Table on Screen 2
+  output$parent_table_screen2 <- renderDT({
+    req(rv$saved_parent_data)
+    datatable(rv$saved_parent_data, selection = "single", options = list(dom = 't', pageLength = 5))
+  })
+  
+  # Child Table on Screen 2
+  output$child_table_screen2 <- renderDT({
+    req(input$parent_table_screen2_rows_selected)
+    selected_row <- input$parent_table_screen2_rows_selected
+    
+    # Filter child data based on selected parent row
     if (!is.null(selected_row)) {
-      rv$parent_data$ParentID[selected_row]
-    } else {
-      NULL
+      filtered_child_data <- rv$child_data[rv$child_data$Parent_ID == rv$saved_parent_data$ID[selected_row], ]
+      datatable(
+        filtered_child_data,
+        editable = list(target = "cell", columns = 3),  # Make only the Weight column editable
+        options = list(dom = 't', pageLength = 5)
+      )
     }
   })
-  
-  # Display the selected parent ID
-  output$selected_parent <- renderText({
-    selected_parent_id()
-  })
-  
-  # Check editability of child table
-  is_child_editable <- reactive({
-    req(selected_parent_id()) # Ensure a parent row is selected
-    
-    # Get the corresponding parent row
-    parent_row <- rv$parent_data[rv$parent_data$ParentID == selected_parent_id(), ]
-    
-    # Check if the combination is valid for editing
-    conc1 <- parent_row$conc_level_1
-    conc2 <- parent_row$conc_level_2
-    conc3 <- parent_row$conc_level_3
-    
-    # Allowed combinations
-    valid_combinations <- list(
-      list(conc_level_1 = "poor", conc_level_2 = "moderate", conc_level_3 = "good"),
-      list(conc_level_1 = "low", conc_level_2 = "moderate", conc_level_3 = "high")
-    )
-    
-    # Check if the current row matches any of the valid combinations
-    any(sapply(valid_combinations, function(combo) {
-      combo$conc_level_1 == conc1 &&
-        combo$conc_level_2 == conc2 &&
-        combo$conc_level_3 == conc3
-    }))
-  })
-  
-  
-  # Display editability status
-  output$edit_status <- renderText({
-    if (is_child_editable()) {
-      "Editable"
-    } else {
-      "Not Editable"
-    }
-  })
-  
-  # Render the child table filtered by the selected parent ID
-  output$child_table <- renderDT({
-    req(selected_parent_id()) # Ensure a parent row is selected
-    
-    # Filter child rows for the selected parent
-    filtered_data <- rv$child_data[rv$child_data$ParentID == selected_parent_id(), ]
-    
-    # Determine if the table should be editable
-    editable <- is_child_editable()
-    
-    datatable(
-      filtered_data,
-      editable = if (editable) list(target = "cell", columns = which(colnames(filtered_data) == "weight")) else FALSE,
-      options = list(dom = 't', pageLength = 5)
-    )
-  })
-  
   
   # Save Child Table
-  observeEvent(input$child_table_cell_edit, {
-    req(is_child_editable()) # Ensure child table is editable
-    info <- input$child_table_cell_edit
-    row <- info$row
-    col <- info$col
-    value <- as.numeric(info$value)
+  observeEvent(input$save_child_table, {
+    selected_row <- input$parent_table_screen2_rows_selected
+    if (is.null(selected_row)) {
+      showNotification("Please select a parent row to save child table changes.", type = "error")
+      return()
+    }
     
-    if (!is.na(value) && value >= 0 && value <= 1) {
-      rv$child_data[row, col] <- value
-    } else {
-      showNotification("Invalid value. Weight must be numeric and between 0 and 1.", type = "error")
-    }
-  })
-  
-  observeEvent(input$save_child, {
-    # Validate weights sum to 1 for each parent
-    valid <- TRUE
-    for (parent_id in unique(rv$child_data$ParentID)) {
-      sum_weights <- sum(rv$child_data$weight[rv$child_data$ParentID == parent_id])
-      if (abs(sum_weights - 1) > 1e-6) {
-        valid <- FALSE
-        showNotification(paste("Weights for ParentID", parent_id, "do not sum to 1."), type = "error")
+    # Retrieve the edited child data
+    updated_child_data <- isolate(input$child_table_screen2_cell_edit)
+    if (!is.null(updated_child_data)) {
+      # Apply changes
+      row <- updated_child_data$row
+      col <- updated_child_data$col
+      value <- as.numeric(updated_child_data$value)
+      
+      # Update the reactive child data
+      parent_id <- rv$saved_parent_data$ID[selected_row]
+      rv$child_data[rv$child_data$Parent_ID == parent_id, "Weight"][row] <- value
+      
+      # Validate the sum of weights
+      child_subset <- rv$child_data[rv$child_data$Parent_ID == parent_id, ]
+      if (round(sum(child_subset$Weight), 2) != 1) {
+        showNotification("Weights must sum to 1.", type = "error")
+      } else {
+        showNotification("Child table saved successfully!", type = "message")
       }
-    }
-    if (valid) {
-      showNotification("Child table saved successfully!", type = "message")
     }
   })
 }
+
+
+
 
 # Run the app
 shinyApp(ui, server)
