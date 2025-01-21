@@ -1,7 +1,8 @@
 library(shiny)
 library(DT)
 
-# Sample initial data
+# ---- Sample initial data ----
+
 initial_parent_data <- data.frame(
   ID = 1:5,
   conc_level_1 = c("low", "poor", "suboptimal", "poor", "low"),
@@ -26,6 +27,8 @@ valid_combinations <- data.frame(
   stringsAsFactors = FALSE
 )
 
+#---- UI ----
+
 ui <- fluidPage(
   titlePanel("Edit Parent and Child Tables"),
   sidebarLayout(
@@ -43,12 +46,17 @@ ui <- fluidPage(
   )
 )
 
+
+#---- SERVER ----
+
 server <- function(input, output, session) {
   rv <- reactiveValues(
     parent_data = initial_parent_data,
     child_data = initial_child_data,
     saved_parent_data = NULL
   )
+
+#---- All screens ----
   
   # Dynamic Sidebar
   output$dynamic_sidebar <- renderUI({
@@ -74,6 +82,10 @@ server <- function(input, output, session) {
       )
     }
   })
+  
+  
+# ---- Screen 1 ----
+  
   
   # Render Parent Table
   output$parent_table <- renderDT({
@@ -113,6 +125,9 @@ server <- function(input, output, session) {
       updateTabsetPanel(session, "main_tabs", selected = "Screen 2")
     }
   })
+  
+  #---- Screen 2 ----
+  
   
   # Back to Screen 1
   observeEvent(input$back_to_screen1, {
@@ -195,6 +210,9 @@ server <- function(input, output, session) {
   observeEvent(input$to_screen3, {
     updateTabsetPanel(session, "main_tabs", selected = "Screen 3")
   })
+  
+  #---- Screen 3 ----
+  
   
   # Navigate back to Screen 2
   observeEvent(input$back_to_screen2, {
