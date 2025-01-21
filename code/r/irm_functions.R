@@ -1621,7 +1621,7 @@ classify_maps_FAO <-
       st_as_sf(coords = c("x", "y"))
     
     #cat("str(df_one_many) = ", str(df_one_many),"\n")
-    stack_code <<- unique(df_one_many[['rulebase_stack']])
+    stack_code <<- unique(df_one_many[['stack']])
     cat("stack_code = ", stack_code,"\n")
     
     if ("optimal" %in% fpm_conc_name) { # biophysical aptitude criteria
@@ -2147,7 +2147,7 @@ classify_maps_CONC <-
       st_as_sf(coords = c("x", "y"))
     
     #cat("str(df_one_many) = ", str(df_one_many),"\n")
-    stack_code <<- unique(df_one_many[['rulebase_stack']])
+    stack_code <<- unique(df_one_many[['stack']])
     cat("stack_code = ", stack_code, "\n")
     
     if ("optimal" %in% fpm_conc_name) {
