@@ -13,11 +13,11 @@ output:
     css: js/style.css
 params:
   EXT: Ethiopia
-  ZONVAR: Z_CODE
-  ZONCODE: 308
-  DIVVAR: W_CODE
-  DIVCODE: 30801
-  DIVNAME: W_NAME
+  ZONCODEVAR: Z_CODE
+  ZONCODEVAL: 308
+  DIVCODEVAR: W_CODE
+  DIVCODEVAL: 30801
+  DIVNAMEVAR: W_NAME
   MASK: 250
   INN1: pearl_millet
 
@@ -57,13 +57,13 @@ pre code {
 
 # EXT defines the extent of the general modelling usually a country - this is used to load the division dataset
 
-# ZONVAR this is the zonal variable within the EXT dataset
+# ZONCODEVARVAR this is the zonal variable within the EXT dataset
 
-# ZONCODE defines the extent of the accessibility model - this is a zonal code within the EXT dataset
+# ZONCODEVAL defines the extent of the accessibility model - this is a zonal code within the EXT dataset
 
 # DIVVAR this is the division variable within the EXT dataset
 
-# DIVCODE defines the extent of the model outputs - this is a division code within the EXT dataset
+# DIVCODEVAL defines the extent of the model outputs - this is a division code within the EXT dataset
 
 # MASK defines the resolution of the mask in metres
 
@@ -80,6 +80,8 @@ for (package in c('raster', 'knitr','ggplot2','tiff',  'dismo', 'RColorBrewer', 
 r_filename <- function(filename) {
   here::here("code/r/", filename)
 }
+
+cat("\n\nFilename: ", knitr::current_input(dir = TRUE))
 
 source(r_filename("irm_functions.R"))
 
@@ -155,10 +157,10 @@ Slope is derived from SRTM 30 meters (DEM). This initially is in geographic coor
 vect_ext <- load_vector_data(paste0("subdiv_", params$EXT))
 
 # select the location to be modelled
-vect_subdiv <- select_location(vect_ext, params$DIVVAR, params$DIVCODE)
+vect_subdiv <- select_location(vect_ext, params$DIVCODEVAR, params$DIVCODEVAL)
 
 # select the zone to be modelled
-vect_div <- select_location(vect_ext, params$ZONVAR, params$ZONCODE)
+vect_div <- select_location(vect_ext, params$ZONCODEVAR, params$ZONCODEVAL)
 
 # get the bounding box for the zone to be modelled
 vect_div_extent <- ext(vect_div)
@@ -167,23 +169,23 @@ vect_div_extent <- ext(vect_div)
 ## Get the target locations
 
 # load the FTC locations
-vect_FTC <- load_vector_data(paste0("FTC_", params$DIVCODE))
+vect_FTC <- load_vector_data(paste0("FTC_", params$DIVCODEVAL))
 
 # load the woreda locations
-vect_woredaC <- load_vector_data(paste0("woredaC_", params$DIVCODE))
+vect_woredaC <- load_vector_data(paste0("woredaC_", params$DIVCODEVAL))
 
 # load the zonal locations
-vect_zoneC <- load_vector_data(paste0("zoneC_", params$ZONCODE))
+vect_zoneC <- load_vector_data(paste0("zoneC_", params$ZONCODEVAL))
 
 
 # load the local market locations
-vect_localmarket <- load_vector_data(paste0("localmarket_", params$DIVCODE))
+vect_localmarket <- load_vector_data(paste0("localmarket_", params$DIVCODEVAL))
 
 # load the woreda market locations
-vect_woredamarket <- load_vector_data(paste0("woredamarket_", params$DIVCODE))
+vect_woredamarket <- load_vector_data(paste0("woredamarket_", params$DIVCODEVAL))
 
 # load the zone market locations
-vect_zonemarket <- load_vector_data(paste0("zonemarket_", params$ZONCODE))
+vect_zonemarket <- load_vector_data(paste0("zonemarket_", params$ZONCODEVAL))
 
 
 ## Get the roads
@@ -204,7 +206,7 @@ vect_roads_zone <- crop(vect_roads_ext, vect_div_extent)
 ## Get slope
 
 # load the slope data
-rast_slope <- load_raster_data("slope_srtm", rast_slope)
+rast_slope <- load_raster_data(paste0("slope_srtm_", params$EXT), rast_slope)
 
 # clip the slope to the zone
 rast_slope_zone <- crop(rast_slope, vect_div_extent)
@@ -213,7 +215,7 @@ rast_slope_zone <- crop(rast_slope, vect_div_extent)
 ## Get landcover
 
 # load the landcover data
-rast_landcover <- load_raster_data("worldcover200_308", rast_landcover)
+rast_landcover <- load_raster_data(paste0("worldcover200_", params$EXT), rast_landcover)
 
 # clip the landcover to the zone
 rast_landcover_zone <- crop(rast_landcover, vect_div_extent)
@@ -628,7 +630,7 @@ v_clas_worldcover_speed <- c(
   20,  3.00,  30,  3.00,  100,  3.00,  
   40,  2.50,
   90,  2.00,
-  10,  1.62,  70,  1.62,
+  10,  1.62,  70,  1.62, 95, 1.62,
   80,  0.50, NA, 0.50)
 
 m_clas_worldcover_speed <- matrix(v_clas_worldcover_speed, ncol = 2, byrow = TRUE)
@@ -998,7 +1000,7 @@ par(mfrow=c(2,2))
 rast_cost_v_FTC <- gdistance::accCost(trans_v, geom(vect_FTC_lea)[, 3:4]) %>% rast()
 
 crs(rast_cost_v_FTC) <- wkt_lea
-writeRaster(rast_cost_v_FTC, here::here(paste0("spatial_data/input/rast_cost_v_FTC_", params$DIVCODE,".tif")), overwrite=T)
+writeRaster(rast_cost_v_FTC, here::here(paste0("spatial_data/input/rast_cost_v_FTC_", params$DIVCODEVAL,".tif")), overwrite=T)
 
 rast_cost_v_FTC_hr <- rast_cost_v_FTC / 3600
 
@@ -1008,14 +1010,14 @@ plot(rast_cost_v_FTC_hr,
      main = "Vehicle and walking access to FTC location (hours)")
 plot(vect_FTC_lea, add = T)
 
-writeRaster(rast_cost_v_FTC_hr, here::here(paste0("spatial_data/input/rast_cost_v_FTC_hr_", params$DIVCODE,".tif")), overwrite=T)
+writeRaster(rast_cost_v_FTC_hr, here::here(paste0("spatial_data/input/rast_cost_v_FTC_hr_", params$DIVCODEVAL,".tif")), overwrite=T)
 
 
 ## transport to woreda location
 rast_cost_v_woredaC <- gdistance::accCost(trans_v, geom(vect_woredaC_lea)[, 3:4]) %>% rast()
 
 crs(rast_cost_v_woredaC) <- wkt_lea
-writeRaster(rast_cost_v_woredaC, here::here(paste0("spatial_data/input/rast_cost_v_woredaC_", params$DIVCODE,".tif")), overwrite=T)
+writeRaster(rast_cost_v_woredaC, here::here(paste0("spatial_data/input/rast_cost_v_woredaC_", params$DIVCODEVAL,".tif")), overwrite=T)
 
 rast_cost_v_woredaC_hr <- rast_cost_v_woredaC / 3600
 
@@ -1025,14 +1027,14 @@ plot(rast_cost_v_woredaC_hr,
      main = "Vehicle and walking access to woreda centre location (hours)")
 plot(vect_woredaC_lea, add = T)
 
-writeRaster(rast_cost_v_woredaC_hr, here::here(paste0("spatial_data/input/rast_cost_v_woredaC_hr_", params$DIVCODE,".tif")), overwrite=T)
+writeRaster(rast_cost_v_woredaC_hr, here::here(paste0("spatial_data/input/rast_cost_v_woredaC_hr_", params$DIVCODEVAL,".tif")), overwrite=T)
 
 
 ## transport to zone location
 rast_cost_v_zoneC <- gdistance::accCost(trans_v, geom(vect_zoneC_lea)[, 3:4]) %>% rast()
 
 crs(rast_cost_v_zoneC) <- wkt_lea
-writeRaster(rast_cost_v_zoneC, here::here(paste0("spatial_data/input/rast_cost_v_zoneC_", params$DIVCODE,".tif")), overwrite=T)
+writeRaster(rast_cost_v_zoneC, here::here(paste0("spatial_data/input/rast_cost_v_zoneC_", params$DIVCODEVAL,".tif")), overwrite=T)
 
 rast_cost_v_zoneC_hr <- rast_cost_v_zoneC / 3600
 
@@ -1042,7 +1044,7 @@ plot(rast_cost_v_zoneC_hr,
      main = "Vehicle and walking access to zone centre location (hours)")
 plot(vect_zoneC_lea, add = T)
 
-writeRaster(rast_cost_v_zoneC_hr, here::here(paste0("spatial_data/input/rast_cost_v_zoneC_hr_", params$DIVCODE,".tif")), overwrite=T)
+writeRaster(rast_cost_v_zoneC_hr, here::here(paste0("spatial_data/input/rast_cost_v_zoneC_hr_", params$DIVCODEVAL,".tif")), overwrite=T)
 
 
 ```
@@ -1072,7 +1074,7 @@ par(mfrow=c(2,2))
 rast_cost_w_FTC <- gdistance::accCost(trans_w, geom(vect_FTC_lea)[, 3:4]) %>% rast()
 
 crs(rast_cost_w_FTC) <- wkt_lea
-writeRaster(rast_cost_w_FTC, here::here(paste0("spatial_data/input/rast_cost_w_FTC_", params$DIVCODE,".tif")), overwrite=T)
+writeRaster(rast_cost_w_FTC, here::here(paste0("spatial_data/input/rast_cost_w_FTC_", params$DIVCODEVAL,".tif")), overwrite=T)
 
 rast_cost_w_FTC_hr <- rast_cost_w_FTC / 3600
 
@@ -1082,14 +1084,14 @@ plot(rast_cost_w_FTC_hr,
      main = "Walking access to FTC location (hours)")
 plot(vect_FTC_lea, add = T)
 
-writeRaster(rast_cost_w_FTC_hr, here::here(paste0("spatial_data/input/rast_cost_w_FTC_hr_", params$DIVCODE,".tif")), overwrite=T)
+writeRaster(rast_cost_w_FTC_hr, here::here(paste0("spatial_data/input/rast_cost_w_FTC_hr_", params$DIVCODEVAL,".tif")), overwrite=T)
 
 
 ## walking to woreda location
 rast_cost_w_woredaC <- gdistance::accCost(trans_w, geom(vect_woredaC_lea)[, 3:4]) %>% rast()
 
 crs(rast_cost_w_woredaC) <- wkt_lea
-writeRaster(rast_cost_w_woredaC, here::here(paste0("spatial_data/input/rast_cost_w_woredaC_", params$DIVCODE,".tif")), overwrite=T)
+writeRaster(rast_cost_w_woredaC, here::here(paste0("spatial_data/input/rast_cost_w_woredaC_", params$DIVCODEVAL,".tif")), overwrite=T)
 
 rast_cost_w_woredaC_hr <- rast_cost_w_woredaC / 3600
 
@@ -1099,14 +1101,14 @@ plot(rast_cost_w_woredaC_hr,
      main = "Walking access to woreda centre location (hours)")
 plot(vect_woredaC_lea, add = T)
 
-writeRaster(rast_cost_w_woredaC_hr, here::here(paste0("spatial_data/input/rast_cost_w_woredaC_hr_", params$DIVCODE,".tif")), overwrite=T)
+writeRaster(rast_cost_w_woredaC_hr, here::here(paste0("spatial_data/input/rast_cost_w_woredaC_hr_", params$DIVCODEVAL,".tif")), overwrite=T)
 
 
 ## walking to zone location
 rast_cost_w_zoneC <- gdistance::accCost(trans_w, geom(vect_zoneC_lea)[, 3:4]) %>% rast()
 
 crs(rast_cost_w_zoneC) <- wkt_lea
-writeRaster(rast_cost_w_zoneC, here::here(paste0("spatial_data/input/rast_cost_w_zoneC_", params$DIVCODE,".tif")), overwrite=T)
+writeRaster(rast_cost_w_zoneC, here::here(paste0("spatial_data/input/rast_cost_w_zoneC_", params$DIVCODEVAL,".tif")), overwrite=T)
 
 rast_cost_w_zoneC_hr <- rast_cost_w_zoneC / 3600
 
@@ -1116,7 +1118,7 @@ plot(rast_cost_w_zoneC_hr,
      main = "Walking access to zone centre location (hours)")
 plot(vect_zoneC_lea, add = T)
 
-writeRaster(rast_cost_w_zoneC_hr, here::here(paste0("spatial_data/input/rast_cost_w_zoneC_hr_", params$DIVCODE,".tif")), overwrite=T)
+writeRaster(rast_cost_w_zoneC_hr, here::here(paste0("spatial_data/input/rast_cost_w_zoneC_hr_", params$DIVCODEVAL,".tif")), overwrite=T)
 
 
 ```
@@ -1134,7 +1136,7 @@ par(mfrow=c(2,2))
 rast_cost_v_localmarket <- gdistance::accCost(trans_v, geom(vect_localmarket_lea)[, 3:4]) %>% rast()
 
 crs(rast_cost_v_localmarket) <- wkt_lea
-writeRaster(rast_cost_v_localmarket, here::here(paste0("spatial_data/input/rast_cost_v_localmarket_", params$DIVCODE,".tif")), overwrite=T)
+writeRaster(rast_cost_v_localmarket, here::here(paste0("spatial_data/input/rast_cost_v_localmarket_", params$DIVCODEVAL,".tif")), overwrite=T)
 
 rast_cost_v_localmarket_hr <- rast_cost_v_localmarket / 3600
 
@@ -1144,14 +1146,14 @@ plot(rast_cost_v_localmarket_hr,
      main = "Vehicle and walking access to local market (hours)")
 plot(vect_localmarket_lea, add = T)
 
-writeRaster(rast_cost_v_localmarket_hr, here::here(paste0("spatial_data/input/rast_cost_v_localmarket_hr_", params$DIVCODE,".tif")), overwrite=T)
+writeRaster(rast_cost_v_localmarket_hr, here::here(paste0("spatial_data/input/rast_cost_v_localmarket_hr_", params$DIVCODEVAL,".tif")), overwrite=T)
 
 
 ## transport to woreda market
 rast_cost_v_woredamarket <- gdistance::accCost(trans_v, geom(vect_woredamarket_lea)[, 3:4]) %>% rast()
 
 crs(rast_cost_v_woredamarket) <- wkt_lea
-writeRaster(rast_cost_v_woredamarket, here::here(paste0("spatial_data/input/rast_cost_v_woredamarket_", params$DIVCODE,".tif")), overwrite=T)
+writeRaster(rast_cost_v_woredamarket, here::here(paste0("spatial_data/input/rast_cost_v_woredamarket_", params$DIVCODEVAL,".tif")), overwrite=T)
 
 rast_cost_v_woredamarket_hr <- rast_cost_v_woredamarket / 3600
 
@@ -1161,14 +1163,14 @@ plot(rast_cost_v_woredamarket_hr,
      main = "Vehicle and walking access to woreda market (hours)")
 plot(vect_woredamarket_lea, add = T)
 
-writeRaster(rast_cost_v_woredamarket_hr, here::here(paste0("spatial_data/input/rast_cost_v_woredamarket_hr_", params$DIVCODE,".tif")), overwrite=T)
+writeRaster(rast_cost_v_woredamarket_hr, here::here(paste0("spatial_data/input/rast_cost_v_woredamarket_hr_", params$DIVCODEVAL,".tif")), overwrite=T)
 
 
 ## transport to zone market
 rast_cost_v_zonemarket <- gdistance::accCost(trans_v, geom(vect_zonemarket_lea)[, 3:4]) %>% rast()
 
 crs(rast_cost_v_zonemarket) <- wkt_lea
-writeRaster(rast_cost_v_zonemarket, here::here(paste0("spatial_data/input/rast_cost_v_zonemarket_", params$DIVCODE,".tif")), overwrite=T)
+writeRaster(rast_cost_v_zonemarket, here::here(paste0("spatial_data/input/rast_cost_v_zonemarket_", params$DIVCODEVAL,".tif")), overwrite=T)
 
 rast_cost_v_zonemarket_hr <- rast_cost_v_zonemarket / 3600
 
@@ -1178,7 +1180,7 @@ plot(rast_cost_v_zonemarket_hr,
      main = "Vehicle and walking access to zone market (hours)")
 plot(vect_zonemarket_lea, add = T)
 
-writeRaster(rast_cost_v_zonemarket_hr, here::here(paste0("spatial_data/input/rast_cost_v_zonemarket_hr_", params$DIVCODE,".tif")), overwrite=T)
+writeRaster(rast_cost_v_zonemarket_hr, here::here(paste0("spatial_data/input/rast_cost_v_zonemarket_hr_", params$DIVCODEVAL,".tif")), overwrite=T)
 
 
 ```
@@ -1197,7 +1199,7 @@ par(mfrow=c(2,2))
 rast_cost_w_localmarket <- gdistance::accCost(trans_w, geom(vect_localmarket_lea)[, 3:4]) %>% rast()
 
 crs(rast_cost_w_localmarket) <- wkt_lea
-writeRaster(rast_cost_w_localmarket, here::here(paste0("spatial_data/input/rast_cost_w_localmarket_", params$DIVCODE,".tif")), overwrite=T)
+writeRaster(rast_cost_w_localmarket, here::here(paste0("spatial_data/input/rast_cost_w_localmarket_", params$DIVCODEVAL,".tif")), overwrite=T)
 
 rast_cost_w_localmarket_hr <- rast_cost_w_localmarket / 3600
 
@@ -1207,14 +1209,14 @@ plot(rast_cost_w_localmarket_hr,
      main = "Walking access to local market (hours)")
 plot(vect_localmarket_lea, add = T)
 
-writeRaster(rast_cost_w_localmarket_hr, here::here(paste0("spatial_data/input/rast_cost_w_localmarket_hr_", params$DIVCODE,".tif")), overwrite=T)
+writeRaster(rast_cost_w_localmarket_hr, here::here(paste0("spatial_data/input/rast_cost_w_localmarket_hr_", params$DIVCODEVAL,".tif")), overwrite=T)
 
 
 ## walking to woreda market
 rast_cost_w_woredamarket <- gdistance::accCost(trans_w, geom(vect_woredamarket_lea)[, 3:4]) %>% rast()
 
 crs(rast_cost_w_woredamarket) <- wkt_lea
-writeRaster(rast_cost_w_woredamarket, here::here(paste0("spatial_data/input/rast_cost_w_woredamarket_", params$DIVCODE,".tif")), overwrite=T)
+writeRaster(rast_cost_w_woredamarket, here::here(paste0("spatial_data/input/rast_cost_w_woredamarket_", params$DIVCODEVAL,".tif")), overwrite=T)
 
 rast_cost_w_woredamarket_hr <- rast_cost_w_woredamarket / 3600
 
@@ -1224,14 +1226,14 @@ plot(rast_cost_w_woredamarket_hr,
      main = "Walking access to woreda market (hours)")
 plot(vect_woredamarket_lea, add = T)
 
-writeRaster(rast_cost_w_woredamarket_hr, here::here(paste0("spatial_data/input/rast_cost_w_woredamarket_hr_", params$DIVCODE,".tif")), overwrite=T)
+writeRaster(rast_cost_w_woredamarket_hr, here::here(paste0("spatial_data/input/rast_cost_w_woredamarket_hr_", params$DIVCODEVAL,".tif")), overwrite=T)
 
 
 ## walking to zone market
 rast_cost_w_zonemarket <- gdistance::accCost(trans_w, geom(vect_zonemarket_lea)[, 3:4]) %>% rast()
 
 crs(rast_cost_w_zonemarket) <- wkt_lea
-writeRaster(rast_cost_w_zonemarket, here::here(paste0("spatial_data/input/rast_cost_w_zonemarket_", params$DIVCODE,".tif")), overwrite=T)
+writeRaster(rast_cost_w_zonemarket, here::here(paste0("spatial_data/input/rast_cost_w_zonemarket_", params$DIVCODEVAL,".tif")), overwrite=T)
 
 rast_cost_w_zonemarket_hr <- rast_cost_w_zonemarket / 3600
 
@@ -1241,8 +1243,17 @@ plot(rast_cost_w_zonemarket_hr,
      main = "Walking access to zone market (hours)")
 plot(vect_zonemarket_lea, add = T)
 
-writeRaster(rast_cost_w_zonemarket_hr, here::here(paste0("spatial_data/input/rast_cost_w_zonemarket_hr_", params$DIVCODE,".tif")), overwrite=T)
+writeRaster(rast_cost_w_zonemarket_hr, here::here(paste0("spatial_data/input/rast_cost_w_zonemarket_hr_", params$DIVCODEVAL,".tif")), overwrite=T)
 
 
 ```
 
+# Session Information
+  
+<div class="fold o"> 
+```{r}
+
+sessionInfo()
+
+``` 
+</div>
