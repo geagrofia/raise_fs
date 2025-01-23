@@ -47,7 +47,8 @@ server <- function(input, output, session) {
     selected_sys =  NULL,
     
     table_data = df_inn,
-    show_inputs  =  FALSE
+    show_inputs_1  =  FALSE,
+    show_inputs_2  =  FALSE
   )
   
   # ---- Render dropdown for innovation one ----
@@ -55,39 +56,27 @@ server <- function(input, output, session) {
     selectInput(
       "innovation_1",
       "Select Innovation 1:",
-      choices = paste0(df_inn$common_name, " (", df_inn$scientific_name, ")"),
+      choices = paste0(rv$table_data$common_name, " (", rv$table_data$scientific_name, ")"),
       selected = rv$selected_inn_1
     )
     
   })
   
-  # ---- Render action button for new second innovation dynamically ----
+  # ---- Render action button for new first innovation dynamically ----
   output$add_inn_1 <- renderUI({
-    if (input$inn_num == "one") {
+   # if (input$inn_num == "one") {
       actionButton("add_inn_1", "Add new innovation 1")
-    }
+   # }
   })
   
-  # ---- Prepare table for editing ----
+  # Show input fields when "Add Row" 1 button is pressed ----
   observeEvent(input$add_inn_1, {
-    current_data <- rv$table_data
-    print(current_data)
-    #new_row <- data.frame(matrix(NA, nrow = 1, ncol = ncol(current_data)))
-    #colnames(new_row) <- colnames(current_data)
-    #updated_data <- rbind(current_data, new_row)
-    #print(updated_data)
-    #rv$table_data <- updated_data
+    rv$show_inputs_1 = TRUE
   })
   
-  
-  # Show input fields when "Add Row" button is pressed
-  observeEvent(input$add_inn_1, {
-    rv$show_inputs = TRUE
-  })
-  
-  # Render the dynamic input fields and save button
+  # Render the dynamic input fields and save button ----
   output$input_fields_inn_1 <- renderUI({
-    if (rv$show_inputs) {
+    if (rv$show_inputs_1) {
       tagList(
         textInput("column2_inn_1", "Value for Column 2", ""),
         textInput("column3_inn_1", "Value for Column 3", ""),
@@ -96,7 +85,7 @@ server <- function(input, output, session) {
     }
   })
   
-  # Save inputs and add a row to the table
+  # Save inputs and add a row to the table ----
   observeEvent(input$save_inputs_inn_1, {
     req(rv$table_data) # Ensure there's existing data
     current_data <- rv$table_data
@@ -125,7 +114,7 @@ server <- function(input, output, session) {
     rv$table_data <- updated_data
     print(updated_data)
     # Hide inputs after saving and clear the input fields
-    rv$show_inputs <- FALSE
+    rv$show_inputs_1 <- FALSE
     updateTextInput(session, "column2_inn_1", value = "")
     updateTextInput(session, "column3_inn_1", value = "")
   })
@@ -143,11 +132,71 @@ server <- function(input, output, session) {
       selectInput(
         "innovation_2",
         "Select Innovation 2:",
-        choices = paste0(df_inn$common_name, " (", df_inn$scientific_name, ")"),
+        choices = paste0(rv$table_data$common_name, " (", rv$table_data$scientific_name, ")"),
         selected = rv$selected_inn_2
       )
     }
   })
+  
+  
+  # ---- Render action button for new second innovation dynamically ----
+  output$add_inn_2 <- renderUI({
+    if (input$inn_num == "two") {
+      actionButton("add_inn_2", "Add new innovation 2")
+    }
+  })
+  
+  # Show input fields when "Add Row" 2 button is pressed ----
+  observeEvent(input$add_inn_2, {
+    rv$show_inputs_2 = TRUE
+  })
+  
+  # Render the dynamic input fields and save button ----
+  output$input_fields_inn_2 <- renderUI({
+    if (rv$show_inputs_2) {
+      tagList(
+        textInput("column2_inn_2", "Value for Column 2 (Innovation 2)", ""),
+        textInput("column3_inn_2", "Value for Column 3 (Innovation 2)", ""),
+        actionButton("save_inputs_inn_2", "Save Inputs (Innovation 2)")
+      )
+    }
+  })
+  
+  # Save inputs and add a row to the table ----
+  observeEvent(input$save_inputs_inn_2, {
+    req(rv$table_data) # Ensure there's existing data
+    current_data <- rv$table_data
+    print(current_data)
+    # Automatically generate the new ID
+    new_id <- if (nrow(current_data) == 0) 1 else max(current_data[[1]], na.rm = TRUE) + 1
+    print(new_id)
+    # Get values from inputs for columns 2 and 3
+    new_col2 <- input$column2_inn_2
+    print(new_col2)
+    new_col3 <- input$column3_inn_2
+    print(new_col3)
+    # Create a new row
+    new_row <- data.frame(
+      Column1 = new_id,
+      Column2 = new_col2,
+      Column3 = new_col3,
+      stringsAsFactors = FALSE
+    )
+    print(new_row)
+    # Ensure the new row matches the column names of the existing data
+    colnames(new_row) <- colnames(current_data)
+    
+    # Append the new row and update the data
+    updated_data <- rbind(current_data, new_row)
+    rv$table_data <- updated_data
+    print(updated_data)
+    # Hide inputs after saving and clear the input fields
+    rv$show_inputs_2 <- FALSE
+    updateTextInput(session, "column2_inn_1", value = "")
+    updateTextInput(session, "column3_inn_1", value = "")
+  })
+  
+  
   
   # ---- Update reactive values based on dropdown selections ----
   observeEvent(input$innovation_2, {
