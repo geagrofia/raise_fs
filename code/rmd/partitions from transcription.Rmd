@@ -1,0 +1,430 @@
+---
+title: "Partitions from Transcription"
+author: "A Farrow"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE)
+
+```
+
+```{r libraries, echo=FALSE, message=FALSE, warning=FALSE, results='asis' }
+
+library(tidyverse)
+library(fuZR)
+library(irm)
+library(patchwork)
+library(stringr)
+library(ggplot2)
+library(dplyr)
+library(stringr)
+library(readr)
+library(tidyr)
+
+```
+
+# Choose crop
+
+```{r crop_choice, echo=FALSE, message=FALSE, warning=FALSE, results='asis'}
+
+crop_name <- "wheat"
+cat("\nCrop =", crop_name, "\n\n")
+
+```
+
+# Load CSV
+
+```{r load_csv, echo=FALSE, message=FALSE, warning=FALSE, results='asis'}
+
+df <- read_csv(
+  paste0(
+    "E:/repos/raise_fs/tab_data/input/transcription/T_",
+    crop_name,
+    "_generic_generic_requirements.csv"
+  )
+)
+
+cat("CSV = E:/repos/raise_fs/tab_data/input/transcription/T_",
+    crop_name,
+    "_generic_generic_requirements.csv")
+
+```
+
+# Convert rating codes to numeric
+
+```{r code_numeric, echo=FALSE, message=FALSE, warning=FALSE, results='asis'}
+
+rating_map <- c(
+  "S1-0" = 97.5,
+  "S1-1" = 90,
+  "S2"   = 72.5,
+  "S3"   = 50,
+  "N1"   = 32.5,
+  "N2"   = 12.5
+)
+
+cat(rating_map)
+
+df <- df %>%
+  mutate(rating = ifelse(
+    rating %in% names(rating_map),
+    rating_map[rating],
+    suppressWarnings(as.numeric(rating))
+  ))
+
+```
+
+# Identify other columns to plot against rating
+
+```{r variables, echo=FALSE, message=FALSE, warning=FALSE, results='asis'}
+
+var_cols <- setdiff(names(df), "rating")
+cat(var_cols)
+
+```
+
+
+```{r functions, echo=FALSE, message=FALSE, warning=FALSE, results='asis'}
+
+# Helper to find crossing at rating = 50 - alternative to above----
+get_crossing_point <- function(df) {
+  df <- df %>%
+    filter(!is.na(final_x),!is.na(rating),
+           is.finite(final_x),
+           is.finite(rating)) %>%
+    arrange(final_x, rating)
+  
+  # Loop through consecutive rows and find where rating crosses 50
+  crossings <- vector("list", 0)
+  
+  for (i in 1:(nrow(df) - 1)) {
+    r1 <- df$rating[i]
+    r2 <- df$rating[i + 1]
+    
+   
+    if (r1 == 50) {  # Check for value of 50 
+      
+      x1 <- df$final_x[i]
+      crossing_x <- (x1)
+      print(r1)
+      print(crossing_x)
+      crossings[[length(crossings) + 1]] <- data.frame(final_x = crossing_x, rating = 50)
+      
+      } else if ((r1 < 50 & r2 > 50) | (r1 > 50 & r2 < 50)) { # Check for bracket around 50 (e.g. 40 to 60 or 60 to 40)
+      x1 <- df$final_x[i]
+      x2 <- df$final_x[i + 1]
+      # Midpoint of x for approximate 50 crossing
+      crossing_x <- (x1 + x2) / 2
+      print(r1)
+      print(r2)
+      print(crossing_x)
+      crossings[[length(crossings) + 1]] <- data.frame(final_x = crossing_x, rating = 50)
+    }
+  }
+  
+  if (length(crossings) == 0)
+    # no crossing over 50 rating so interpolate from data
+    # Keep only rows where rating and var are not NA
+  {
+    df <- df %>% filter(!is.na(rating), !is.na(final_x))
+    
+    if (nrow(df) < 2)
+      return(NA)  # Need at least two points to interpolate
+    
+    # Linear interpolation for rating = 50 and rating = 100
+    var_50 <- approx(
+      x = df$rating,
+      y = df$final_x,
+      xout = 50,
+      rule = 2
+    )$y
+    
+    # Return var_50
+    cat("\n\nCrossing Interpolated\n\n")
+    crossings[[length(crossings) + 1]] <- data.frame(final_x = var_50, rating = 50)
+  }
+  
+  bind_rows(crossings)
+}
+
+# Helper to find trend----
+get_trend <- function(df) {
+  first_val <- df$rating[1]
+  last_val <- df$rating[nrow(df)]
+  
+  if (last_val > first_val) {
+    df <- df |> mutate(trend = "ascending")
+    cat("ascending")
+    return(df)
+  } else if (last_val < first_val) {
+    df <- df |> mutate(trend = "descending")
+    cat("descending")
+    return(df)
+  } else {
+    cat("flat")
+    return("flat")
+  }
+}
+
+#Helper to find boundary width----
+
+get_boundary <- function(df) {
+  
+  # Keep only rows where rating and var are not NA
+  df <- df %>% filter(!is.na(rating), !is.na(final_x))
+  
+  if (nrow(df) < 2) return(NA)  # Need at least two points to interpolate
+  
+  # Linear interpolation for rating = 50 and rating = 100
+  var_50 <- approx(x = df$rating, y = df$final_x, xout = 50, rule = 2)$y
+  var_100 <- approx(x = df$rating, y = df$final_x, xout = 100, rule = 2)$y
+  
+  # Return difference
+  return(var_100 - var_50)
+}
+```
+
+# Criteria plots
+
+```{r loop, echo=FALSE, message=FALSE, warning=FALSE, results='asis'}
+
+# Loop over each criterion and generate plot
+
+for (var in var_cols) {
+  df_plot <- df %>%
+    select(rating, !!sym(var)) %>%
+    rename(x_var = !!sym(var)) %>%
+    mutate(row_id = row_number()) |>
+    cat()
+  
+  # Group by rating and assign a row index within each group
+  df_grouped <- df_plot %>%
+    group_by(rating) %>%
+    mutate(rating_instance = row_number()) %>%
+    ungroup() |>
+    filter(!is.na(x_var)) |>
+    print()
+  
+  # First occurrences
+  df1 <- df_grouped %>%
+    filter(rating_instance == 1) %>%
+    select(-rating_instance)
+  
+  # Second occurrences
+  df2 <- df_grouped %>%
+    filter(rating_instance == 2) %>%
+    select(-rating_instance)
+  
+  # (Optional) Sort back to original order
+  df1 <- df1 %>% arrange(row_id) %>% select(-row_id) |>
+    print()
+  df2 <- df2 %>% arrange(row_id) %>% select(-row_id) |>
+    print()
+  
+  
+  df1 <- df1 |>
+    mutate(
+      x_numeric = suppressWarnings(as.numeric(x_var)),
+      x_extracted = as.numeric(str_extract(x_var, "\\d+\\.*\\d*")),
+      final_x = ifelse(!is.na(x_numeric), x_numeric, x_extracted),
+      label = ifelse(is.na(x_numeric) & !is.na(final_x), x_var, NA)
+    ) %>%
+    print() %>%
+    arrange(as.numeric(final_x), as.numeric(rating)) %>%
+    print(n = 30)
+
+  df1 <- get_trend(df1)
+  boundary_df1 <- get_boundary(df1)
+  cat("Estimated boundary width df1 (var at 100 - var at 50):", boundary_df1, "\n")
+
+  cat("\nhere1\n")
+  str(df2)
+  cat("\nhere2\n")
+  cat(nrow(df2))
+  cat("\nhere3\n")
+  
+  if (nrow(df2) > 0) {
+    cat("\n\n(nrow(df2) > 0 =", nrow(df2), "\n\n")
+    df2 <- df2 |>
+      mutate(
+        x_numeric = suppressWarnings(as.numeric(x_var)),
+        x_extracted = as.numeric(str_extract(x_var, "\\d+\\.*\\d*")),
+        final_x = ifelse(!is.na(x_numeric), x_numeric, x_extracted),
+        label = ifelse(is.na(x_numeric) &
+                         !is.na(final_x), x_var, NA)
+      ) %>%
+      print() %>%
+      arrange(as.numeric(final_x), desc(as.numeric(rating))) %>%
+      print(n = 30)
+    
+  } else {
+    cat("\n\n(nrow(df2) > 0 =", nrow(df2), "\n\n")
+  } 
+  
+  cat("\nnrow(df2)\n")
+  str(nrow(df2))
+  cat("\nhere5\n")
+  
+  if (nrow(df2) > 0) {
+    df2 <- get_trend(df2)
+    boundary_df2 <- get_boundary(df2)
+    cat("Estimated boundary width df2 (var at 100 - var at 50):", boundary_df2, "\n") 
+    df_plot <- rbind(df1, df2)
+  } else {
+    df_plot <- df1
+    cat("\nhere6\n")
+  }
+  
+  cat("\nhere7\n")
+  str(df2)
+  cat("\nhere8\n")
+  
+  # Split by trend
+  ascending <- df_plot %>% filter(trend == "ascending")
+  descending <- df_plot %>% filter(trend == "descending")
+  
+  # Get crossing points
+  cat("ascending")
+  if (nrow(ascending) > 0)
+    cross_asc <- get_crossing_point(ascending)
+  cat("descending")
+  if (nrow(descending) > 0)
+    cross_desc <- get_crossing_point(descending)
+  
+
+
+  
+  
+  # Plot
+  p <- ggplot(df_plot, aes(x = final_x, y = rating)) +
+    geom_point() +
+    geom_text(
+      aes(label = label),
+      na.rm = TRUE,
+      vjust = -0.5,
+      color = "red"
+    ) +
+    labs(x = var,
+         y = "Rating",
+         title = paste(var)) +
+    theme_minimal()
+  
+  p <- p + geom_smooth(
+    data = df_plot,
+    # method = "gam",
+    # formula = y ~ s(x, bs = "cs"),
+    aes(x = final_x, y = rating),
+    se = FALSE,
+    color = "blue"
+  )
+  
+  cat("Plotting:", var, "\n")
+  cat("Ascending n:", nrow(ascending), "\n")
+  cat("Descending n:", nrow(descending), "\n")
+
+  # Add crossing annotations
+  if (exists("cross_asc")) {
+    p <- p + geom_text(
+      data = cross_asc,
+      aes(label = paste(
+        round(cross_asc$final_x, digits = 2), "↑ threshold"
+      )),
+      hjust = 0, vjust = 0.5,
+      color = "blue"
+    )
+  }
+  if (exists("cross_desc")) {
+    p <- p + geom_text(
+      data = cross_desc,
+      aes(label = paste("threshold ↓",
+        round(cross_desc$final_x, digits = 2) 
+      )),
+      hjust = 1, vjust = 0.5,
+      color = "orange"
+    )
+  }
+
+  if (exists("cross_asc"))
+  {
+    if (exists("cross_desc")) { # implies two thresholds required
+      
+      if (boundary_df1 > boundary_df2) { # implies that df1 is ascending
+        
+        #zadeh fuzzy partition for two thresholds with df1 ascending
+        cat("two thresholds with df1 ascending")
+        cat(c(cross_asc$final_x, cross_desc$final_x))
+        fp_rating_zadeh <-
+          ZadehFuzzyPartition(
+            level = c("low", "medium", "high"),
+            crossoverPoint = c(cross_asc$final_x, cross_desc$final_x),
+            transitionWidth = c(abs(boundary_df1 * 2), abs(boundary_df2 * 2))
+          )
+        
+      } else {  # implies that df2 is ascending
+        
+        #zadeh fuzzy partition for two thresholds with df2 ascending
+        cat("two thresholds with df2 ascending")
+        fp_rating_zadeh <-
+          ZadehFuzzyPartition(
+            level = c("low", "medium", "high"),
+            crossoverPoint = c(cross_asc$final_x, cross_desc$final_x),
+            transitionWidth = c(abs(boundary_df2 * 2), abs(boundary_df1 * 2))
+          )
+      }
+    }  else  { # implies one ascending threshold required
+      
+      #zadeh fuzzy partition for one threshold
+      cat("one threshold with df1 ascending")
+      fp_rating_zadeh <-
+        ZadehFuzzyPartition(
+          level = c("low", "high"),
+          crossoverPoint = cross_asc$final_x,
+          transitionWidth = abs(boundary_df1 * 2)
+        )
+    }
+  } else { 
+    if (exists("cross_desc")) { # implies one descending threshold required
+      
+      #zadeh fuzzy partition for one threshold
+      cat("one threshold with df1 descending")
+      fp_rating_zadeh <-
+        ZadehFuzzyPartition(
+          level = c("low", "high"),
+          crossoverPoint = cross_desc$final_x,
+          transitionWidth = abs(boundary_df1 * 2)
+        )
+    }
+  }
+    
+  if (exists("fp_rating_zadeh")) {# construct the fuzzy partition plot
+  plot_fp_zadeh <- plot(
+    fp_rating_zadeh,
+    xlab = "whatever",
+    ylab = expression(paste("Membership ( ", mu, " )")),
+    title = "Rule base\nProposition\nFuzzy partition",
+    theme = theme_bw()
+  )
+    p <- p + plot_fp_zadeh  
+  }
+
+
+  
+  print(p)  # Show the plot
+   
+  rm(cross_asc)
+  rm(cross_desc)
+  rm(ascending)
+  rm(descending)
+  rm(df1)
+  rm(df2)
+  rm(df_plot)
+  rm(df_grouped)
+  rm(boundary_df1)
+  rm(boundary_df2)
+  
+}
+```
+
