@@ -7,7 +7,18 @@ output: html_document
 
 ```{r setup, include=FALSE}
 
-knitr::opts_chunk$set(echo = TRUE)
+options(width = 250, dplyr.width = 120)
+
+#set (chunk) options - figure path is necessary to avoid an error message
+knitr::opts_chunk$set(
+  comment = NA,
+  dpi = 96,
+  echo = FALSE,
+  #fig.path = paste0("figures/", params$INN1,"/"),
+  warning = FALSE,
+  cache = FALSE,
+  include = TRUE
+)
 
 ```
 
@@ -23,19 +34,19 @@ library(dplyr)
 library(stringr)
 library(readr)
 library(tidyr)
+library(kableExtra)
 
 ```
 
-# Choose crop
+# Load and prepare transcribed data
 
 ```{r crop_choice, echo=FALSE, message=FALSE, warning=FALSE, results='asis'}
 
-crop_name <- "wheat"
+crop_name <- "barley"
 cat("\nCrop =", crop_name, "\n\n")
 
 ```
 
-# Load CSV
 
 ```{r load_csv, echo=FALSE, message=FALSE, warning=FALSE, results='asis'}
 
@@ -43,17 +54,17 @@ df <- read_csv(
   paste0(
     "E:/repos/raise_fs/tab_data/input/transcription/T_",
     crop_name,
-    "_generic_generic_requirements.csv"
-  )
+    "_generic_generic_requirements.csv"), locale = locale(encoding = "Latin1")
+  
 )
 
-cat("CSV = E:/repos/raise_fs/tab_data/input/transcription/T_",
+cat("csv file = E:/repos/raise_fs/tab_data/input/transcription/T_",
     crop_name,
     "_generic_generic_requirements.csv")
 
 ```
 
-# Convert rating codes to numeric
+FAO suitability classes and limitations need to be converted into a rating value between 0 and 100:
 
 ```{r code_numeric, echo=FALSE, message=FALSE, warning=FALSE, results='asis'}
 
@@ -66,9 +77,10 @@ rating_map <- c(
   "N2"   = 12.5
 )
 
-cat(rating_map)
+cat("\n")
+  rating_map |> t() |> kable(caption = "rating codes", linesep = "") |> kable_styling(bootstrap_options = "bordered", full_width = F, position = "left") |>  print()
 
-df <- df %>%
+df <- df |>
   mutate(rating = ifelse(
     rating %in% names(rating_map),
     rating_map[rating],
@@ -77,12 +89,24 @@ df <- df %>%
 
 ```
 
-# Identify other columns to plot against rating
 
 ```{r variables, echo=FALSE, message=FALSE, warning=FALSE, results='asis'}
 
 var_cols <- setdiff(names(df), "rating")
-cat(var_cols)
+var_cols |> kable(caption = "Criteria to plot against rating", col.names = NULL) |> kable_styling(bootstrap_options = "bordered", full_width = F, position = "left") |>  print()
+
+df_small <- var_cols |> tibble()
+names(df_small) <- c("criterion")
+
+df_output <- tibble(
+  criterion = character(0),
+  threshold_1  = numeric(0),
+  threshold_2  = numeric(0),
+  width_1  = numeric(0),
+  width_2  = numeric(0)
+)
+
+df_output <- full_join(df_output, df_small)
 
 ```
 
@@ -91,10 +115,10 @@ cat(var_cols)
 
 # Helper to find crossing at rating = 50 - alternative to above----
 get_crossing_point <- function(df) {
-  df <- df %>%
+  df <- df |>
     filter(!is.na(final_x),!is.na(rating),
            is.finite(final_x),
-           is.finite(rating)) %>%
+           is.finite(rating)) |>
     arrange(final_x, rating)
   
   # Loop through consecutive rows and find where rating crosses 50
@@ -109,8 +133,8 @@ get_crossing_point <- function(df) {
       
       x1 <- df$final_x[i]
       crossing_x <- (x1)
-      print(r1)
-      print(crossing_x)
+      #print(r1)
+      #print(crossing_x)
       crossings[[length(crossings) + 1]] <- data.frame(final_x = crossing_x, rating = 50)
       
       } else if ((r1 < 50 & r2 > 50) | (r1 > 50 & r2 < 50)) { # Check for bracket around 50 (e.g. 40 to 60 or 60 to 40)
@@ -118,9 +142,9 @@ get_crossing_point <- function(df) {
       x2 <- df$final_x[i + 1]
       # Midpoint of x for approximate 50 crossing
       crossing_x <- (x1 + x2) / 2
-      print(r1)
-      print(r2)
-      print(crossing_x)
+      #print(r1)
+      #print(r2)
+      #print(crossing_x)
       crossings[[length(crossings) + 1]] <- data.frame(final_x = crossing_x, rating = 50)
     }
   }
@@ -129,7 +153,7 @@ get_crossing_point <- function(df) {
     # no crossing over 50 rating so interpolate from data
     # Keep only rows where rating and var are not NA
   {
-    df <- df %>% filter(!is.na(rating), !is.na(final_x))
+    df <- df |> filter(!is.na(rating), !is.na(final_x))
     
     if (nrow(df) < 2)
       return(NA)  # Need at least two points to interpolate
@@ -157,14 +181,14 @@ get_trend <- function(df) {
   
   if (last_val > first_val) {
     df <- df |> mutate(trend = "ascending")
-    cat("ascending")
+    #cat("ascending")
     return(df)
   } else if (last_val < first_val) {
     df <- df |> mutate(trend = "descending")
-    cat("descending")
+    #cat("descending")
     return(df)
   } else {
-    cat("flat")
+    #cat("flat")
     return("flat")
   }
 }
@@ -174,7 +198,7 @@ get_trend <- function(df) {
 get_boundary <- function(df) {
   
   # Keep only rows where rating and var are not NA
-  df <- df %>% filter(!is.na(rating), !is.na(final_x))
+  df <- df |> filter(!is.na(rating), !is.na(final_x))
   
   if (nrow(df) < 2) return(NA)  # Need at least two points to interpolate
   
@@ -189,40 +213,48 @@ get_boundary <- function(df) {
 
 # Criteria plots
 
-```{r loop, echo=FALSE, message=FALSE, warning=FALSE, results='asis'}
+```{r loop, message=FALSE, fig.dim = c(9, 6), warning=FALSE, echo=FALSE, out.width="100%", results = "asis"}
 
 # Loop over each criterion and generate plot
 
 for (var in var_cols) {
-  df_plot <- df %>%
-    select(rating, !!sym(var)) %>%
-    rename(x_var = !!sym(var)) %>%
-    mutate(row_id = row_number()) |>
-    cat()
+  df_plot <- df |>
+    select(rating, !!sym(var)) |>
+    rename(x_var = !!sym(var)) |>
+    mutate(row_id = row_number())
   
+  cat("\n")
+  
+  df_plot |> select(-row_id) |> t() |>
+    kable(caption = paste("<h2 style=color:black;>", var, "</h2>"), escape = FALSE,
+    format = "html") |> kable_styling(
+      bootstrap_options = "bordered", font_size = 9,
+      full_width = F,
+      position = "left"
+    ) |>  print()
+  
+  cat("\n")
+   
   # Group by rating and assign a row index within each group
-  df_grouped <- df_plot %>%
-    group_by(rating) %>%
-    mutate(rating_instance = row_number()) %>%
+  df_grouped <- df_plot |>
+    group_by(rating) |>
+    mutate(rating_instance = row_number()) |>
     ungroup() |>
-    filter(!is.na(x_var)) |>
-    print()
+    filter(!is.na(x_var)) 
   
   # First occurrences
-  df1 <- df_grouped %>%
-    filter(rating_instance == 1) %>%
+  df1 <- df_grouped |>
+    filter(rating_instance == 1) |>
     select(-rating_instance)
   
   # Second occurrences
-  df2 <- df_grouped %>%
-    filter(rating_instance == 2) %>%
+  df2 <- df_grouped |>
+    filter(rating_instance == 2) |>
     select(-rating_instance)
   
   # (Optional) Sort back to original order
-  df1 <- df1 %>% arrange(row_id) %>% select(-row_id) |>
-    print()
-  df2 <- df2 %>% arrange(row_id) %>% select(-row_id) |>
-    print()
+  df1 <- df1 |> arrange(row_id) |> select(-row_id) 
+  df2 <- df2 |> arrange(row_id) |> select(-row_id) 
   
   
   df1 <- df1 |>
@@ -231,23 +263,25 @@ for (var in var_cols) {
       x_extracted = as.numeric(str_extract(x_var, "\\d+\\.*\\d*")),
       final_x = ifelse(!is.na(x_numeric), x_numeric, x_extracted),
       label = ifelse(is.na(x_numeric) & !is.na(final_x), x_var, NA)
-    ) %>%
-    print() %>%
-    arrange(as.numeric(final_x), as.numeric(rating)) %>%
-    print(n = 30)
+    ) |>
+    arrange(as.numeric(final_x), as.numeric(rating)) 
 
   df1 <- get_trend(df1)
-  boundary_df1 <- get_boundary(df1)
-  cat("Estimated boundary width df1 (var at 100 - var at 50):", boundary_df1, "\n")
-
-  cat("\nhere1\n")
-  str(df2)
-  cat("\nhere2\n")
-  cat(nrow(df2))
-  cat("\nhere3\n")
+  boundary_df1 <- get_boundary(df1)   
   
-  if (nrow(df2) > 0) {
-    cat("\n\n(nrow(df2) > 0 =", nrow(df2), "\n\n")
+  cat("\n")
+  cat("Estimated boundary width df1 (var at 100 - var at 50):", abs(boundary_df1), "\n\n")
+  
+  # create a df to later link to df_output
+  df_var_output <- tibble(criterion = var, width_1 = abs(boundary_df1) * 2)
+    df_var_output |> kable(caption = var) |> kable_styling(
+      bootstrap_options = "bordered",
+      full_width = F,
+      position = "left"
+    ) |>  print()
+
+if (nrow(df2) > 0) {
+    #cat("\n\n(nrow(df2) > 0 =", nrow(df2), "\n\n")
     df2 <- df2 |>
       mutate(
         x_numeric = suppressWarnings(as.numeric(x_var)),
@@ -255,48 +289,42 @@ for (var in var_cols) {
         final_x = ifelse(!is.na(x_numeric), x_numeric, x_extracted),
         label = ifelse(is.na(x_numeric) &
                          !is.na(final_x), x_var, NA)
-      ) %>%
-      print() %>%
-      arrange(as.numeric(final_x), desc(as.numeric(rating))) %>%
-      print(n = 30)
+      ) |>
+      arrange(as.numeric(final_x), desc(as.numeric(rating)))
     
   } else {
     cat("\n\n(nrow(df2) > 0 =", nrow(df2), "\n\n")
   } 
   
-  cat("\nnrow(df2)\n")
-  str(nrow(df2))
-  cat("\nhere5\n")
-  
   if (nrow(df2) > 0) {
     df2 <- get_trend(df2)
     boundary_df2 <- get_boundary(df2)
-    cat("Estimated boundary width df2 (var at 100 - var at 50):", boundary_df2, "\n") 
+    
+    cat("\n")
+    cat("Estimated boundary width df2 (var at 100 - var at 50):", abs(boundary_df2), "\n\n") 
+    
+    # add to df to later link to df_output
+    df_var_output <- df_var_output |> mutate(width_2 = abs(boundary_df2) * 2)
+    df_var_output |> kable(caption = var) |> kable_styling(
+      bootstrap_options = "bordered",
+      full_width = F,
+      position = "left"
+    ) |>  print()
+
     df_plot <- rbind(df1, df2)
   } else {
     df_plot <- df1
-    cat("\nhere6\n")
   }
-  
-  cat("\nhere7\n")
-  str(df2)
-  cat("\nhere8\n")
-  
+
   # Split by trend
-  ascending <- df_plot %>% filter(trend == "ascending")
-  descending <- df_plot %>% filter(trend == "descending")
+  ascending <- df_plot |> filter(trend == "ascending")
+  descending <- df_plot |> filter(trend == "descending")
   
   # Get crossing points
-  cat("ascending")
   if (nrow(ascending) > 0)
     cross_asc <- get_crossing_point(ascending)
-  cat("descending")
   if (nrow(descending) > 0)
     cross_desc <- get_crossing_point(descending)
-  
-
-
-  
   
   # Plot
   p <- ggplot(df_plot, aes(x = final_x, y = rating)) +
@@ -307,6 +335,7 @@ for (var in var_cols) {
       vjust = -0.5,
       color = "red"
     ) +
+    ylim(0, 100) +
     labs(x = var,
          y = "Rating",
          title = paste(var)) +
@@ -321,9 +350,9 @@ for (var in var_cols) {
     color = "blue"
   )
   
-  cat("Plotting:", var, "\n")
-  cat("Ascending n:", nrow(ascending), "\n")
-  cat("Descending n:", nrow(descending), "\n")
+  cat("\nPlotting:", var, "\n\n")
+  cat("\nAscending n:", nrow(ascending), "\n\n")
+  cat("\nDescending n:", nrow(descending), "\n\n")
 
   # Add crossing annotations
   if (exists("cross_asc")) {
@@ -354,8 +383,9 @@ for (var in var_cols) {
       if (boundary_df1 > boundary_df2) { # implies that df1 is ascending
         
         #zadeh fuzzy partition for two thresholds with df1 ascending
-        cat("two thresholds with df1 ascending")
+        cat("\nTwo thresholds with ratings ascending then descending: \n")
         cat(c(cross_asc$final_x, cross_desc$final_x))
+        cat("\n")
         fp_rating_zadeh <-
           ZadehFuzzyPartition(
             level = c("low", "medium", "high"),
@@ -363,46 +393,84 @@ for (var in var_cols) {
             transitionWidth = c(abs(boundary_df1 * 2), abs(boundary_df2 * 2))
           )
         
+        # add to df to later link to df_output
+        df_var_output <- df_var_output |> mutate(threshold_1 = cross_asc$final_x,
+                                                 threshold_2 = cross_desc$final_x)
+        df_var_output |> kable(caption = var) |> kable_styling(
+          bootstrap_options = "bordered",
+          full_width = F,
+          position = "left"
+        ) |>  print()
+        
+        
       } else {  # implies that df2 is ascending
         
         #zadeh fuzzy partition for two thresholds with df2 ascending
-        cat("two thresholds with df2 ascending")
+        cat("\nTwo thresholds with ratings descending then ascending: \n")
         fp_rating_zadeh <-
           ZadehFuzzyPartition(
             level = c("low", "medium", "high"),
-            crossoverPoint = c(cross_asc$final_x, cross_desc$final_x),
+            crossoverPoint = c(cross_desc$final_x, cross_asc$final_x),
             transitionWidth = c(abs(boundary_df2 * 2), abs(boundary_df1 * 2))
           )
+        
+        # add to df to later link to df_output
+        df_var_output <- df_var_output |> mutate(threshold_1 = cross_desc$final_x,
+                                                 threshold_2 = cross_asc$final_x)
+        df_var_output |> kable(caption = var) |> kable_styling(
+          bootstrap_options = "bordered",
+          full_width = F,
+          position = "left"
+        ) |>  print()
+        
       }
     }  else  { # implies one ascending threshold required
       
       #zadeh fuzzy partition for one threshold
-      cat("one threshold with df1 ascending")
+      cat("\nOne threshold with ratings ascending\n")
       fp_rating_zadeh <-
         ZadehFuzzyPartition(
           level = c("low", "high"),
           crossoverPoint = cross_asc$final_x,
           transitionWidth = abs(boundary_df1 * 2)
         )
+      
+      # add to df to later link to df_output
+        df_var_output <- df_var_output |> mutate(threshold_1 = cross_asc$final_x)
+        df_var_output |> kable(caption = var) |> kable_styling(
+          bootstrap_options = "bordered",
+          full_width = F,
+          position = "left"
+        ) |>  print()
+        
     }
   } else { 
     if (exists("cross_desc")) { # implies one descending threshold required
       
       #zadeh fuzzy partition for one threshold
-      cat("one threshold with df1 descending")
+      cat("\nOne threshold with ratings descending\n")
       fp_rating_zadeh <-
         ZadehFuzzyPartition(
           level = c("low", "high"),
           crossoverPoint = cross_desc$final_x,
           transitionWidth = abs(boundary_df1 * 2)
         )
+      
+            # add to df to later link to df_output
+        df_var_output <- df_var_output |> mutate(threshold_1 = cross_desc$final_x)
+        df_var_output |> kable(caption = var) |> kable_styling(
+          bootstrap_options = "bordered",
+          full_width = F,
+          position = "left"
+        ) |>  print()
+        
     }
   }
     
   if (exists("fp_rating_zadeh")) {# construct the fuzzy partition plot
   plot_fp_zadeh <- plot(
     fp_rating_zadeh,
-    xlab = "whatever",
+    xlab = var,
     ylab = expression(paste("Membership ( ", mu, " )")),
     title = "Rule base\nProposition\nFuzzy partition",
     theme = theme_bw()
@@ -410,10 +478,19 @@ for (var in var_cols) {
     p <- p + plot_fp_zadeh  
   }
 
-
-  
   print(p)  # Show the plot
-   
+  
+    # link to df_output
+  
+  ## NEED TO OVERWRITE ## ----
+  df_output <<- df_output |> rows_update(df_var_output, by = "criterion")
+  
+  df_output |> kable(caption = var) |> kable_styling(
+    bootstrap_options = "bordered",
+    full_width = F,
+    position = "left"
+  ) 
+  
   rm(cross_asc)
   rm(cross_desc)
   rm(ascending)
@@ -424,7 +501,48 @@ for (var in var_cols) {
   rm(df_grouped)
   rm(boundary_df1)
   rm(boundary_df2)
-  
+  rm(df_var_output)
+        
 }
+```
+
+# Output csv
+
+
+```{r output, message=FALSE, fig.dim = c(9, 6), warning=FALSE, echo=FALSE, out.width="100%", results = "asis"}
+# 
+
+df_output |> kable(caption = "Criteria, thresholds and boundary widths") |> kable_styling(
+  bootstrap_options = "bordered",
+  full_width = F,
+  position = "left"
+) |>  print()
+
+df_output <- df_output |> mutate(
+  crit_code = NA,
+  weight = NA,
+  thresh_source = "Sys et al., 1993",
+  data_desc = NA,
+  phen_stage = NA,
+  prop_level_1 = NA,
+  prop_level_2 = NA,
+  prop_level_3 = NA,
+  conc_level_1 = NA,
+  conc_level_2 = NA,
+  conc_level_3 = NA,
+  prec_temp = NA,
+  texture = NA,
+  fuzzy_partition = "zadeh"
+) |> relocate(c(weight, threshold_1, threshold_2), .after = criterion)
+
+write.csv(
+  df_output,
+  paste0(
+    "E:/repos/raise_fs/tab_data/input/",
+    crop_name,
+    "_generic_generic_requirements.csv"
+  ), , row.names=FALSE
+)
+
 ```
 
