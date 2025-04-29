@@ -1,5 +1,5 @@
 ---
-title: "Partitions from Transcription"
+title: "Processing Transcription"
 author: "A Farrow"
 date: "`r Sys.Date()`"
 output: html_document
@@ -38,12 +38,13 @@ library(kableExtra)
 
 ```
 
-# Load and prepare transcribed data
+
 
 ```{r crop_choice, echo=FALSE, message=FALSE, warning=FALSE, results='asis'}
 
+# Load and prepare transcribed data
 crop_name <- "barley"
-cat("\nCrop =", crop_name, "\n\n")
+cat("\n# Crop =", crop_name, "\n\n")
 
 ```
 
@@ -54,13 +55,13 @@ df <- read_csv(
   paste0(
     "E:/repos/raise_fs/tab_data/input/transcription/T_",
     crop_name,
-    "_generic_generic_requirements.csv"), locale = locale(encoding = "Latin1")
+    "_generic_generic_requirements.csv") , locale = locale(encoding = "Latin1")
   
 )
 
-cat("csv file = E:/repos/raise_fs/tab_data/input/transcription/T_",
+cat("\ncsv file = E:/repos/raise_fs/tab_data/input/transcription/T_",
     crop_name,
-    "_generic_generic_requirements.csv")
+    "_generic_generic_requirements.csv\n\n")
 
 ```
 
@@ -103,7 +104,13 @@ df_output <- tibble(
   threshold_1  = numeric(0),
   threshold_2  = numeric(0),
   width_1  = numeric(0),
-  width_2  = numeric(0)
+  width_2  = numeric(0),
+  prop_level_1 = character(0),
+  prop_level_2 = character(0),
+  prop_level_3 = character(0),
+  conc_level_1 = character(0),
+  conc_level_2 = character(0),
+  conc_level_3 = character(0)
 )
 
 df_output <- full_join(df_output, df_small)
@@ -228,7 +235,7 @@ for (var in var_cols) {
   df_plot |> select(-row_id) |> t() |>
     kable(caption = paste("<h2 style=color:black;>", var, "</h2>"), escape = FALSE,
     format = "html") |> kable_styling(
-      bootstrap_options = "bordered", font_size = 9,
+      bootstrap_options = "bordered", font_size = 12,
       full_width = F,
       position = "left"
     ) |>  print()
@@ -260,7 +267,7 @@ for (var in var_cols) {
   df1 <- df1 |>
     mutate(
       x_numeric = suppressWarnings(as.numeric(x_var)),
-      x_extracted = as.numeric(str_extract(x_var, "\\d+\\.*\\d*")),
+      x_extracted = as.numeric(str_extract(x_var, "-?\\d+\\.*\\d*")),
       final_x = ifelse(!is.na(x_numeric), x_numeric, x_extracted),
       label = ifelse(is.na(x_numeric) & !is.na(final_x), x_var, NA)
     ) |>
@@ -285,7 +292,7 @@ if (nrow(df2) > 0) {
     df2 <- df2 |>
       mutate(
         x_numeric = suppressWarnings(as.numeric(x_var)),
-        x_extracted = as.numeric(str_extract(x_var, "\\d+\\.*\\d*")),
+        x_extracted = as.numeric(str_extract(x_var, "-?\\d+\\.*\\d*")),
         final_x = ifelse(!is.na(x_numeric), x_numeric, x_extracted),
         label = ifelse(is.na(x_numeric) &
                          !is.na(final_x), x_var, NA)
@@ -356,6 +363,10 @@ if (nrow(df2) > 0) {
 
   # Add crossing annotations
   if (exists("cross_asc")) {
+    
+    #cat("\n\nDebug 1a\n\n")
+    #locale = "UTF-8"
+    
     p <- p + geom_text(
       data = cross_asc,
       aes(label = paste(
@@ -364,6 +375,7 @@ if (nrow(df2) > 0) {
       hjust = 0, vjust = 0.5,
       color = "blue"
     )
+    #cat("\n\nDebug 1b\n\n")
   }
   if (exists("cross_desc")) {
     p <- p + geom_text(
@@ -375,6 +387,8 @@ if (nrow(df2) > 0) {
       color = "orange"
     )
   }
+  
+#cat("\n\nDebug 2\n\n")
 
   if (exists("cross_asc"))
   {
@@ -394,8 +408,16 @@ if (nrow(df2) > 0) {
           )
         
         # add to df to later link to df_output
-        df_var_output <- df_var_output |> mutate(threshold_1 = cross_asc$final_x,
-                                                 threshold_2 = cross_desc$final_x)
+        df_var_output <- df_var_output |> mutate(
+          threshold_1 = cross_asc$final_x,
+          threshold_2 = cross_desc$final_x,
+          prop_level_1 = "low",
+          prop_level_2 = "medium",
+          prop_level_3 = "high",
+          conc_level_1 = "suboptimal",
+          conc_level_2 = "optimal",
+          conc_level_3 = "suboptimal"
+        )
         df_var_output |> kable(caption = var) |> kable_styling(
           bootstrap_options = "bordered",
           full_width = F,
@@ -415,8 +437,16 @@ if (nrow(df2) > 0) {
           )
         
         # add to df to later link to df_output
-        df_var_output <- df_var_output |> mutate(threshold_1 = cross_desc$final_x,
-                                                 threshold_2 = cross_asc$final_x)
+        df_var_output <- df_var_output |> mutate(
+          threshold_1 = cross_desc$final_x,
+          threshold_2 = cross_asc$final_x,
+          prop_level_1 = "low",
+          prop_level_2 = "medium",
+          prop_level_3 = "high",
+          conc_level_1 = "optimal",
+          conc_level_2 = "suboptimal",
+          conc_level_3 = "optimal"
+        )
         df_var_output |> kable(caption = var) |> kable_styling(
           bootstrap_options = "bordered",
           full_width = F,
@@ -436,7 +466,12 @@ if (nrow(df2) > 0) {
         )
       
       # add to df to later link to df_output
-        df_var_output <- df_var_output |> mutate(threshold_1 = cross_asc$final_x)
+        df_var_output <- df_var_output |> mutate(threshold_1 = cross_asc$final_x,
+          prop_level_1 = "low",
+          prop_level_2 = "high",
+          conc_level_1 = "suboptimal",
+          conc_level_2 = "optimal"
+        )
         df_var_output |> kable(caption = var) |> kable_styling(
           bootstrap_options = "bordered",
           full_width = F,
@@ -457,7 +492,13 @@ if (nrow(df2) > 0) {
         )
       
             # add to df to later link to df_output
-        df_var_output <- df_var_output |> mutate(threshold_1 = cross_desc$final_x)
+      df_var_output <- df_var_output |> mutate(
+        threshold_1 = cross_desc$final_x,
+        prop_level_1 = "low",
+        prop_level_2 = "high",
+        conc_level_1 = "optimal",
+        conc_level_2 = "suboptimal"
+      )
         df_var_output |> kable(caption = var) |> kable_styling(
           bootstrap_options = "bordered",
           full_width = F,
@@ -511,12 +552,22 @@ if (nrow(df2) > 0) {
 
 ```{r output, message=FALSE, fig.dim = c(9, 6), warning=FALSE, echo=FALSE, out.width="100%", results = "asis"}
 # 
+df_output |> kable(
+    caption = paste("<h2 style=color:black;> Criteria, thresholds, boundary widths, propositions and conclusions </h2>"),
+    escape = FALSE,
+    format = "html"
+  ) |> kable_styling(
+    bootstrap_options = "bordered",
+    font_size = 12,
+    full_width = F,
+    position = "left"
+  ) |>  print()
 
-df_output |> kable(caption = "Criteria, thresholds and boundary widths") |> kable_styling(
-  bootstrap_options = "bordered",
-  full_width = F,
-  position = "left"
-) |>  print()
+# df_output |> kable(caption = "Criteria, thresholds, boundary widths, propositions and conclusions") |> kable_styling(
+#   bootstrap_options = "bordered",
+#   full_width = F,
+#   position = "left"
+# ) |>  print()
 
 df_output <- df_output |> mutate(
   crit_code = NA,
@@ -524,16 +575,39 @@ df_output <- df_output |> mutate(
   thresh_source = "Sys et al., 1993",
   data_desc = NA,
   phen_stage = NA,
-  prop_level_1 = NA,
-  prop_level_2 = NA,
-  prop_level_3 = NA,
-  conc_level_1 = NA,
-  conc_level_2 = NA,
-  conc_level_3 = NA,
   prec_temp = NA,
   texture = NA,
   fuzzy_partition = "zadeh"
-) |> relocate(c(weight, threshold_1, threshold_2), .after = criterion)
+) |> relocate(c(weight, threshold_1, threshold_2), .after = criterion) |> relocate(crit_code, .before = criterion) |> relocate(c(thresh_source,	data_desc,	phen_stage), .before = prop_level_1)
+
+# add texture values
+df_output <- df_output |>
+  add_row(
+    criterion = "Soil Texture",
+    threshold_1 = 0.5,
+    width_1 = 1,
+    thresh_source = "Sys et al., 1993",
+    prop_level_1 = "poor",
+    prop_level_2 = "good",
+    conc_level_1 = "suboptimal",
+    conc_level_2 = "optimal",
+    texture = 1,
+    fuzzy_partition = "zadeh"
+  )
+
+# add drainage values
+df_output <- df_output |>
+  add_row(
+    criterion = "Drainage",
+    threshold_1 = 0.5,
+    width_1 = 1,
+    thresh_source = "Sys et al., 1993",
+    prop_level_1 = "poor",
+    prop_level_2 = "good",
+    conc_level_1 = "suboptimal",
+    conc_level_2 = "optimal",
+    fuzzy_partition = "zadeh"
+  )
 
 write.csv(
   df_output,
@@ -541,7 +615,7 @@ write.csv(
     "E:/repos/raise_fs/tab_data/input/",
     crop_name,
     "_generic_generic_requirements.csv"
-  ), , row.names=FALSE
+  ), fileEncoding  = "Latin1" , row.names=FALSE
 )
 
 ```
