@@ -180,6 +180,8 @@ if (keep_knit == F) {
 
 # Load existing data tables
 
+## Requirements
+
 Requirements data have already been transcribed from literature, and generated during calibration workshops.
 
 It is possible that the biophysical requirements may be generic, while the socio-economic requirements may have been relevant for a specific ideotype or, more likely, a specific scenario.
@@ -230,6 +232,8 @@ cat("\ncsv file = E:/repos/raise_fs/tab_data/input/AHP/AHP_",
     "_generic_generic_requirements.csv\n\n")
 
 ```
+
+## Weights
 
 Weights are produced during the calibration workshop for socio-economic criteria.
 
@@ -293,6 +297,10 @@ cat("\ncsv weights file = E:/repos/raise_fs/tab_data/input/AHP/AHP_",
     "_weights.csv\n\n")
 
 ```
+
+
+## Higher level rule bases
+
 
 ```{r load_csv_higher_sef, echo=FALSE, message=FALSE, warning=FALSE, results='asis'}
 
@@ -435,7 +443,7 @@ df_combined |> kable(caption = paste("<h2 style=color:black;>", combi,"requireme
 ```{r merge_df_links, echo=FALSE, message=FALSE, warning=FALSE, results='asis'}
 
 
-df_links_combined <- full_join(df_links_sef, df_links_ba)
+df_links_combined <- full_join(df_links_sef, df_links_ba) |> left_join(select(df_combined, crit_code, weight), by = "crit_code")
 
 df_links_combined |> kable(caption = paste("<h2 style=color:black;>", combi,"links merged</h2>")) |> kable_styling(
       bootstrap_options = "bordered",
