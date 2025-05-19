@@ -43,7 +43,7 @@ library(kableExtra)
 ```{r crop_choice, echo=FALSE, message=FALSE, warning=FALSE, results='asis'}
 
 # Load and prepare transcribed data
-crop_name <- "barley"
+crop_name <- "wheat"
 cat("\n# Crop =", crop_name, "\n\n")
 
 ```
@@ -571,14 +571,30 @@ df_output |> kable(
 
 df_output <- df_output |> mutate(
   crit_code = NA,
-  weight = NA,
   thresh_source = "Sys et al., 1993",
   data_desc = NA,
+  data_file_prefix = NA,
+  raster_or_brick = NA,
+  agg_fun = NA,
+  rsm_fun = NA,
   phen_stage = NA,
+  yield = NA,
+  temp_resolution = NA,
   prec_temp = NA,
   texture = NA,
   fuzzy_partition = "zadeh"
-) |> relocate(c(weight, threshold_1, threshold_2), .after = criterion) |> relocate(crit_code, .before = criterion) |> relocate(c(thresh_source,	data_desc,	phen_stage), .before = prop_level_1)
+) |> relocate(c(threshold_1, threshold_2), .after = criterion) |> relocate(crit_code, .before = criterion) |> relocate(
+  c(
+    thresh_source,
+    data_desc,
+    data_file_prefix,
+    raster_or_brick,
+    agg_fun,
+    rsm_fun,
+    phen_stage
+  ),
+  .before = prop_level_1
+)
 
 # add texture values
 df_output <- df_output |>
