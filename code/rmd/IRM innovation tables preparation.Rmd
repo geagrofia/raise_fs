@@ -1,0 +1,469 @@
+---
+title: "IRM innovation tables preparation"
+author: "A Farrow"
+date: "`r Sys.Date()`"
+output: html_document
+---
+```{r setup, include=FALSE}
+
+options(width = 250, dplyr.width = 120)
+
+#set (chunk) options - figure path is necessary to avoid an error message
+knitr::opts_chunk$set(
+  comment = NA,
+  dpi = 96,
+  echo = FALSE,
+  #fig.path = paste0("figures/", params$INN1,"/"),
+  warning = FALSE,
+  cache = FALSE,
+  include = TRUE
+)
+
+```
+
+```{r libraries, echo=FALSE, message=FALSE, warning=FALSE, results='asis' }
+
+library(tidyverse)
+library(fuZR)
+library(irm)
+library(patchwork)
+library(stringr)
+library(ggplot2)
+library(dplyr)
+library(stringr)
+library(readr)
+library(tidyr)
+library(kableExtra)
+library(knitr)
+
+```
+
+# Check for existing requirements
+
+## Load the innovations data frame
+
+```{r existing_inn, echo=FALSE, message=FALSE, warning=FALSE, results='asis' }
+
+df_inn <- read.csv("E:/repos/raise_fs/shiny/data/innovations.csv")
+df_inn <- df_inn|> mutate(innovation = paste(crop_name, ideotype, scenario, sep = '-'))
+
+df_inn |> kable(caption = paste("<h2 style=color:black;> Existing innovations</h2>")) |> kable_styling(
+      bootstrap_options = "bordered",
+      full_width = F,
+      position = "left"
+    ) |>  print()
+
+```
+
+## Define the biophysical innovation details:
+
+```{r inn_choice_ba, echo=FALSE, message=FALSE, warning=FALSE, results='asis'}
+
+# Load transcribed biophysical data
+crop_name_ba <- "barley"
+crop_name_inn <- crop_name_ba
+cat("\n### Crop =", crop_name_ba, "\n\n")
+
+ideotype_ba <- "generic"
+cat("\n### Ideotype =", ideotype_ba, "\n\n")
+
+scenario_ba <- "generic"
+cat("\n### Scenario =", scenario_ba, "\n\n")
+
+combi_ba <- paste0(crop_name_ba,"-",ideotype_ba,"-", scenario_ba)
+cat("\n### Biophysical requirements - Innovation =", combi_ba, "\n\n")
+
+# If statement to check if combi_ba is in df_inn$innovation (case-insensitive)
+if (any(grepl(combi_ba, df_inn$innovation, ignore.case = TRUE))) {
+  cat("\n## BA - Match found!")
+} else {
+  cat("\n## BA - No match.")
+}
+
+```
+
+## Define the socio-economic innovation details:
+
+```{r inn_choice-sef, echo=FALSE, message=FALSE, warning=FALSE, results='asis'}
+
+# Load AHP socio-economic data
+
+ideotype_sef <- "generic"
+cat("\n### Ideotype =", ideotype_sef, "\n\n")
+
+scenario_sef <- "generic"
+cat("\n### Scenario =", scenario_sef, "\n\n")
+
+combi_sef <- paste0(crop_name_inn,"-",ideotype_sef,"-", scenario_sef)
+cat("\n### Socio-Economic requirements - Innovation =", combi_sef, "\n\n")
+
+
+# If statement to check if combi_sef is in df_inn$innovation (case-insensitive)
+if (any(grepl(combi_sef, df_inn$innovation, ignore.case = TRUE))) {
+  cat("\n## SEF - Match found!")
+} else {
+  cat("\n## SEF - No match.")
+}
+
+```
+
+## Combine details
+
+```{r inn_compare, echo=FALSE, message=FALSE, warning=FALSE, results='asis'}
+
+# which is the most specific ideotype - ba or sef?
+
+
+if (ideotype_ba == "generic" &
+    ideotype_sef == "generic") {
+  ideotype_inn  <-  "generic"
+} else {if (ideotype_ba == "generic" &
+         ideotype_sef != "generic") {
+  ideotype_inn  <-  ideotype_sef
+} else {if (ideotype_ba != "generic" &
+         ideotype_sef == "generic") {
+  ideotype  <-  ideotype_ba
+} else {if (ideotype_ba != "generic" &
+         ideotype_sef != "generic") {
+  ideotype_inn  <-  ideotype_ba
+  cat("MISMATCH")
+  knit_exit(append, fully = TRUE)
+}}}}
+
+# which is the most specific scenario - ba or sef?
+
+if (scenario_ba == "generic" &
+    scenario_sef == "generic") {
+  scenario_inn  <-  "generic"
+} else {if (scenario_ba == "generic" &
+         scenario_sef != "generic") {
+  scenario_inn  <-  scenario_sef
+} else {if (scenario_ba != "generic" &
+         scenario_sef == "generic") {
+  scenario_inn  <-  scenario_ba
+} else {if (scenario_ba != "generic" &
+         scenario_sef != "generic") {
+  scenario_inn  <-  scenario_ba
+  cat("MISMATCH")
+  knit_exit(append, fully = TRUE)
+}}}}
+
+combi <- paste0(crop_name_inn,"-",ideotype_inn,"-", scenario_inn)
+
+cat("\n### Requirements - Innovation =", combi, "\n\n")
+
+# If statement to check if innovation is in df_inn$innovation (case-insensitive)
+  if (any(grepl(combi, df_inn$innovation, ignore.case = TRUE))) {
+    
+     cat("\n ## Match found \n\n # EXITING!")
+     
+     keep_knit <- F
+    
+  } else {
+    
+    cat("\n ## No match.")
+    keep_knit <- T
+    
+  }
+```
+
+
+```{r stop}
+
+if (keep_knit == F) {
+  
+  knit_exit(fully = TRUE)
+  
+}
+```
+
+
+# Load existing data tables
+
+Requirements data have already been transcribed from literature, and generated during calibration workshops.
+
+It is possible that the biophysical requirements may be generic, while the socio-economic requirements may have been relevant for a specific ideotype or, more likely, a specific scenario.
+
+In these cases the name of the whole innovation is that of the most specific of the two names.
+
+```{r load_csv_ba, echo=FALSE, message=FALSE, warning=FALSE, results='asis'}
+
+df_ba <- read_csv(
+  paste0(
+    "E:/repos/raise_fs/tab_data/input/",
+    crop_name_ba,
+    "_",
+    ideotype_ba,
+    "_",
+    scenario_ba,
+    "_requirements.csv"
+  ) ,
+  locale = locale(encoding = "Latin1")
+  
+)
+
+cat(
+  "\ncsv file = E:/repos/raise_fs/tab_data/input/",
+  crop_name_ba,
+  "_",
+  ideotype_ba,
+  "_",
+  scenario_ba,
+  "_requirements.csv\n\n"
+)
+
+```
+
+
+```{r load_csv_sef, echo=FALSE, message=FALSE, warning=FALSE, results='asis'}
+
+df_sef <- read_csv(
+  paste0(
+    "E:/repos/raise_fs/tab_data/input/AHP/AHP_",
+    crop_name_inn,
+    "_generic_generic_requirements.csv") , locale = locale(encoding = "Latin1")
+  
+)
+
+cat("\ncsv file = E:/repos/raise_fs/tab_data/input/AHP/AHP_",
+    crop_name_inn,
+    "_generic_generic_requirements.csv\n\n")
+
+```
+
+Weights are produced during the calibration workshop for socio-economic criteria.
+
+No weights are produced during the transcription of biophysical requirements.
+
+
+```{r load_csv_weights_ba, echo=FALSE, message=FALSE, warning=FALSE, results='asis'}
+
+df_weights_ba <- read_csv(
+  paste0(
+    "E:/repos/raise_fs/tab_data/input/",
+    crop_name_ba,
+    "_",
+    ideotype_ba,
+    "_",
+    scenario_ba,
+    "_weights.csv"
+  ) ,
+  locale = locale(encoding = "Latin1")
+  
+)
+
+cat(
+  "\ncsv weights file = E:/repos/raise_fs/tab_data/input/",
+  crop_name_ba,
+  "_",
+  ideotype_ba,
+  "_",
+  scenario_ba,
+  "_weights.csv\n\n"
+)
+
+```
+
+
+Socio-economic criteria have a weights file and a higher-level rule bases file.
+
+The weights file contains weights for both the lower-level and higher-level rule bases.
+
+```{r load_csv_weights_sef, echo=FALSE, message=FALSE, warning=FALSE, results='asis'}
+
+df_weights_sef <- read_csv(
+  paste0(
+    "E:/repos/raise_fs/tab_data/input/AHP/AHP_",
+    crop_name_inn,
+    "_",
+    ideotype_sef,
+    "_",
+    scenario_sef,
+    "_weights.csv"
+  ) ,
+  locale = locale(encoding = "Latin1")
+)
+
+cat("\ncsv weights file = E:/repos/raise_fs/tab_data/input/AHP/AHP_",
+    crop_name_inn,
+    "_",
+    ideotype_sef,
+    "_",
+    scenario_sef,
+    "_weights.csv\n\n")
+
+```
+
+```{r load_csv_higher_sef, echo=FALSE, message=FALSE, warning=FALSE, results='asis'}
+
+df_higher_sef <- read_csv(
+  paste0(
+    "E:/repos/raise_fs/tab_data/input/AHP/AHP_",
+    crop_name_inn,
+    "_",
+    ideotype_sef,
+    "_",
+    scenario_sef,
+    "_higher.csv"
+  ) ,
+  locale = locale(encoding = "Latin1")
+)
+
+cat("\ncsv weights file = E:/repos/raise_fs/tab_data/input/AHP/AHP_",
+    crop_name_inn,
+    "_",
+    ideotype_sef,
+    "_",
+    scenario_sef,
+    "_higher.csv\n\n")
+
+```
+
+## Links between lower and higher level rule bases
+
+```{r load_csv_links_sef, echo=FALSE, message=FALSE, warning=FALSE, results='asis'}
+
+df_links_sef <- read_csv(
+  paste0(
+    "E:/repos/raise_fs/tab_data/input/AHP/AHP_",
+    crop_name_inn,
+    "_",
+    ideotype_sef,
+    "_",
+    scenario_sef,
+    "_links.csv"
+  ) ,
+  locale = locale(encoding = "Latin1")
+)
+
+cat("\ncsv links file = E:/repos/raise_fs/tab_data/input/AHP/AHP_",
+    crop_name_inn,
+    "_",
+    ideotype_sef,
+    "_",
+    scenario_sef,
+    "_links.csv\n\n")
+
+```
+
+```{r load_csv_links_ba, echo=FALSE, message=FALSE, warning=FALSE, results='asis'}
+
+df_links_ba <- read_csv(
+  paste0(
+    "E:/repos/raise_fs/tab_data/input/",
+    crop_name_ba,
+    "_",
+    ideotype_sef,
+    "_",
+    scenario_sef,
+    "_links.csv"
+  ) ,
+  locale = locale(encoding = "Latin1")
+)
+
+cat("\ncsv links file = E:/repos/raise_fs/tab_data/input/",
+    crop_name_inn,
+    "_",
+    ideotype_sef,
+    "_",
+    scenario_sef,
+    "_links.csv\n\n")
+
+```
+
+# Merge existing data tables and ouput
+
+## Requirements
+
+```{r merge_df, echo=FALSE, message=FALSE, warning=FALSE, results='asis'}
+
+
+df_all_ba <- full_join(df_weights_ba, df_ba)
+
+df_higher_weights_sef <- df_higher_sef |> full_join(df_weights_sef)
+
+# Merge data frames and overwrite NA values in common variables
+df_all_sef <-  left_join(df_higher_weights_sef, df_sef, by="crit_code") |> 
+mutate(criterion= ifelse(is.na(criterion.y), criterion.x, criterion.y), conc_level_1 = ifelse(is.na(conc_level_1.y), conc_level_1.x, conc_level_1.y), conc_level_2 = ifelse(is.na(conc_level_2.y), conc_level_2.x, conc_level_2.y), conc_level_3 = ifelse(is.na(conc_level_3.y), conc_level_3.x, conc_level_3.y), .keep = "unused")
+
+df_combined <- full_join(df_all_sef, df_ba) |> relocate(criterion, .after = crit_code) |> relocate(conc_level_1:conc_level_3, .after = prop_level_3)
+
+
+df_combined |> kable(caption = paste("<h2 style=color:black;>", combi,"requirements merged</h2>")) |> kable_styling(
+      bootstrap_options = "bordered",
+      full_width = F,
+      position = "left"
+    ) |>  print()
+
+```
+
+
+```{r output_df, echo=FALSE, message=FALSE, warning=FALSE, results='asis'}
+
+# output the combined requirements table
+
+  cat("\n ### No match.")
+  
+  write.csv(
+    df_combined,
+    paste0(
+      "E:/repos/raise_fs/shiny/data/",
+      crop_name_inn,
+      "_",
+      ideotype_inn,
+      "_",
+      scenario_inn,
+      "_requirements.csv"
+    ),
+    row.names = FALSE
+  )
+  
+  
+  # add innovation to the table
+  
+  df_inn <- df_inn |> add_row(crop_name = crop_name_inn,
+                              ideotype = ideotype_inn,
+                              scenario = scenario_inn) |> select(crop_name, ideotype, scenario) |> arrange(crop_name, ideotype, scenario)
+  
+  write.csv(df_inn, "E:/repos/raise_fs/shiny/data/innovations.csv", row.names = FALSE)
+
+
+```
+
+## Link between lower and higher levels
+
+```{r merge_df_links, echo=FALSE, message=FALSE, warning=FALSE, results='asis'}
+
+
+df_links_combined <- full_join(df_links_sef, df_links_ba)
+
+df_links_combined |> kable(caption = paste("<h2 style=color:black;>", combi,"links merged</h2>")) |> kable_styling(
+      bootstrap_options = "bordered",
+      full_width = F,
+      position = "left"
+    ) |>  print()
+
+```
+
+
+```{r output_df_links, echo=FALSE, message=FALSE, warning=FALSE, results='asis'}
+
+# output the combined links table
+
+  cat("\n ### No match.")
+  
+  write.csv(
+    df_links_combined,
+    paste0(
+      "E:/repos/raise_fs/shiny/data/",
+      crop_name_inn,
+      "_",
+      ideotype_inn,
+      "_",
+      scenario_inn,
+      "_links.csv"
+    ),
+    row.names = FALSE
+  )
+
+```
