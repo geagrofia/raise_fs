@@ -32,9 +32,9 @@ ui <- fluidPage(
       numericInput(
         "resolution",
         "Resolution (m)",
-        100,
+        250,
         min = 10,
-        max = 10000,
+        max = 100000,
         step = 10,
         width = NULL
       ),
