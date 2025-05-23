@@ -56,7 +56,7 @@ server <- function(input, output, session) {
       df_inn(),
       rownames = F,
       filter = "bottom",
-      selection = "single",
+      selection = list(mode = "single", selected = selected_row()),
       editable = FALSE,
       options = list(
         columnDefs = list(list(
@@ -131,6 +131,9 @@ server <- function(input, output, session) {
     selected_row()
   })
   
+  
+  
+  
   # Render editable inputs (for "edit" mode)
   output$edit_controls <- renderUI({
     req(selected_row())
@@ -178,14 +181,10 @@ server <- function(input, output, session) {
       )
     } else {
       
-      print(edited_row$crop_name)
-      print(edited_row$ideotype)
-      print(edited_row$scenario)
-      
       # Validation: check for NA in edited_row
       if ((edited_row$crop_name == "") | grepl("^\\s*$", edited_row$crop_name) |
-          (edited_row$ideotype == "") | grepl("^\\s*$", edited_row$ideotype) |
-          (edited_row$scenario == "")| grepl("^\\s*$", edited_row$scenario)) {
+          (edited_row$ideotype  == "") | grepl("^\\s*$", edited_row$ideotype) |
+          (edited_row$scenario  == "") | grepl("^\\s*$", edited_row$scenario)) {
         showModal(
           modalDialog(
             title = "Validation Error",
@@ -200,14 +199,13 @@ server <- function(input, output, session) {
         all_df_inn <- all_df_inn[all_df_inn$inn_ID != edited_row$inn_ID, ]
         all_df_inn <- rbind(all_df_inn, edited_row)
         df_inn(all_df_inn)
-        editing_mode(NULL)  # Reset editing mode
-        selected_row(NULL)  # Clear selection
+        editing_mode("view")  # Reset editing mode
+        selected_row(df_inn()[nrow(all_df_inn), ])# select the newly added innovation in the datatable
+
       }
     }
+    
   })
-  
-
-  
 
   
   # Cancel editing and clear the UI
