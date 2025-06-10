@@ -5,6 +5,8 @@ library(shinylogs)
 
 source("E:/repos/raise_fs/shiny/modules/bslib_screen1_module_v3.R")
 source("E:/repos/raise_fs/shiny/modules/bslib_screen2_module_v3.R")
+source("E:/repos/raise_fs/shiny/modules/bslib_screen3_module_v3.R")
+source("E:/repos/raise_fs/shiny/modules/bslib_screen4_module_v3.R")
 
 ui <- fluidPage(
   # use_tracking(),
@@ -30,6 +32,13 @@ server <- function(input, output, session) {
   shared_values <- reactiveValues(selected_zone = NULL)
   shared_values <- reactiveValues(selected_woreda = NULL)
   
+  shared_values <- reactiveValues(resolution = NULL)
+  shared_values <- reactiveValues(aggregation = NULL)
+  
+  shared_values <- reactiveValues(num_innovations = NULL)
+  shared_values <- reactiveValues(innovation_system = NULL)
+  
+  
   switch_screen <- function(screen) {
     current_screen(screen)
   }
@@ -38,7 +47,11 @@ server <- function(input, output, session) {
     if (current_screen() == "screen1") {
       bslib_screen1_module_v3_SidebarUI("screen1", shared_values)
     } else if (current_screen() == "screen2") {
-      bslib_screen2_module_v3_SidebarUI("screen2")
+      bslib_screen2_module_v3_SidebarUI("screen2", shared_values)
+    } else if (current_screen() == "screen3") {
+      bslib_screen3_module_v3_SidebarUI("screen3", shared_values)
+    } else if (current_screen() == "screen4") {
+      bslib_screen4_module_v3_SidebarUI("screen4", shared_values)
     }
   })
   
@@ -47,11 +60,17 @@ server <- function(input, output, session) {
       bslib_screen1_module_v3_MainUI("screen1")
     } else if (current_screen() == "screen2") {
       bslib_screen2_module_v3_MainUI("screen2")
+    } else if (current_screen() == "screen3") {
+      bslib_screen3_module_v3_MainUI("screen3")
+    } else if (current_screen() == "screen4") {
+      bslib_screen4_module_v3_MainUI("screen4")
     }
   })
   
   bslib_screen1_module_v3_Server("screen1", shared_values, switch_screen)
   bslib_screen2_module_v3_Server("screen2", shared_values, switch_screen)
+  bslib_screen3_module_v3_Server("screen3", shared_values, switch_screen)
+  bslib_screen4_module_v3_Server("screen4", shared_values, switch_screen)
 }
 
 shinyApp(ui, server)
