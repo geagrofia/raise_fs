@@ -1,4 +1,4 @@
-# modules/screen2.R
+# modules/screen3.R
 
 bslib_screen3_module_v3_SidebarUI <- function(id, shared_values) {
   
@@ -12,7 +12,7 @@ bslib_screen3_module_v3_SidebarUI <- function(id, shared_values) {
     # Second radio button (conditionally shown)----
     uiOutput(ns("innovation_system_ui")),
   
-  # UI actionButton Back to Screen 2 ----
+    # UI actionButtons screen navigation ----
   actionButton(ns("back_to_screen2"), "Back to Screen 2"),
   actionButton(ns("to_screen4"), "Go to Screen 4")
   )
@@ -45,9 +45,9 @@ bslib_screen3_module_v3_Server <- function(id, shared_values, switch_screen) {
       }
     })
     
-    output$value <- renderText({ input$resolution })
-    
-    output$value <- renderText({ input$aggregation })
+    # output$value <- renderText({ input$resolution })
+    # 
+    # output$value <- renderText({ input$aggregation })
     
     output$num_innovations_display <- renderText({
       paste("Number of innovations:", shared_values$num_innovations)

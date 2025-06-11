@@ -2,6 +2,7 @@ library(shiny)
 library(bslib)
 library(tidyverse)
 library(shinylogs)
+library(shinyjs)
 
 source("E:/repos/raise_fs/shiny/modules/bslib_screen1_module_v3.R")
 source("E:/repos/raise_fs/shiny/modules/bslib_screen2_module_v3.R")
@@ -9,11 +10,18 @@ source("E:/repos/raise_fs/shiny/modules/bslib_screen3_module_v3.R")
 source("E:/repos/raise_fs/shiny/modules/bslib_screen4_module_v3.R")
 
 ui <- fluidPage(
+  
+  useShinyjs(), # for disabling/enabling the actionbuttons
+  
   # use_tracking(),
   theme = bs_theme(version = 5, bootswatch = "united"),
+  
+  # Application title
+  titlePanel("IRM Setup"),
+  
   sidebarLayout(
-    sidebarPanel(uiOutput("dynamic_sidebar")),
-    mainPanel(uiOutput("dynamic_main"))
+    sidebarPanel(uiOutput("dynamic_sidebar"), width = 6),
+    mainPanel(uiOutput("dynamic_main"), width = 6)
   )
 )
 
