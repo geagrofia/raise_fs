@@ -477,14 +477,14 @@ bslib_screen4_module_v3_Server <- function(id, shared_values, switch_screen) {
         message(paste("ZZ2 observeEvent newscreen: new inn", shared_values$crop_name_1,"-", shared_values$ideotype_1,"-", shared_values$scenario_1))
         
         file.copy(
-          # existing innovation to be duplicated
+          # existing innovation requirements to be duplicated----
           paste0("E:/repos/raise_fs/shiny/data/", 
                          shared_values$crop_name_0,
                          "_",
                          shared_values$ideotype_0,
                          "_", 
                          shared_values$scenario_0,
-                         ".csv"),
+                         "_requirements.csv"),
           # new innovation
                   paste0("E:/repos/raise_fs/shiny/data/", 
                          shared_values$crop_name_1,
@@ -492,8 +492,122 @@ bslib_screen4_module_v3_Server <- function(id, shared_values, switch_screen) {
                          shared_values$ideotype_1,
                          "_", 
                          shared_values$scenario_1,
-                         ".csv"),
+                         "_requirements.csv"),
                   overwrite = TRUE)
+
+        file.copy(
+          # existing innovation links to be duplicated----
+          paste0("E:/repos/raise_fs/shiny/data/", 
+                 shared_values$crop_name_0,
+                 "_",
+                 shared_values$ideotype_0,
+                 "_", 
+                 shared_values$scenario_0,
+                 "_links.csv"),
+          # new innovation
+          paste0("E:/repos/raise_fs/shiny/data/", 
+                 shared_values$crop_name_1,
+                 "_",
+                 shared_values$ideotype_1,
+                 "_", 
+                 shared_values$scenario_1,
+                 "_links.csv"),
+          overwrite = TRUE)
+        
+        file.copy(
+          # existing innovation growth stages to be duplicated----
+          paste0("E:/repos/raise_fs/shiny/data/", 
+                 shared_values$crop_name_0,
+                 "_",
+                 shared_values$ideotype_0,
+                 "_", 
+                 shared_values$scenario_0,
+                 "_gs.csv"),
+          # new innovation
+          paste0("E:/repos/raise_fs/shiny/data/", 
+                 shared_values$crop_name_1,
+                 "_",
+                 shared_values$ideotype_1,
+                 "_", 
+                 shared_values$scenario_1,
+                 "_gs.csv"),
+          overwrite = TRUE)
+        
+        file.copy(
+          # existing innovation soil texture to be duplicated----
+          paste0("E:/repos/raise_fs/shiny/data/", 
+                 shared_values$crop_name_0,
+                 "_",
+                 shared_values$ideotype_0,
+                 "_", 
+                 shared_values$scenario_0,
+                 "_texture.csv"),
+          # new innovation
+          paste0("E:/repos/raise_fs/shiny/data/", 
+                 shared_values$crop_name_1,
+                 "_",
+                 shared_values$ideotype_1,
+                 "_", 
+                 shared_values$scenario_1,
+                 "_texture.csv"),
+          overwrite = TRUE)
+        
+        file.copy(
+          # existing innovation drainage to be duplicated----
+          paste0("E:/repos/raise_fs/shiny/data/", 
+                 shared_values$crop_name_0,
+                 "_",
+                 shared_values$ideotype_0,
+                 "_", 
+                 shared_values$scenario_0,
+                 "_drainage.csv"),
+          # new innovation
+          paste0("E:/repos/raise_fs/shiny/data/", 
+                 shared_values$crop_name_1,
+                 "_",
+                 shared_values$ideotype_1,
+                 "_", 
+                 shared_values$scenario_1,
+                 "_drainage.csv"),
+          overwrite = TRUE)
+        
+        file.copy(
+          # existing innovation weights to be duplicated----
+          paste0("E:/repos/raise_fs/shiny/data/", 
+                 shared_values$crop_name_0,
+                 "_",
+                 shared_values$ideotype_0,
+                 "_", 
+                 shared_values$scenario_0,
+                 "_weights.csv"),
+          # new innovation
+          paste0("E:/repos/raise_fs/shiny/data/", 
+                 shared_values$crop_name_1,
+                 "_",
+                 shared_values$ideotype_1,
+                 "_", 
+                 shared_values$scenario_1,
+                 "_weights.csv"),
+          overwrite = TRUE)
+        
+        file.copy(
+          # existing innovation yield to be duplicated----
+          paste0("E:/repos/raise_fs/shiny/data/", 
+                 shared_values$crop_name_0,
+                 "_",
+                 shared_values$ideotype_0,
+                 "_", 
+                 shared_values$scenario_0,
+                 "_yield.csv"),
+          # new innovation
+          paste0("E:/repos/raise_fs/shiny/data/", 
+                 shared_values$crop_name_1,
+                 "_",
+                 shared_values$ideotype_1,
+                 "_", 
+                 shared_values$scenario_1,
+                 "_yield.csv"),
+          overwrite = TRUE)        
         
         switch_screen("screen5")
       }
@@ -516,6 +630,99 @@ bslib_screen4_module_v3_Server <- function(id, shared_values, switch_screen) {
                  shared_values$scenario_1,
                  ".csv"),
           overwrite = TRUE)
+        
+        
+        file.copy(
+          # existing innovation requirements to be duplicated----
+          "E:/repos/raise_fs/shiny/data/generic_generic_generic_requirements.csv",
+          # new innovation
+          paste0("E:/repos/raise_fs/shiny/data/", 
+                 shared_values$crop_name_1,
+                 "_",
+                 shared_values$ideotype_1,
+                 "_", 
+                 shared_values$scenario_1,
+                 "_requirements.csv"),
+          overwrite = TRUE)
+        
+        file.copy(
+          # existing innovation links to be duplicated----
+          "E:/repos/raise_fs/shiny/data/generic_generic_generic_links.csv",
+          # new innovation
+          paste0("E:/repos/raise_fs/shiny/data/", 
+                 shared_values$crop_name_1,
+                 "_",
+                 shared_values$ideotype_1,
+                 "_", 
+                 shared_values$scenario_1,
+                 "_links.csv"),
+          overwrite = TRUE)
+        
+        file.copy(
+          # existing innovation growth stages to be duplicated----
+          "E:/repos/raise_fs/shiny/data/generic_generic_generic_gs.csv",
+          # new innovation
+          paste0("E:/repos/raise_fs/shiny/data/", 
+                 shared_values$crop_name_1,
+                 "_",
+                 shared_values$ideotype_1,
+                 "_", 
+                 shared_values$scenario_1,
+                 "_gs.csv"),
+          overwrite = TRUE)
+        
+        file.copy(
+          # existing innovation soil texture to be duplicated----
+          "E:/repos/raise_fs/shiny/data/generic_generic_generic_texture.csv",
+          # new innovation
+          paste0("E:/repos/raise_fs/shiny/data/", 
+                 shared_values$crop_name_1,
+                 "_",
+                 shared_values$ideotype_1,
+                 "_", 
+                 shared_values$scenario_1,
+                 "_texture.csv"),
+          overwrite = TRUE)
+        
+        file.copy(
+          # existing innovation drainage to be duplicated----
+          "E:/repos/raise_fs/shiny/data/generic_generic_generic_drainage.csv",
+          # new innovation
+          paste0("E:/repos/raise_fs/shiny/data/", 
+                 shared_values$crop_name_1,
+                 "_",
+                 shared_values$ideotype_1,
+                 "_", 
+                 shared_values$scenario_1,
+                 "_drainage.csv"),
+          overwrite = TRUE)
+        
+        file.copy(
+          # existing innovation weights to be duplicated----
+          "E:/repos/raise_fs/shiny/data/generic_generic_generic_weights.csv",
+          # new innovation
+          paste0("E:/repos/raise_fs/shiny/data/", 
+                 shared_values$crop_name_1,
+                 "_",
+                 shared_values$ideotype_1,
+                 "_", 
+                 shared_values$scenario_1,
+                 "_weights.csv"),
+          overwrite = TRUE)
+        
+        file.copy(
+          # existing innovation yield to be duplicated----
+          "E:/repos/raise_fs/shiny/data/generic_generic_generic_yield.csv",
+          # new innovation
+          paste0("E:/repos/raise_fs/shiny/data/", 
+                 shared_values$crop_name_1,
+                 "_",
+                 shared_values$ideotype_1,
+                 "_", 
+                 shared_values$scenario_1,
+                 "_yield.csv"),
+          overwrite = TRUE)
+        
         switch_screen("screen5")
       }
       
