@@ -131,6 +131,7 @@ bslib_screen3_module_v3_Server <- function(id, shared_values, switch_screen) {
     #2 observeEvent to_screen3 ----
     observeEvent(input$to_screen4, {
       switch_screen("screen4")
+      message(paste("To screen 4. forget:", shared_values$forget))
     })
     
   })

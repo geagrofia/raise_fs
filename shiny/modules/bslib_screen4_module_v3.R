@@ -3,7 +3,6 @@
 library(DT)
 
 
-
 bslib_screen4_module_v3_SidebarUI <- function(id, shared_values) {
   
   ns <- NS(id)
@@ -38,10 +37,8 @@ bslib_screen4_module_v3_MainUI <- function(id) {
     
     # UI row details (view) or edit controls (edit)----
     uiOutput(ns("row_details")),
-    uiOutput(ns("edit_controls"))
-    
-    # ,
-    # uiOutput(ns("validate_butons"))
+    uiOutput(ns("edit_controls")),
+    uiOutput(ns("validate_butons"))
   )
 }
 
@@ -50,7 +47,7 @@ bslib_screen4_module_v3_Server <- function(id, shared_values, switch_screen) {
     
     ns <- session$ns
     
-    #Load your CSV file----
+        #Load your CSV file----
     load_data <- function() {
       df_inn <- read.csv("E:/repos/raise_fs/shiny/data/innovations.csv")
       return(df_inn)
@@ -63,10 +60,19 @@ bslib_screen4_module_v3_Server <- function(id, shared_values, switch_screen) {
     #     scenario
     df_inn <- reactiveVal(load_data())
     selected_row <- reactiveVal(NULL)
-    editing_mode <- reactiveVal(0)  # Track the current action: "select", "duplicate", "add"
+    inn_choice_mode <- reactiveVal(NULL) # Track the selection choice: "existing", "duplicate", "new"
+    editing_mode <- reactiveVal("view")  # Track the editing mode: "view", "edit"
     
     # Render the data table----
     output$data_table <- renderDT({
+      
+      
+      message(paste("Initiation. editing_mode:", editing_mode()))
+      message(paste("Initiation. inn_choice_mode:", inn_choice_mode()))
+      message(paste("Initiation. forget:", shared_values$forget))
+      message(paste("Initiation. num_innovations", shared_values$num_innovations))
+      message(paste("Initiation. inn details1:", shared_values$crop_name_1,"-", shared_values$ideotype_1,"-", shared_values$scenario_1))
+     
       
       datatable(
         df_inn(),
@@ -91,7 +97,7 @@ bslib_screen4_module_v3_Server <- function(id, shared_values, switch_screen) {
     
     # observe the editing_mode to determine next_screen visibility----
     observe({
-      if (editing_mode() == 0 | editing_mode() == "edit") {
+      if (editing_mode() == "edit") {
         disable("next_screen")
       } else {
         enable("next_screen")
@@ -116,7 +122,18 @@ bslib_screen4_module_v3_Server <- function(id, shared_values, switch_screen) {
     observeEvent(input$select_row, {
       req(input$data_table_rows_selected)
       selected_row(df_inn()[input$data_table_rows_selected, ])
+      shared_values$crop_name_1 <-  selected_row()$crop_name
+      shared_values$ideotype_1 <- selected_row()$ideotype
+      shared_values$scenario_1 <- selected_row()$scenario
+      
+      # ensure that duplicated innovation is NULL
+      shared_values$crop_name_0  <- NULL
+      shared_values$ideotype_0 <- NULL
+      shared_values$scenario_0 <- NULL
+      message(paste("YY observeEvent: existing inn. original inn (should be NULL):", shared_values$crop_name_0,"-", shared_values$ideotype_0,"-", shared_values$scenario_0))
+      
       editing_mode("view")  # Set to "view" mode
+      inn_choice_mode("existing")#  Set to "existing" innovation mode
     })
     
     # observeEvent duplicate row (Option 2: Edit after duplication)----
@@ -125,7 +142,13 @@ bslib_screen4_module_v3_Server <- function(id, shared_values, switch_screen) {
       new_row <- df_inn()[input$data_table_rows_selected, ]
       new_row$inn_ID <- max(df_inn()$inn_ID) + 1
       selected_row(new_row)
+      # save the duplicated innovation for later copying
+      shared_values$crop_name_0  <- new_row$crop_name
+      shared_values$ideotype_0 <- new_row$ideotype
+      shared_values$scenario_0 <- new_row$scenario
+      message(paste("YY observeEvent: duplicate row. inn to duplicate:", shared_values$crop_name_0,"-", shared_values$ideotype_0,"-", shared_values$scenario_0))
       editing_mode("edit")  # Set to "edit" mode
+      inn_choice_mode("duplicate")#  Set to "duplicate" innovation mode
       
     })
     
@@ -138,8 +161,14 @@ bslib_screen4_module_v3_Server <- function(id, shared_values, switch_screen) {
         scenario = ""
       )
       selected_row(new_row)
-      editing_mode("edit")  # Set to "edit" mode
+      # ensure that duplicated innovation is NULL
+      shared_values$crop_name_0  <- NULL
+      shared_values$ideotype_0 <- NULL
+      shared_values$scenario_0 <- NULL
+      message(paste("YY observeEvent: new row. original inn (should be NULL):", shared_values$crop_name_0,"-", shared_values$ideotype_0,"-", shared_values$scenario_0))
       
+      editing_mode("edit")  # Set to "edit" mode
+      inn_choice_mode("new")#  Set to "new" innovation mode
     })
     
     # output Render row details (for "view" mode)----
@@ -172,10 +201,10 @@ bslib_screen4_module_v3_Server <- function(id, shared_values, switch_screen) {
           # textInput(ns("edit_scenario"), "Scenario", row$scenario),
           textInput(ns("edit_crop_name"), "Crop_name", row$crop_name),
           textInput(ns("edit_ideotype"), "Ideotype", row$ideotype),
-          textInput(ns("edit_scenario"), "Scenario", row$scenario),
+          textInput(ns("edit_scenario"), "Scenario", row$scenario)#,
           
-          actionButton(ns("save_row_btn"), "Save"),
-          actionButton(ns("cancel_btn"), "Cancel")
+          # actionButton(ns("save_row_btn"), "Save"),
+          # actionButton(ns("cancel_btn"), "Cancel")
         )
         #disable("save_row_btn")
       }
@@ -243,27 +272,21 @@ bslib_screen4_module_v3_Server <- function(id, shared_values, switch_screen) {
       disable("save_row_btn")
     }})
     
-    # # output Render validation buttons (for "edit" mode)----
-    # output$validate_butons <- renderUI({
-    #   req(selected_row())
-    #   
-    #   if (editing_mode() == "edit") {
-    #     row <- selected_row()
-    #     tagList(
-    #       h4("Validate"),
-    #       actionButton(ns("save_row_btn"), "Save"),
-    #       actionButton(ns("cancel_btn"), "Cancel")
-    #     )
-    #   }
-    # })
+
+
     
     # observeEvent Save edited row and validate (for duplication or adding new rows)----
-    observeEvent(ns(input$save_row_btn), {
-      
-      message(paste("2a observeEvent: save_row_btn Edit mode:", editing_mode()))
+   observeEvent(ns(input$save_row_btn), {
+     message(paste("2a observeEvent: save_row_btn Edit mode:", editing_mode()))
+     message(paste("2a observeEvent: save_row_btn forget:", shared_values$forget))
+     message(paste("2a observeEvent: save_row_btn inn details:", shared_values$crop_name_1,"-", shared_values$ideotype_1,"-", shared_values$scenario_1))
+     
+     if (shared_values$forget > 0 ) {
+       
+      message(paste("2b observeEvent: save_row_btn Edit mode:", editing_mode()))
        
       if (!is.null(selected_row())){ #added
-        message(paste("2b observeEvent: save_row_btn Edit mode:", editing_mode()))  
+        message(paste("2c observeEvent: save_row_btn Edit mode:", editing_mode()))  
       edited_row <- data.frame(
         inn_ID = selected_row()$inn_ID,
         crop_name = input$edit_crop_name,
@@ -309,6 +332,10 @@ bslib_screen4_module_v3_Server <- function(id, shared_values, switch_screen) {
 
         } else {
           # Save the row
+          shared_values$crop_name_1 <- edited_row$crop_name
+          shared_values$ideotype_1 <- edited_row$ideotype
+          shared_values$scenario_1 <- edited_row$scenario
+            
           all_df_inn <- all_df_inn[all_df_inn$inn_ID != edited_row$inn_ID, ]
           all_df_inn <- rbind(all_df_inn, edited_row)
           df_inn(all_df_inn)
@@ -317,16 +344,51 @@ bslib_screen4_module_v3_Server <- function(id, shared_values, switch_screen) {
 
         }
       }
+      }
       } #added
+     shared_values$forget <- (shared_values$forget + 1)
+     message(paste("2c observeEvent: shared_values$forget = ", shared_values$forget))
     }, ignoreInit = TRUE)
     
     
     # observeEvent cancel_btn editing and clear the UI----
     observeEvent(ns(input$cancel_btn), {
-      message(paste("2 observeEvent: cancel_btn. Edit mode:", editing_mode()))
-      editing_mode(0)  # Reset editing mode
+      
+      message(paste("3a observeEvent: cancel_btn. Edit mode:", editing_mode()))
+      message(paste("3a observeEvent: cancel_btn. forget:", shared_values$forget))
+      message(paste("3a observeEvent: cancel_btn. inn details:", shared_values$crop_name_1,"-", shared_values$ideotype_1,"-", shared_values$scenario_1))
+      
+      
+      if (shared_values$forget > 1 ) { 
+        
+      editing_mode("view")  # Reset editing mode
+      message(paste("3a observeEvent: cancel_btn. shared_values$forget = ", shared_values$forget))
       selected_row(NULL)  # Clear selection
+      }
     }, ignoreInit = TRUE)
+    
+    
+    
+    # output Render validation buttons (for "edit" mode)----
+    output$validate_butons <- renderUI({
+      
+      message(paste("1", shared_values$forget))
+      req(selected_row())
+      
+      message(paste("2",  shared_values$forget))
+      req(input$edit_crop_name)
+      message(paste("3",  shared_values$forget))
+      
+      if (editing_mode() == "edit") {
+        message(paste("4",  shared_values$forget))
+        row <- selected_row()
+        tagList(
+          h4("Validate"),
+          actionButton(ns("save_row_btn"), "Save"),
+          actionButton(ns("cancel_btn"), "Cancel")
+        )
+      }
+    })
     
     # _----
     
@@ -397,7 +459,71 @@ bslib_screen4_module_v3_Server <- function(id, shared_values, switch_screen) {
     
     #2 observeEvent to_screen5 ----
     observeEvent(input$to_screen5, {
+      req(selected_row())
+      
+      # if existing innovation selected then edit mode is view
+      # do nothing - load using values for shared_values$crop_name_1 etc.
+      if (inn_choice_mode() == "existing")  {
+        message(paste("ZZ1 observeEvent newscreen: existing inn", shared_values$crop_name_0,"-", shared_values$ideotype_0,"-", shared_values$scenario_0))
+        message(paste("ZZ1 observeEvent newscreen: new inn", shared_values$crop_name_1,"-", shared_values$ideotype_1,"-", shared_values$scenario_1))
+        switch_screen("screen5")
+      }
+      
+      # if duplicate innovation selected then edit mode is edit and crop_name_0 etc have a value
+      # create a new requirements table using values for shared_values$crop_name_0 etc.
+      
+      if (inn_choice_mode() == "duplicate" && !is.null(shared_values$crop_name_0))  {
+        message(paste("ZZ2 observeEvent newscreen: existing inn", shared_values$crop_name_0,"-", shared_values$ideotype_0,"-", shared_values$scenario_0))
+        message(paste("ZZ2 observeEvent newscreen: new inn", shared_values$crop_name_1,"-", shared_values$ideotype_1,"-", shared_values$scenario_1))
+        
+        file.copy(
+          # existing innovation to be duplicated
+          paste0("E:/repos/raise_fs/shiny/data/", 
+                         shared_values$crop_name_0,
+                         "_",
+                         shared_values$ideotype_0,
+                         "_", 
+                         shared_values$scenario_0,
+                         ".csv"),
+          # new innovation
+                  paste0("E:/repos/raise_fs/shiny/data/", 
+                         shared_values$crop_name_1,
+                         "_",
+                         shared_values$ideotype_1,
+                         "_", 
+                         shared_values$scenario_1,
+                         ".csv"),
+                  overwrite = TRUE)
+        
+        switch_screen("screen5")
+      }
+      
+      # if a new innovation selected then edit mode is view and crop_name_0 etc are NULL
+      # create a new requirements table using filename from shared_values$crop_name_1 etc. and completely generic values from a generic requirements file
+      
+      if (inn_choice_mode() == "new" && is.null(shared_values$crop_name_0))  {
+        message(paste("ZZ3 observeEvent newscreen: existing inn", shared_values$crop_name_0,"-", shared_values$ideotype_0,"-", shared_values$scenario_0))
+        message(paste("ZZ3 observeEvent newscreen: new inn", shared_values$crop_name_1,"-", shared_values$ideotype_1,"-", shared_values$scenario_1))
+        file.copy(
+          # generic requirements
+          "E:/repos/raise_fs/shiny/data/generic-generic-generic.csv", 
+          # new innovation
+          paste0("E:/repos/raise_fs/shiny/data/", 
+                 shared_values$crop_name_1,
+                 "_",
+                 shared_values$ideotype_1,
+                 "_", 
+                 shared_values$scenario_1,
+                 ".csv"),
+          overwrite = TRUE)
+        switch_screen("screen5")
+      }
+      
+      # shared_values$crop_name_1 <-  selected_row()$crop_name
+      # shared_values$ideotype_1 <-  selected_row()$ideotype
+      # shared_values$scenario_1 <-  selected_row()$scenario
       switch_screen("screen5")
+      
     })
     
   })

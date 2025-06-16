@@ -8,6 +8,7 @@ source("E:/repos/raise_fs/shiny/modules/bslib_screen1_module_v3.R")
 source("E:/repos/raise_fs/shiny/modules/bslib_screen2_module_v3.R")
 source("E:/repos/raise_fs/shiny/modules/bslib_screen3_module_v3.R")
 source("E:/repos/raise_fs/shiny/modules/bslib_screen4_module_v3.R")
+source("E:/repos/raise_fs/shiny/modules/bslib_screen5_module_v3.R")
 
 ui <- fluidPage(
   
@@ -33,20 +34,60 @@ server <- function(input, output, session) {
   # )
   
   current_screen <- reactiveVal("screen1")
-  shared_values <- reactiveValues(dropdown = NULL)
-  shared_values <- reactiveValues(level = NULL)
-  shared_values <- reactiveValues(selected_nation = NULL)
-  shared_values <- reactiveValues(selected_region = NULL)
-  shared_values <- reactiveValues(selected_zone = NULL)
-  shared_values <- reactiveValues(selected_woreda = NULL)
+  # shared_values <- reactiveValues(dropdown = NULL)
+  # 
+  # # save the geography
+  # shared_values <- reactiveValues(level = NULL)
+  # shared_values <- reactiveValues(selected_nation = NULL)
+  # shared_values <- reactiveValues(selected_region = NULL)
+  # shared_values <- reactiveValues(selected_zone = NULL)
+  # shared_values <- reactiveValues(selected_woreda = NULL)
+  # 
+  # # save the spatial resolution
+  # shared_values <- reactiveValues(resolution = NULL)
+  # shared_values <- reactiveValues(aggregation = NULL)
+  # 
+  # # save the innovation system
+  # shared_values <- reactiveValues(num_innovations = NULL)
+  # shared_values <- reactiveValues(innovation_system = NULL)
+  # 
+  # shared_values <- reactiveValues(forget = 0)
+  # 
+  # # save the innovation details
+  # shared_values <- reactiveValues(scenario_1 = "low labour")
+  # shared_values <- reactiveValues(crop_name_1 = "potato")
+  # shared_values <- reactiveValues(ideotype_1 = "cruiser")
+
+  shared_values <- reactiveValues(
+    # geography details
+    level = NULL,
+    selected_nation = NULL,
+    selected_region = NULL,
+    selected_zone = NULL,
+    selected_woreda = NULL, 
+    # spatial resolution system details
+    resolution = NULL, 
+    aggregation = NULL, 
+    # innovation system details
+    num_innovations = NULL, 
+    innovation_system = NULL, 
+    # counter used internally on screen 4
+    forget = 0, 
+    # used for creating a new requirements file based on duplicates
+    crop_name_0 = NULL,
+    ideotype_0 = NULL,
+    scenario_0 = NULL,
+    # innovation #1 details
+    crop_name_1 = NULL,
+    ideotype_1 = NULL,
+    scenario_1 = NULL,
+    # innovation #2 details
+    crop_name_2 = NULL,
+    ideotype_2 = NULL,
+    scenario_2 = NULL,
+    )
   
-  shared_values <- reactiveValues(resolution = NULL)
-  shared_values <- reactiveValues(aggregation = NULL)
-  
-  shared_values <- reactiveValues(num_innovations = NULL)
-  shared_values <- reactiveValues(innovation_system = NULL)
-  
-  
+
   switch_screen <- function(screen) {
     current_screen(screen)
   }
@@ -60,6 +101,8 @@ server <- function(input, output, session) {
       bslib_screen3_module_v3_SidebarUI("screen3", shared_values)
     } else if (current_screen() == "screen4") {
       bslib_screen4_module_v3_SidebarUI("screen4", shared_values)
+    } else if (current_screen() == "screen5") {
+      bslib_screen5_module_v3_SidebarUI("screen5", shared_values)
     }
   })
   
@@ -72,6 +115,8 @@ server <- function(input, output, session) {
       bslib_screen3_module_v3_MainUI("screen3")
     } else if (current_screen() == "screen4") {
       bslib_screen4_module_v3_MainUI("screen4")
+    } else if (current_screen() == "screen5") {
+      bslib_screen5_module_v3_MainUI("screen5")
     }
   })
   
@@ -79,6 +124,7 @@ server <- function(input, output, session) {
   bslib_screen2_module_v3_Server("screen2", shared_values, switch_screen)
   bslib_screen3_module_v3_Server("screen3", shared_values, switch_screen)
   bslib_screen4_module_v3_Server("screen4", shared_values, switch_screen)
+  bslib_screen5_module_v3_Server("screen5", shared_values, switch_screen)
 }
 
 shinyApp(ui, server)
