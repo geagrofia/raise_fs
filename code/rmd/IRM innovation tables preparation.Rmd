@@ -204,6 +204,11 @@ df_ba <- read_csv(
   
 )
 
+# remove rows with no data which have NA as crit_code
+
+df_ba <- df_ba |> filter(!is.na(crit_code))
+
+
 cat(
   "\ncsv file = E:/repos/raise_fs/tab_data/input/",
   crop_name_ba,
@@ -226,6 +231,10 @@ df_sef <- read_csv(
     "_generic_generic_requirements.csv") , locale = locale(encoding = "Latin1")
   
 )
+
+# remove rows with no data which have NA as crit_code
+
+df_sef <- df_sef |> filter(!is.na(crit_code))
 
 cat("\ncsv file = E:/repos/raise_fs/tab_data/input/AHP/AHP_",
     crop_name_inn,
@@ -428,10 +437,13 @@ df_combined |> kable(caption = paste("<h2 style=color:black;>", combi,"requireme
   
   
   # add innovation to the table
+  # automatic value for ID based on number of rows
   
-  df_inn <- df_inn |> add_row(crop_name = crop_name_inn,
+  new_ID <- nrow(df_inn) + 1
+  
+  df_inn <- df_inn |> add_row(inn_ID = new_ID, crop_name = crop_name_inn,
                               ideotype = ideotype_inn,
-                              scenario = scenario_inn) |> select(crop_name, ideotype, scenario) |> arrange(crop_name, ideotype, scenario)
+                              scenario = scenario_inn) |> select(inn_ID, crop_name, ideotype, scenario) |> arrange(inn_ID, crop_name, ideotype, scenario)
   
   write.csv(df_inn, "E:/repos/raise_fs/shiny/data/innovations.csv", row.names = FALSE)
 
