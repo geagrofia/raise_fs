@@ -466,6 +466,8 @@ bslib_screen4_module_v3_Server <- function(id, shared_values, switch_screen) {
       if (inn_choice_mode() == "existing")  {
         message(paste("ZZ1 observeEvent newscreen: existing inn", shared_values$crop_name_0,"-", shared_values$ideotype_0,"-", shared_values$scenario_0))
         message(paste("ZZ1 observeEvent newscreen: new inn", shared_values$crop_name_1,"-", shared_values$ideotype_1,"-", shared_values$scenario_1))
+        message(paste("ZZ1 observeEvent newscreen: shared_values$current_tree", shared_values$current_tree))
+        
         switch_screen("screen5")
       }
       
@@ -569,25 +571,6 @@ bslib_screen4_module_v3_Server <- function(id, shared_values, switch_screen) {
                  "_", 
                  shared_values$scenario_1,
                  "_drainage.csv"),
-          overwrite = TRUE)
-        
-        file.copy(
-          # existing innovation weights to be duplicated----
-          paste0("E:/repos/raise_fs/shiny/data/", 
-                 shared_values$crop_name_0,
-                 "_",
-                 shared_values$ideotype_0,
-                 "_", 
-                 shared_values$scenario_0,
-                 "_weights.csv"),
-          # new innovation
-          paste0("E:/repos/raise_fs/shiny/data/", 
-                 shared_values$crop_name_1,
-                 "_",
-                 shared_values$ideotype_1,
-                 "_", 
-                 shared_values$scenario_1,
-                 "_weights.csv"),
           overwrite = TRUE)
         
         file.copy(
@@ -695,19 +678,6 @@ bslib_screen4_module_v3_Server <- function(id, shared_values, switch_screen) {
                  "_", 
                  shared_values$scenario_1,
                  "_drainage.csv"),
-          overwrite = TRUE)
-        
-        file.copy(
-          # existing innovation weights to be duplicated----
-          "E:/repos/raise_fs/shiny/data/generic_generic_generic_weights.csv",
-          # new innovation
-          paste0("E:/repos/raise_fs/shiny/data/", 
-                 shared_values$crop_name_1,
-                 "_",
-                 shared_values$ideotype_1,
-                 "_", 
-                 shared_values$scenario_1,
-                 "_weights.csv"),
           overwrite = TRUE)
         
         file.copy(
