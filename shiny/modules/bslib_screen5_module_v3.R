@@ -29,16 +29,17 @@ bslib_screen5_module_v3_MainUI <- function(id) {
     textOutput(ns("scenario_1_display")),
     #DTOutput(ns("inn_req_data_table")),
     h3("Edit Hierarchy:"),
-    shinyTree(ns("tree"),
-      checkbox = F,
-      theme = "proton",
-      stripes = F,
-      themeIcons = TRUE,
-      themeDots = TRUE,
-      dragAndDrop = TRUE,
-      contextmenu = T
-    ),
-    actionButton(ns("save_button"), "Save Changes"),  # Button to save changes
+    # shinyTree(ns("tree"),
+    #   checkbox = F,
+    #   theme = "proton",
+    #   stripes = F,
+    #   themeIcons = TRUE,
+    #   themeDots = TRUE,
+    #   dragAndDrop = TRUE,
+    #   contextmenu = T
+    # ),
+    uiOutput(ns("shiny_tree_editing")),
+    actionButton(ns("save_button"), "Save Changes / Re-load"),  # Button to save changes
     actionButton(ns("reset_button"), "Reset to Original") # Button to reset to original      
     
   )
@@ -136,6 +137,84 @@ bslib_screen5_module_v3_Server <- function(id, shared_values, switch_screen) {
     
     #print(df_short())
     
+    # --- STEP 1: Recursive cleaner to convert 0 to list() and remove attrs ----
+    clean_tree <- function(tree) {
+      if (is.null(tree)) return(NULL)
+      
+      out <- list()
+      for (name in names(tree)) {
+        child <- tree[[name]]
+        
+      #   # If child is a list → recurse
+      #   if (is.list(child)) {
+      #     # remove shinyTree metadata
+      #     child <- child[!grepl("^st", names(child))]
+      #     out[[name]] <- clean_tree(child)
+      #   } else {
+      #     # child is likely a leaf: num 0 → treat as leaf node
+      #     out[[name]] <- list()  # turn into empty list so data.tree can parse it
+      #   }
+      # }
+        
+        # Pull attributes from the current node
+        crit_code <- attr(child, "crit_code")
+        
+        # Normalize leaf: numeric → empty list
+        if (!is.list(child)) {
+          child <- list()
+        } else {
+          child <- child[!grepl("^st", names(child))]  # remove shinyTree meta
+        }
+        
+        # Wrap in a list with weight attribute
+        attr(child, "crit_code") <- crit_code
+        out[[name]] <- clean_tree(child)
+        attributes(out[[name]]) <- attributes(child)  # reattach crit_code
+      }
+      return(out)
+    }
+    
+    # --- STEP 2: Edge extractor ----
+    get_edges <- function(node) {
+      edges <- data.frame(from = character(), to = character(), stringsAsFactors = FALSE)
+      for (child in node$children) {
+        edges <- rbind(edges, data.frame(from = node$name, to = child$name, stringsAsFactors = FALSE))
+        edges <- rbind(edges, get_edges(child))
+      }
+      return(edges)
+    }
+    
+    get_edges_with_crit_code <- function(node) {
+      edges <- data.frame(from = character(), to = character(), crit_code = numeric(), stringsAsFactors = FALSE)
+      
+      for (child in node$children) {
+        w <- attr(child, "crit_code")
+        if (is.null(w)) w <- NA  # fallback if crit_code is missing
+        
+        edges <- rbind(edges, data.frame(from = node$name, to = child$name, crit_code = w, stringsAsFactors = FALSE))
+        edges <- rbind(edges, get_edges_with_crit_code(child))
+      }
+      
+      return(edges)
+    }
+    
+    #render the tree ui output----
+    
+    output$shiny_tree_editing <- renderUI({
+      
+      shinyTree(ns("tree"),
+                  checkbox = F,
+                  theme = "proton",
+                  stripes = F,
+                  themeIcons = TRUE,
+                  themeDots = TRUE,
+                  dragAndDrop = TRUE,
+                  contextmenu = T
+                )
+      #shinyTree::shinyTreeOutput(ns("tree"))
+    })
+    
+    
     # render the tree----
     output$tree <- renderTree({
       
@@ -152,20 +231,21 @@ bslib_screen5_module_v3_Server <- function(id, shared_values, switch_screen) {
       # FROM IRM AUTOMATE - Return a logical vector indicating which cases are complete, i.e., have no missing values
       df_inn_complete <- df_inn_req[complete.cases(df_inn_req$crit_code, df_inn_req$criterion), ]
       # # 
-      df_short <-  df_inn_complete |> dplyr::select("stack", "criterion", "weight")
+      df_short <-  df_inn_complete |> dplyr::select("stack", "criterion", "crit_code")
       # print(df_short)
       
       df_short$stack[is.na(df_short$stack)] <- "root2"
       
       
       # Convert to tree
-      tree_plot <- FromDataFrameNetwork(df_short, c("weight"))
+      tree_plot <- FromDataFrameNetwork(df_short, c("crit_code"))
       
       
-      # Add weights to node names if they exist
+      #Add crit_code to node names if they exist
       tree_plot$Do(function(node) {
-        if (!is.null(node$weight) && !is.na(node$weight)) {
-          node$name <- paste0(node$name, " (weight: ", node$weight, ")")
+        if (!is.null(node$crit_code) && !is.na(node$crit_code)) {
+          #node$name <- paste0(node$name, " (crit_code: ", node$crit_code, ")")
+          #node$crit_code <- paste0(node$name, " (crit_code: ", node$crit_code, ")")
         }
       })
       
@@ -212,24 +292,25 @@ bslib_screen5_module_v3_Server <- function(id, shared_values, switch_screen) {
     # observeEvent save button is clicked ----
     observeEvent(input$save_button, {
       
-      message(paste("observeEvent: save_button  print(input$tree):"))
-      print(input$tree)
-      
+      #message(paste("observeEvent: save_button  print(input$tree):"))
+      #print(input$tree)
+      message("str(input$tree)")
+      print(str(input$tree))
       saved_tree <- input$tree  # Retrieve the current state from the input
       
-      message(paste("observeEvent: save_button  print(saved_tree):"))
-      print(saved_tree)
+      #message(paste("observeEvent: save_button  print(saved_tree):"))
+      #print(saved_tree)
       
-      message(paste("observeEvent: save_button  print(shared_values$current_tree):"))
-      print(shared_values$current_tree)
+      #message(paste("observeEvent: save_button  print(shared_values$current_tree):"))
+      #print(shared_values$current_tree)
       
       
       if (!is.null(saved_tree)) {
         shared_values$current_tree <- saved_tree  # Update the reactive value
         #print(shared_values$current_tree)
         
-        message(paste("observeEvent: save_button IF  print(shared_values$current_tree):"))
-        print(shared_values$current_tree)
+        #message(paste("observeEvent: save_button IF  print(shared_values$current_tree):"))
+        #print(shared_values$current_tree)
         
         #output$tree_output <- renderPrint(saved_tree)  # Output for debugging
         #print(saved_tree)
@@ -238,7 +319,7 @@ bslib_screen5_module_v3_Server <- function(id, shared_values, switch_screen) {
         # For example, to save as a JSON file:
         jsonlite::write_json(
           saved_tree,
-          paste(
+          paste0(
             "data/",
             shared_values$crop_name_1,
             "_",
@@ -247,7 +328,8 @@ bslib_screen5_module_v3_Server <- function(id, shared_values, switch_screen) {
             shared_values$scenario_1 ,
             "_tree.json"
           ))
-        write.csv(treeToDf(saved_tree), paste(
+        
+        write.csv(treeToDf(saved_tree), paste0(
           "data/",
           shared_values$crop_name_1,
           "_",
@@ -256,6 +338,37 @@ bslib_screen5_module_v3_Server <- function(id, shared_values, switch_screen) {
           shared_values$scenario_1 ,
           "_tree.csv"))
         
+        # Step 1: Clean the tree (remove attrs, fix leaves)
+        cleaned <- clean_tree(input$tree)
+        message("str(cleaned)")
+        print(str(cleaned))
+        # Step 2: Convert to data.tree structure
+        root <- tryCatch({
+          node <- as.Node(cleaned)
+          node$name <- "Root"  # Optional: set root name
+          node
+        }, error = function(e) {
+          message("Error converting tree: ", e$message)
+          return(NULL)
+        })
+        
+        # Step 3: Generate edges
+        if (!is.null(root)) {
+          edges_df <- get_edges_with_crit_code(root)
+          message("edges_df")
+          print(edges_df)
+        } else {
+          print("Tree conversion failed.")
+        }
+
+        write.csv(edges_df, paste0(
+          "data/",
+          shared_values$crop_name_1,
+          "_",
+          shared_values$ideotype_1,
+          "_",
+          shared_values$scenario_1 ,
+          "_tree_network.csv"))
         
       }
     })
