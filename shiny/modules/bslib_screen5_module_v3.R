@@ -145,31 +145,20 @@ bslib_screen5_module_v3_Server <- function(id, shared_values, switch_screen) {
       for (name in names(tree)) {
         child <- tree[[name]]
         
-      #   # If child is a list → recurse
-      #   if (is.list(child)) {
-      #     # remove shinyTree metadata
-      #     child <- child[!grepl("^st", names(child))]
-      #     out[[name]] <- clean_tree(child)
-      #   } else {
-      #     # child is likely a leaf: num 0 → treat as leaf node
-      #     out[[name]] <- list()  # turn into empty list so data.tree can parse it
-      #   }
-      # }
-        
-        # Pull attributes from the current node
+        # Extract crit_code
         crit_code <- attr(child, "crit_code")
         
-        # Normalize leaf: numeric → empty list
+        # Ensure child is a list even if it's a leaf
         if (!is.list(child)) {
           child <- list()
         } else {
-          child <- child[!grepl("^st", names(child))]  # remove shinyTree meta
+          child <- child[!grepl("^st", names(child))]  # remove shinyTree artifacts
         }
         
-        # Wrap in a list with weight attribute
+        # Reattach crit_code
         attr(child, "crit_code") <- crit_code
         out[[name]] <- clean_tree(child)
-        attributes(out[[name]]) <- attributes(child)  # reattach crit_code
+        attributes(out[[name]]) <- attributes(child)  # reapply crit_code
       }
       return(out)
     }
@@ -184,19 +173,94 @@ bslib_screen5_module_v3_Server <- function(id, shared_values, switch_screen) {
       return(edges)
     }
     
-    get_edges_with_crit_code <- function(node) {
-      edges <- data.frame(from = character(), to = character(), crit_code = numeric(), stringsAsFactors = FALSE)
+    # # gives NA values
+    # get_edges_with_codes <- function(node) {
+    #   edges <- list()
+    #   
+    #   from_code <- attr(node, "crit_code")
+    #   
+    #   for (child in node$children) {
+    #     to_code <- attr(child, "crit_code")
+    #     
+    #     edges[[length(edges) + 1]] <- data.frame(
+    #       from = node$name,
+    #       to = child$name,
+    #       from_code = if (!is.null(from_code)) from_code else NA,
+    #       to_code = if (!is.null(to_code)) to_code else NA,
+    #       stringsAsFactors = FALSE
+    #     )
+    #     
+    #     # Recurse on the child
+    #     child_edges <- get_edges_with_codes(child)
+    #     if (nrow(child_edges) > 0) {
+    #       edges[[length(edges) + 1]] <- child_edges
+    #     }
+    #   }
+    #   
+    #   # Combine all into a single data.frame
+    #   if (length(edges) > 0) {
+    #     do.call(rbind, edges)
+    #   } else {
+    #     data.frame(from = character(), to = character(),
+    #                from_code = character(), to_code = character(),
+    #                stringsAsFactors = FALSE)
+    #   }
+    # }
+    
+    
+    # 20/06/2025----
+    
+    # Recursive function to build a data.tree Node from the shinyTree-style list
+    build_tree <- function(name, node_data) {
+      node <- Node$new(name)
       
-      for (child in node$children) {
-        w <- attr(child, "crit_code")
-        if (is.null(w)) w <- NA  # fallback if crit_code is missing
-        
-        edges <- rbind(edges, data.frame(from = node$name, to = child$name, crit_code = w, stringsAsFactors = FALSE))
-        edges <- rbind(edges, get_edges_with_crit_code(child))
+      # Add crit_code if it exists
+      crit_code <- attr(node_data, "crit_code")
+      if (!is.null(crit_code)) {
+        node$crit_code <- crit_code
       }
       
-      return(edges)
+      # Check if node_data has children (i.e., is a list)
+      if (is.list(node_data)) {
+        for (child_name in names(node_data)) {
+          child <- build_tree(child_name, node_data[[child_name]])
+          node$AddChildNode(child)
+        }
+      }
+      
+      return(node)
     }
+    
+    # Function to extract edges and crit_codes
+    get_edges_with_codes <- function(node) {
+      edges <- list()
+      
+      for (child in node$children) {
+        edges[[length(edges) + 1]] <- data.frame(
+          stack_code = if (!is.null(node$crit_code)) node$crit_code else NA,
+          stack = node$name,
+          crit_code = if (!is.null(child$crit_code)) child$crit_code else NA,
+          criterion = child$name,
+          stringsAsFactors = FALSE
+        )
+        
+        # Recurse on children
+        child_edges <- get_edges_with_codes(child)
+        if (nrow(child_edges) > 0) {
+          edges[[length(edges) + 1]] <- child_edges
+        }
+      }
+      
+      if (length(edges) > 0) {
+        do.call(rbind, edges)
+      } else {
+        data.frame(stack = character(), criterion = character(),
+                   stack_code = character(), crit_code = character(),
+                   stringsAsFactors = FALSE)
+      }
+    }
+    
+    
     
     #render the tree ui output----
     
@@ -326,7 +390,7 @@ bslib_screen5_module_v3_Server <- function(id, shared_values, switch_screen) {
             shared_values$ideotype_1,
             "_",
             shared_values$scenario_1 ,
-            "_tree.json"
+            "_saved_tree.json"
           ))
         
         write.csv(treeToDf(saved_tree), paste0(
@@ -336,30 +400,46 @@ bslib_screen5_module_v3_Server <- function(id, shared_values, switch_screen) {
           shared_values$ideotype_1,
           "_",
           shared_values$scenario_1 ,
-          "_tree.csv"))
+          "_saved_tree.csv"))
         
-        # Step 1: Clean the tree (remove attrs, fix leaves)
-        cleaned <- clean_tree(input$tree)
-        message("str(cleaned)")
-        print(str(cleaned))
-        # Step 2: Convert to data.tree structure
-        root <- tryCatch({
-          node <- as.Node(cleaned)
-          node$name <- "Root"  # Optional: set root name
-          node
-        }, error = function(e) {
-          message("Error converting tree: ", e$message)
-          return(NULL)
-        })
+        # # Step 1: Clean the tree (remove attrs, fix leaves)
+        # cleaned <- clean_tree(input$tree)
+        # message("str(cleaned)")
+        # print(str(cleaned))
+        # # Step 2: Convert to data.tree structure
+        # root <- tryCatch({
+        #   node <- as.Node(cleaned)
+        #   message("node")
+        #   print(node)
+        #   node$name <- "Root"  # Optional: set root name
+        #   node
+        # }, error = function(e) {
+        #   message("Error converting tree: ", e$message)
+        #   return(NULL)
+        # })
+        # 
+        # message("root")
+        # print(root)
+        # 
+        # # Step 3: Generate edges
+        # if (!is.null(root)) {
+        #   edges_df <- get_edges_with_codes(root)
+        #   message("edges_df")
+        #   print(edges_df)
+        # } else {
+        #   print("Tree conversion failed.")
+        # }
         
-        # Step 3: Generate edges
-        if (!is.null(root)) {
-          edges_df <- get_edges_with_crit_code(root)
-          message("edges_df")
-          print(edges_df)
-        } else {
-          print("Tree conversion failed.")
-        }
+        if (is.null(input$tree)) return()
+        
+        root_name <- names(input$tree)[1]
+        root_data <- input$tree[[1]]
+        
+        tree <- build_tree(root_name, root_data)
+        
+        edges_df <- get_edges_with_codes(tree)
+        print(edges_df)
+        
 
         write.csv(edges_df, paste0(
           "data/",
@@ -368,7 +448,7 @@ bslib_screen5_module_v3_Server <- function(id, shared_values, switch_screen) {
           shared_values$ideotype_1,
           "_",
           shared_values$scenario_1 ,
-          "_tree_network.csv"))
+          "_saved_tree_network.csv"))
         
       }
     })
