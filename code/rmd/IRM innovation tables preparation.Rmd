@@ -403,7 +403,7 @@ df_higher_weights_sef <- df_higher_sef |> full_join(df_weights_sef)
 df_all_sef <-  left_join(df_higher_weights_sef, df_sef, by="crit_code") |> 
 mutate(criterion= ifelse(is.na(criterion.y), criterion.x, criterion.y), conc_level_1 = ifelse(is.na(conc_level_1.y), conc_level_1.x, conc_level_1.y), conc_level_2 = ifelse(is.na(conc_level_2.y), conc_level_2.x, conc_level_2.y), conc_level_3 = ifelse(is.na(conc_level_3.y), conc_level_3.x, conc_level_3.y), .keep = "unused")
 
-df_combined <- full_join(df_all_sef, df_ba) |> relocate(criterion, .after = crit_code) |> relocate(conc_level_1:conc_level_3, .after = prop_level_3)
+df_combined <- full_join(df_all_sef, df_all_ba) |> relocate(criterion, .after = crit_code) |> relocate(conc_level_1:conc_level_3, .after = prop_level_3)
 
 
 df_combined |> kable(caption = paste("<h2 style=color:black;>", combi,"requirements merged</h2>")) |> kable_styling(
