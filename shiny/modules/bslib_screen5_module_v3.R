@@ -302,7 +302,7 @@ bslib_screen5_module_v3_Server <- function(id, shared_values, switch_screen) {
     
     # render the tree----
     output$tree <- renderTree({
-      
+      req(switch_screen())
       df_inn_req <- read.csv(paste0("E:/repos/raise_fs/shiny/data/",
                                     shared_values$crop_name_1,
                                     "_",
@@ -362,10 +362,12 @@ bslib_screen5_module_v3_Server <- function(id, shared_values, switch_screen) {
       if (is.null(shared_values$current_tree))
         {# Reactive value to hold the current tree structure
         message(paste("renderTree 1.  shared_values$current_tree is NULL"))
+        print(shared_values$current_tree)
         shared_values$current_tree <- tree_json
         } 
       
       message(paste("renderTree 2.  shared_values$current_tree is not NULL"))
+      print(shared_values$current_tree)
           # 
       # # Print the result
       #print(tree_json)
@@ -593,7 +595,6 @@ bslib_screen5_module_v3_Server <- function(id, shared_values, switch_screen) {
     
     #2 observeEvent back_to_screen4 ----
     observeEvent(input$back_to_screen4, {
-      shared_values$current_tree <- NULL
       switch_screen("screen4")
     })
     

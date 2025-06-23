@@ -25,6 +25,7 @@ bslib_screen6_module_v3_MainUI <- function(id) {
     textOutput(ns("crop_1_display")),
     textOutput(ns("ideotype_1_display")),
     textOutput(ns("scenario_1_display")),
+    textOutput(ns("inn_type_1_display")),
     DTOutput(ns("conclusions_data_table"))
     
   )
@@ -37,39 +38,98 @@ bslib_screen6_module_v3_Server <- function(id, shared_values, switch_screen) {
     
     # Render the data table----
     output$conclusions_data_table <- renderDT({
-      message(paste("Initiation. inn details1:", shared_values$crop_name_1,"-", shared_values$ideotype_1,"-", shared_values$scenario_1))
-      df_inn_tree_net <- read.csv(paste0("E:/repos/raise_fs/shiny/data/",
-                                                shared_values$crop_name_1,
-                                                "_",
-                                                shared_values$ideotype_1,
-                                                "_",
-                                                shared_values$scenario_1,
-                                                "_saved_tree_network.csv"))
-      
-      message(paste("Initiation. df_inn_tree_net"))
-      print(df_inn_tree_net)
-      
-      df_inn_tree_net_stack <- dplyr::select(df_inn_tree_net, "stack_code") |> distinct()
-      
-      message(paste("Initiation. df_inn_tree_net_stack"))
-      print(df_inn_tree_net_stack)
-
-      
-      datatable(
-        df_inn_tree_net_stack,
-        rownames = F,
-        filter = "bottom",
-        selection = list(mode = "single"),
-        editable = T,
-        options = list(
-          # columnDefs = list(list(
-          #   visible = FALSE, targets = c(0) # hide the inn_ID
-          # )),
-          lengthMenu = c(10, 20, 50),
-          pageLength = 20#,
-          #order = list(list(1, 'asc'), list(2, 'asc'), list(3, 'asc'))
+      req(shared_values$inn_type_1)
+      req(switch_screen())
+      message(
+        paste(
+          "Initiation. inn details1:",
+          shared_values$crop_name_1,
+          "-",
+          shared_values$ideotype_1,
+          "-",
+          shared_values$scenario_1
         )
       )
+      df_inn_tree_net <- read.csv(
+        paste0(
+          "E:/repos/raise_fs/shiny/data/",
+          shared_values$crop_name_1,
+          "_",
+          shared_values$ideotype_1,
+          "_",
+          shared_values$scenario_1,
+          "_saved_tree_network.csv"
+        )
+      )
+      
+      df_inn_tree_net_stack <- dplyr::select(df_inn_tree_net, "stack_code") |> distinct()
+      print(str(df_inn_tree_net_stack))
+      
+      df_inn_requirements <- read.csv(
+        paste0(
+          "E:/repos/raise_fs/shiny/data/",
+          shared_values$crop_name_1,
+          "_",
+          shared_values$ideotype_1,
+          "_",
+          shared_values$scenario_1,
+          "_requirements.csv"
+        )
+      )
+      
+      print(str(df_inn_requirements))
+      
+      df_inn_conc <- dplyr::left_join(
+        df_inn_tree_net_stack,
+        df_inn_requirements,
+        join_by(stack_code == crit_code),
+        keep = T
+      ) |> dplyr::select("crit_code",
+                         "criterion",
+                         "conc_level_1",
+                         "conc_level_2",
+                         "conc_level_3")
+      print(str(df_inn_conc))
+      
+      # if existing innovation then not editable
+      if (shared_values$inn_type_1 == "existing") {
+        datatable(
+          df_inn_conc,
+          rownames = F,
+          filter = "bottom",
+          selection = list(mode = "none"),
+          editable = FALSE,
+          # only edit the conclusions
+          options = list(
+            # columnDefs = list(list(
+            #   visible = FALSE, targets = c(0) # hide the inn_ID
+            # )),
+            lengthMenu = c(10, 20, 50),
+            pageLength = 20#,
+            #order = list(list(1, 'asc'), list(2, 'asc'), list(3, 'asc'))
+          )
+        )
+        
+      } else {
+        datatable(
+          df_inn_conc,
+          rownames = F,
+          filter = "bottom",
+          selection = list(mode = "single"),
+          editable = list(target = "cell", disable = list(columns = c(0, 1))),
+          # only edit the conclusions
+          options = list(
+            # columnDefs = list(list(
+            #   visible = FALSE, targets = c(0) # hide the inn_ID
+            # )),
+            lengthMenu = c(10, 20, 50),
+            pageLength = 20#,
+            #order = list(list(1, 'asc'), list(2, 'asc'), list(3, 'asc'))
+          )
+        )
+      }
+      
+      
     }, server = FALSE)
      
     # _----
@@ -148,11 +208,17 @@ bslib_screen6_module_v3_Server <- function(id, shared_values, switch_screen) {
       paste("You selected scenario on Screen 4:", shared_values$scenario_1)
     })
     
+    
+    output$inn_type_1_display <- renderText({
+      message(paste("Innovation type:", shared_values$inn_type_1))
+      req(shared_values$inn_type_1)
+      paste("You selected Innovation type on Screen 4:", shared_values$inn_type_1)
+    })
+    
     # _ navigation----
     
     #2 observeEvent back_to_screen5 ----
     observeEvent(input$back_to_screen5, {
-      shared_values$current_tree <- NULL
       switch_screen("screen5")
     })
     
