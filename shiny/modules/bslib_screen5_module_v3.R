@@ -27,8 +27,10 @@ bslib_screen5_module_v3_MainUI <- function(id) {
     textOutput(ns("crop_1_display")),
     textOutput(ns("ideotype_1_display")),
     textOutput(ns("scenario_1_display")),
+    textOutput(ns("inn_type_1_display")),
     #DTOutput(ns("inn_req_data_table")),
-    h3("Edit Hierarchy:"),
+    htmlOutput(ns("inn_type_edit_mode_1_display")),
+    
     # shinyTree(ns("tree"),
     #   checkbox = F,
     #   theme = "proton",
@@ -39,8 +41,9 @@ bslib_screen5_module_v3_MainUI <- function(id) {
     #   contextmenu = T
     # ),
     uiOutput(ns("shiny_tree_editing")),
-    actionButton(ns("save_button"), "Save Changes / Re-load"),  # Button to save changes
-    actionButton(ns("reset_button"), "Reset to Original") # Button to reset to original      
+    uiOutput(ns("dyanamic_save_reset"))
+    #actionButton(ns("save_button"), "Save Changes / Re-load"),  # Button to save changes
+    #actionButton(ns("reset_button"), "Reset to Original") # Button to reset to original      
     
   )
 }
@@ -265,16 +268,34 @@ bslib_screen5_module_v3_Server <- function(id, shared_values, switch_screen) {
     #render the tree ui output----
     
     output$shiny_tree_editing <- renderUI({
+      if (shared_values$inn_type_1 == "existing") {
+        shinyTree(
+          ns("tree"),
+          checkbox = F,
+          theme = "proton",
+          stripes = F,
+          themeIcons = TRUE,
+          themeDots = TRUE,
+          dragAndDrop = FALSE,
+          contextmenu = FALSE
+        )
+      } else {
+        shinyTree(
+          ns("tree"),
+          checkbox = F,
+          theme = "proton",
+          stripes = F,
+          themeIcons = TRUE,
+          themeDots = TRUE,
+          dragAndDrop = TRUE,
+          contextmenu = T
+        )
+        
+        
+      }
       
-      shinyTree(ns("tree"),
-                  checkbox = F,
-                  theme = "proton",
-                  stripes = F,
-                  themeIcons = TRUE,
-                  themeDots = TRUE,
-                  dragAndDrop = TRUE,
-                  contextmenu = T
-                )
+      
+      
       #shinyTree::shinyTreeOutput(ns("tree"))
     })
     
@@ -353,8 +374,21 @@ bslib_screen5_module_v3_Server <- function(id, shared_values, switch_screen) {
       
     })
     
+    # render the buttons UI output ----
+    output$dyanamic_save_reset <- renderUI({
+      if (shared_values$inn_type_1 == "existing") {
+        # observe the inn_type to determine button visibility----
+      } else {
+        tagList(
+        actionButton(ns("save_dyn_button"), "Save Changes / Re-load"), # Button to save changes
+        actionButton(ns("reset_dyn_button"), "Reset to Original")) # Button to reset to original
+      }
+    })
+  # }
+  # })
+    
     # observeEvent save button is clicked ----
-    observeEvent(input$save_button, {
+    observeEvent(input$save_dyn_button, {
       
       #message(paste("observeEvent: save_button  print(input$tree):"))
       #print(input$tree)
@@ -454,7 +488,7 @@ bslib_screen5_module_v3_Server <- function(id, shared_values, switch_screen) {
     })
     
     # observeEvent reset button is clicked----
-    observeEvent(input$reset_button, {
+    observeEvent(input$reset_dyn_button, {
       print(shared_values$current_tree)
       shared_values$current_tree <- NULL
     })
@@ -515,6 +549,26 @@ bslib_screen5_module_v3_Server <- function(id, shared_values, switch_screen) {
       }
     }) 
     
+    output$inn_type_1_display <- renderText({
+      message(paste("Innovation type:", shared_values$inn_type_1))
+      req(shared_values$inn_type_1)
+      paste("You selected Innovation type on Screen 4:", shared_values$inn_type_1)
+    })
+    
+    output$inn_type_edit_mode_1_display <- renderUI({
+      message(paste("Innovation type:", shared_values$inn_type_1))
+      req(shared_values$inn_type_1)
+      if (shared_values$inn_type_1 == "existing") {
+        str1 <- paste("")
+        str2 <- paste(h3("View Hierarchy"))
+      } else {
+        str1 <- paste("")
+        str2 <- paste(h3("Edit Hierarchy"))
+      }
+      HTML(paste(str1, str2, sep = '<br/>'))
+    })
+    
+
     output$crop_1_display <- renderText({
       message(paste("crop details:", shared_values$crop_name_1))
       req(shared_values$crop_name_1)

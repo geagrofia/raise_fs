@@ -60,7 +60,6 @@ bslib_screen4_module_v3_Server <- function(id, shared_values, switch_screen) {
     #     scenario
     df_inn <- reactiveVal(load_data())
     selected_row <- reactiveVal(NULL)
-    inn_choice_mode <- reactiveVal(NULL) # Track the selection choice: "existing", "duplicate", "new"
     editing_mode <- reactiveVal("view")  # Track the editing mode: "view", "edit"
     
     # Render the data table----
@@ -68,7 +67,7 @@ bslib_screen4_module_v3_Server <- function(id, shared_values, switch_screen) {
       
       
       message(paste("Initiation. editing_mode:", editing_mode()))
-      message(paste("Initiation. inn_choice_mode:", inn_choice_mode()))
+      message(paste("Initiation. shared_values$inn_type_1:", shared_values$inn_type_1))
       message(paste("Initiation. forget:", shared_values$forget))
       message(paste("Initiation. num_innovations", shared_values$num_innovations))
       message(paste("Initiation. inn details1:", shared_values$crop_name_1,"-", shared_values$ideotype_1,"-", shared_values$scenario_1))
@@ -133,7 +132,7 @@ bslib_screen4_module_v3_Server <- function(id, shared_values, switch_screen) {
       message(paste("YY observeEvent: existing inn. original inn (should be NULL):", shared_values$crop_name_0,"-", shared_values$ideotype_0,"-", shared_values$scenario_0))
       
       editing_mode("view")  # Set to "view" mode
-      inn_choice_mode("existing")#  Set to "existing" innovation mode
+      shared_values$inn_type_1 <- "existing"#  Set to "existing" innovation mode
     })
     
     # observeEvent duplicate row (Option 2: Edit after duplication)----
@@ -148,7 +147,7 @@ bslib_screen4_module_v3_Server <- function(id, shared_values, switch_screen) {
       shared_values$scenario_0 <- new_row$scenario
       message(paste("YY observeEvent: duplicate row. inn to duplicate:", shared_values$crop_name_0,"-", shared_values$ideotype_0,"-", shared_values$scenario_0))
       editing_mode("edit")  # Set to "edit" mode
-      inn_choice_mode("duplicate")#  Set to "duplicate" innovation mode
+      shared_values$inn_type_1 <- "duplicate"#  Set to "duplicate" innovation mode
       
     })
     
@@ -168,7 +167,7 @@ bslib_screen4_module_v3_Server <- function(id, shared_values, switch_screen) {
       message(paste("YY observeEvent: new row. original inn (should be NULL):", shared_values$crop_name_0,"-", shared_values$ideotype_0,"-", shared_values$scenario_0))
       
       editing_mode("edit")  # Set to "edit" mode
-      inn_choice_mode("new")#  Set to "new" innovation mode
+      shared_values$inn_type_1 <- "new"#  Set to "new" innovation mode
     })
     
     # output Render row details (for "view" mode)----
@@ -463,7 +462,7 @@ bslib_screen4_module_v3_Server <- function(id, shared_values, switch_screen) {
       
       # if existing innovation selected then edit mode is view
       # do nothing - load using values for shared_values$crop_name_1 etc.
-      if (inn_choice_mode() == "existing")  {
+      if (shared_values$inn_type_1 == "existing")  {
         message(paste("ZZ1 observeEvent newscreen: existing inn", shared_values$crop_name_0,"-", shared_values$ideotype_0,"-", shared_values$scenario_0))
         message(paste("ZZ1 observeEvent newscreen: new inn", shared_values$crop_name_1,"-", shared_values$ideotype_1,"-", shared_values$scenario_1))
         message(paste("ZZ1 observeEvent newscreen: shared_values$current_tree", shared_values$current_tree))
@@ -474,7 +473,7 @@ bslib_screen4_module_v3_Server <- function(id, shared_values, switch_screen) {
       # if duplicate innovation selected then edit mode is edit and crop_name_0 etc have a value
       # create a new requirements table using values for shared_values$crop_name_0 etc.
       
-      if (inn_choice_mode() == "duplicate" && !is.null(shared_values$crop_name_0))  {
+      if (shared_values$inn_type_1 == "duplicate" && !is.null(shared_values$crop_name_0))  {
         message(paste("ZZ2 observeEvent newscreen: existing inn", shared_values$crop_name_0,"-", shared_values$ideotype_0,"-", shared_values$scenario_0))
         message(paste("ZZ2 observeEvent newscreen: new inn", shared_values$crop_name_1,"-", shared_values$ideotype_1,"-", shared_values$scenario_1))
         
@@ -598,7 +597,7 @@ bslib_screen4_module_v3_Server <- function(id, shared_values, switch_screen) {
       # if a new innovation selected then edit mode is view and crop_name_0 etc are NULL
       # create a new requirements table using filename from shared_values$crop_name_1 etc. and completely generic values from a generic requirements file
       
-      if (inn_choice_mode() == "new" && is.null(shared_values$crop_name_0))  {
+      if (shared_values$inn_type_1 == "new" && is.null(shared_values$crop_name_0))  {
         message(paste("ZZ3 observeEvent newscreen: existing inn", shared_values$crop_name_0,"-", shared_values$ideotype_0,"-", shared_values$scenario_0))
         message(paste("ZZ3 observeEvent newscreen: new inn", shared_values$crop_name_1,"-", shared_values$ideotype_1,"-", shared_values$scenario_1))
         file.copy(

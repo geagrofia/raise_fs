@@ -74,6 +74,10 @@ server <- function(input, output, session) {
     innovation_system = NULL, 
     # counter used internally on screen 4
     forget = 0, 
+    # code for showing whether innovation 1 is "existing", "duplicate" or "new" innovation
+    inn_type_1 = "existing",
+    # code for showing whether innovation 2 is "existing", "duplicate" or "new" innovation
+    inn_type_2 = "existing",
     # used for creating a new requirements file based on duplicates
     crop_name_0 = NULL,
     ideotype_0 = NULL,
