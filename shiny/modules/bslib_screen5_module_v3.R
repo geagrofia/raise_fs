@@ -263,6 +263,87 @@ bslib_screen5_module_v3_Server <- function(id, shared_values, switch_screen) {
       }
     }
     
+  
+    
+    # assign codes to any newly created criteria----
+    auto_assign_codes <- function(df, prefix = "NEW") {
+      # Map of name → assigned code
+      name_code_map <- list()
+      #used_codes <- character()
+      df_used_codes <- read.csv(
+        paste0(
+          "E:/repos/raise_fs/shiny/data/",
+          shared_values$crop_name_1,
+          "_",
+          shared_values$ideotype_1,
+          "_",
+          shared_values$scenario_1,
+          "_requirements.csv"
+        )
+      ) |> dplyr::select("crit_code") |> dplyr::distinct()
+      used_codes <- df_used_codes[["crit_code"]]
+      print(used_codes)
+        
+      counter <- 1
+      
+      generate_code <- function(name) {
+        # Try using abbreviation if unique
+        base_code <- toupper(substr(name, 1, 2))
+        if (is.na(base_code) || base_code == "" || base_code %in% used_codes) {
+          # Fall back to generated code
+          repeat {
+            code <- paste0(prefix, counter)
+            counter <<- counter + 1
+            if (!(code %in% used_codes)) {
+              break
+            }
+          }
+        } else {
+          code <- base_code
+        }
+        
+        used_codes <<- c(used_codes, code)
+        return(code)
+      }
+      
+      for (i in seq_len(nrow(df))) {
+        # Assign code for stack
+        stack_name <- df$stack[i]
+        if (!is.na(stack_name)) {
+          if (!is.null(name_code_map[[stack_name]])) {
+            df$stack_code[i] <- name_code_map[[stack_name]]
+          } else if (!is.na(df$stack_code[i])) {
+            name_code_map[[stack_name]] <- df$stack_code[i]
+            used_codes <- c(used_codes, df$stack_code[i])
+          } else {
+            code <- generate_code(stack_name)
+            name_code_map[[stack_name]] <- code
+            df$stack_code[i] <- code
+          }
+        }
+        
+        # Assign code for criterion
+        crit_name <- df$criterion[i]
+        if (!is.na(crit_name)) {
+          if (!is.null(name_code_map[[crit_name]])) {
+            df$crit_code[i] <- name_code_map[[crit_name]]
+          } else if (!is.na(df$crit_code[i])) {
+            name_code_map[[crit_name]] <- df$crit_code[i]
+            used_codes <- c(used_codes, df$crit_code[i])
+          } else {
+            code <- generate_code(crit_name)
+            name_code_map[[crit_name]] <- code
+            df$crit_code[i] <- code
+          }
+        }
+      }
+      
+      # Ensure character
+      df$stack_code <- as.character(df$stack_code)
+      df$crit_code <- as.character(df$crit_code)
+      
+      return(df)
+    }
     
     
     #render the tree ui output----
@@ -459,9 +540,9 @@ bslib_screen5_module_v3_Server <- function(id, shared_values, switch_screen) {
         # 
         # # Step 3: Generate edges
         # if (!is.null(root)) {
-        #   edges_df <- get_edges_with_codes(root)
-        #   message("edges_df")
-        #   print(edges_df)
+        #   df_edges <- get_edges_with_codes(root)
+        #   message("df_edges")
+        #   print(df_edges)
         # } else {
         #   print("Tree conversion failed.")
         # }
@@ -473,11 +554,13 @@ bslib_screen5_module_v3_Server <- function(id, shared_values, switch_screen) {
         
         tree <- build_tree(root_name, root_data)
         
-        edges_df <- get_edges_with_codes(tree)
-        print(edges_df)
+        df_edges <- get_edges_with_codes(tree)
+        print(df_edges)
         
+        df_edges_code <- auto_assign_codes(df_edges)
+        print(df_edges_code)
 
-        write.csv(edges_df, paste0(
+        write.csv(df_edges_code, paste0(
           "data/",
           shared_values$crop_name_1,
           "_",
