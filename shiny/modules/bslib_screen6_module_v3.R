@@ -26,7 +26,8 @@ bslib_screen6_module_v3_MainUI <- function(id) {
     textOutput(ns("ideotype_1_display")),
     textOutput(ns("scenario_1_display")),
     textOutput(ns("inn_type_1_display")),
-    DTOutput(ns("conclusions_data_table"))
+    DTOutput(ns("conclusions_data_table")),
+    uiOutput(ns("dyanamic_save_reset"))
     
   )
 }
@@ -64,6 +65,7 @@ bslib_screen6_module_v3_Server <- function(id, shared_values, switch_screen) {
       
       df_inn_tree_net_stack <- dplyr::select(df_inn_tree_net, "stack_code") |> distinct()
       print(str(df_inn_tree_net_stack))
+      print(df_inn_tree_net_stack)
       
       df_inn_requirements <- read.csv(
         paste0(
@@ -79,9 +81,103 @@ bslib_screen6_module_v3_Server <- function(id, shared_values, switch_screen) {
       
       print(str(df_inn_requirements))
       
+      # add new rows to requirements based on tree network ----
+      
+      df_used_codes_req <- df_inn_requirements |> dplyr::select("crit_code") |> dplyr::distinct()
+      used_codes_req <- df_used_codes_req[["crit_code"]]
+      df_used_codes_tree <- df_inn_tree_net |> dplyr::select("stack_code", "stack") |> dplyr::distinct()
+      used_codes_tree <- df_used_codes_tree[["stack_code"]]
+      
+      # Find codes in df_used_codes_tree that are not in df_used_codes_req
+      new_codes <- setdiff(used_codes_tree, used_codes_req)
+      
+      # if there are new codes ----
+      
+      if (length(new_codes) > 0) {
+        df_new_codes <- data.frame(crit_code = new_codes)
+        df_new_codes_stackname <- left_join(df_new_codes,
+                                            df_used_codes_tree,
+                                            join_by(crit_code == stack_code))
+        message("df_new_codes_stackname")
+        print(df_new_codes_stackname)
+        
+        v_req_names <- c(
+          "weight",
+          "threshold_1",
+          "threshold_2",
+          "width_1",
+          "width_2",
+          "thresh_source",
+          "data_desc",
+          "data_file_prefix",
+          "raster_or_brick",
+          "agg_fun",
+          "rsm_fun",
+          "prop_level_1",
+          "prop_level_2",
+          "prop_level_3",
+          "conc_level_1" ,
+          "conc_level_2",
+          "conc_level_3",
+          "fuzzy_partition",
+          "yield" ,
+          "phen_stage",
+          "temp_resolution",
+          "prec_temp",
+          "texture"
+        )
+        
+        df_new_codes_stackname[, v_req_names] <- NA
+        message("df_new_codes_stackname")
+        print(df_new_codes_stackname)
+        
+        #df_new_codes_stackname <- mutate(df_new_codes_stackname, criterion == stack)
+        df_new_codes_stackname <- df_new_codes_stackname |> rename(criterion = stack)
+        message("df_new_codes_stackname")
+        print(df_new_codes_stackname)
+        
+        
+        # # Create new rows with NA or default values
+        # df_new_rows <- data.frame(
+        #   crit_code = new_codes,
+        #   criterion = NA,
+        #   weight = NA,
+        #   threshold_1 = NA,
+        #   threshold_2 = NA,
+        #   width_1 = NA,
+        #   width_2 = NA,
+        #   thresh_source = NA,
+        #   data_desc = NA,
+        #   data_file_prefix = NA,
+        #   raster_or_brick = NA,
+        #   agg_fun = NA,
+        #   rsm_fun = NA,
+        #   prop_level_1 = NA,
+        #   prop_level_2 = NA,
+        #   prop_level_3 = NA,
+        #   conc_level_1 = NA,
+        #   conc_level_2 = NA,
+        #   conc_level_3 = NA,
+        #   fuzzy_partition = NA,
+        #   yield = NA,
+        #   phen_stage = NA,
+        #   temp_resolution = NA,
+        #   prec_temp = NA,
+        #   texture = NA
+        # )
+        
+        
+        
+        
+        # Append new rows to df_inn_requirements
+        df_inn_requirements_updated <- rbind(df_inn_requirements, df_new_codes_stackname)
+      } else { # if there are no new codes ----
+        df_inn_requirements_updated <- df_inn_requirements
+      }
+      
       df_inn_conc <- dplyr::left_join(
         df_inn_tree_net_stack,
-        df_inn_requirements,
+        df_inn_requirements_updated,
         join_by(stack_code == crit_code),
         keep = T
       ) |> dplyr::select("crit_code",
@@ -90,6 +186,7 @@ bslib_screen6_module_v3_Server <- function(id, shared_values, switch_screen) {
                          "conc_level_2",
                          "conc_level_3")
       print(str(df_inn_conc))
+      print(df_inn_conc)
       
       # if existing innovation then not editable
       if (shared_values$inn_type_1 == "existing") {
@@ -132,6 +229,23 @@ bslib_screen6_module_v3_Server <- function(id, shared_values, switch_screen) {
       
     }, server = FALSE)
      
+    # render the buttons UI output ----
+    output$dyanamic_save_reset <- renderUI({
+      # observe whether conclusions are filled to determine button visibility----
+      if (1 == 2) {
+        
+        
+        
+        
+        #
+      } else {
+        tagList(
+          actionButton(ns("save_dyn_button"), "Save Changes / Re-load"), # Button to save changes
+          actionButton(ns("reset_dyn_button"), "Reset to Original")) # Button to reset to original
+      }
+    })
+    
+    
     # _----
     
     # outputs from previous screens----
