@@ -442,12 +442,12 @@ bslib_screen5_module_v3_Server <- function(id, shared_values, switch_screen) {
       
       if (is.null(shared_values$current_tree))
         {# Reactive value to hold the current tree structure
-        message(paste("renderTree 1.  shared_values$current_tree is NULL"))
+        message(paste("S5. renderTree 1.  shared_values$current_tree is NULL"))
         print(shared_values$current_tree)
         shared_values$current_tree <- tree_json
         } 
       
-      message(paste("renderTree 2.  shared_values$current_tree is not NULL"))
+      message(paste("S5. renderTree 2.  shared_values$current_tree is not NULL"))
       print(shared_values$current_tree)
           # 
       # # Print the result
@@ -475,7 +475,7 @@ bslib_screen5_module_v3_Server <- function(id, shared_values, switch_screen) {
       
       #message(paste("observeEvent: save_button  print(input$tree):"))
       #print(input$tree)
-      message("str(input$tree)")
+      message("S5. str(input$tree)")
       print(str(input$tree))
       saved_tree <- input$tree  # Retrieve the current state from the input
       
@@ -583,27 +583,27 @@ bslib_screen5_module_v3_Server <- function(id, shared_values, switch_screen) {
     # outputs from previous screens----
     
     output$num_innovations_display <- renderText({
-      paste("Number of innovations:", shared_values$num_innovations)
+      paste("S5. Number of innovations:", shared_values$num_innovations)
     })
     
     output$innovation_system_display <- renderText({
       if (shared_values$num_innovations == "two_inn") {
-        paste("Innovation System:", shared_values$innovation_system)
+        paste("S5. Innovation System:", shared_values$innovation_system)
       }
     })    
     
     output$spatres_display <- renderText({
-      paste("Your spatial resolution is:", shared_values$resolution)
+      paste("S5. Your spatial resolution is:", shared_values$resolution)
     })
     
     
     output$aggregation_display <- renderText({
-      paste("Your aggregation level is:", shared_values$aggregation)
+      paste("S5. Your aggregation level is:", shared_values$aggregation)
     })
 
     output$level_display <- renderText({
       req(shared_values$level)
-      paste("You selected level on Screen 1:", shared_values$level)
+      paste("S5. You selected level on Screen 1:", shared_values$level)
     })
     
     output$selection_display <- renderText({
@@ -611,7 +611,7 @@ bslib_screen5_module_v3_Server <- function(id, shared_values, switch_screen) {
       
       if (shared_values$level == "woreda") {
         paste(
-          "You selected geography:",
+          "S5. You selected geography:",
           shared_values$selected_region,
           shared_values$selected_zone,
           shared_values$selected_woreda
@@ -619,29 +619,29 @@ bslib_screen5_module_v3_Server <- function(id, shared_values, switch_screen) {
       } else {
         if (shared_values$level == "zone") {
           paste(
-            "You selected geography:",
+            "S5. You selected geography:",
             shared_values$selected_region,
             shared_values$selected_zone
           )
         } else {
           if (shared_values$level == "region") {
-            paste("You selected geography:",
+            paste("S5. You selected geography:",
                   shared_values$selected_region)
           } else {
-            paste("You selected geography: Ethiopia")
+            paste("S5. You selected geography: Ethiopia")
           }
         }
       }
     }) 
     
     output$inn_type_1_display <- renderText({
-      message(paste("Innovation type:", shared_values$inn_type_1))
+      message(paste("S5. Innovation type:", shared_values$inn_type_1))
       req(shared_values$inn_type_1)
-      paste("You selected Innovation type on Screen 4:", shared_values$inn_type_1)
+      paste("S5. You selected Innovation type on Screen 4:", shared_values$inn_type_1)
     })
     
     output$inn_type_edit_mode_1_display <- renderUI({
-      message(paste("Innovation type:", shared_values$inn_type_1))
+      message(paste("S5. Innovation type:", shared_values$inn_type_1))
       req(shared_values$inn_type_1)
       if (shared_values$inn_type_1 == "existing") {
         str1 <- paste("")
@@ -655,23 +655,23 @@ bslib_screen5_module_v3_Server <- function(id, shared_values, switch_screen) {
     
 
     output$crop_1_display <- renderText({
-      message(paste("crop details:", shared_values$crop_name_1))
+      message(paste("S5. crop details:", shared_values$crop_name_1))
       req(shared_values$crop_name_1)
-      paste("You selected crop on Screen 4:", shared_values$crop_name_1)
+      paste("S5. You selected crop on Screen 4:", shared_values$crop_name_1)
     })
     
     
     output$ideotype_1_display <- renderText({
-      message(paste("ideotype details:", shared_values$ideotype_1))
+      message(paste("S5. ideotype details:", shared_values$ideotype_1))
       req(shared_values$ideotype_1)
-      paste("You selected ideotype on Screen 4:", shared_values$ideotype_1)
+      paste("S5. You selected ideotype on Screen 4:", shared_values$ideotype_1)
     })
     
     
     output$scenario_1_display <- renderText({
-      message(paste("scenario details:", shared_values$scenario_1))
+      message(paste("S5. scenario details:", shared_values$scenario_1))
       req(shared_values$scenario_1)
-      paste("You selected scenario on Screen 4:", shared_values$scenario_1)
+      paste("S5. You selected scenario on Screen 4:", shared_values$scenario_1)
     })
 
     # _ navigation----

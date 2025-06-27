@@ -3,6 +3,8 @@ library(bslib)
 library(tidyverse)
 library(shinylogs)
 library(shinyjs)
+library(data.table)
+#library(DT)
 
 source("E:/repos/raise_fs/shiny/modules/bslib_screen1_module_v3.R")
 source("E:/repos/raise_fs/shiny/modules/bslib_screen2_module_v3.R")

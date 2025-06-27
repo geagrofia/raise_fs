@@ -66,11 +66,11 @@ bslib_screen4_module_v3_Server <- function(id, shared_values, switch_screen) {
     output$data_table <- renderDT({
       
       
-      message(paste("Initiation. editing_mode:", editing_mode()))
-      message(paste("Initiation. shared_values$inn_type_1:", shared_values$inn_type_1))
-      message(paste("Initiation. forget:", shared_values$forget))
-      message(paste("Initiation. num_innovations", shared_values$num_innovations))
-      message(paste("Initiation. inn details1:", shared_values$crop_name_1,"-", shared_values$ideotype_1,"-", shared_values$scenario_1))
+      message(paste("S4. Initiation. editing_mode:", editing_mode()))
+      message(paste("S4. Initiation. shared_values$inn_type_1:", shared_values$inn_type_1))
+      message(paste("S4. Initiation. forget:", shared_values$forget))
+      message(paste("S4. Initiation. num_innovations", shared_values$num_innovations))
+      message(paste("S4. Initiation. inn details1:", shared_values$crop_name_1,"-", shared_values$ideotype_1,"-", shared_values$scenario_1))
      
       
       datatable(
@@ -129,7 +129,7 @@ bslib_screen4_module_v3_Server <- function(id, shared_values, switch_screen) {
       shared_values$crop_name_0  <- NULL
       shared_values$ideotype_0 <- NULL
       shared_values$scenario_0 <- NULL
-      message(paste("YY observeEvent: existing inn. original inn (should be NULL):", shared_values$crop_name_0,"-", shared_values$ideotype_0,"-", shared_values$scenario_0))
+      message(paste("S4. YY observeEvent: existing inn. original inn (should be NULL):", shared_values$crop_name_0,"-", shared_values$ideotype_0,"-", shared_values$scenario_0))
       
       editing_mode("view")  # Set to "view" mode
       shared_values$inn_type_1 <- "existing"#  Set to "existing" innovation mode
@@ -145,7 +145,7 @@ bslib_screen4_module_v3_Server <- function(id, shared_values, switch_screen) {
       shared_values$crop_name_0  <- new_row$crop_name
       shared_values$ideotype_0 <- new_row$ideotype
       shared_values$scenario_0 <- new_row$scenario
-      message(paste("YY observeEvent: duplicate row. inn to duplicate:", shared_values$crop_name_0,"-", shared_values$ideotype_0,"-", shared_values$scenario_0))
+      message(paste("S4. YY observeEvent: duplicate row. inn to duplicate:", shared_values$crop_name_0,"-", shared_values$ideotype_0,"-", shared_values$scenario_0))
       editing_mode("edit")  # Set to "edit" mode
       shared_values$inn_type_1 <- "duplicate"#  Set to "duplicate" innovation mode
       
@@ -164,7 +164,7 @@ bslib_screen4_module_v3_Server <- function(id, shared_values, switch_screen) {
       shared_values$crop_name_0  <- NULL
       shared_values$ideotype_0 <- NULL
       shared_values$scenario_0 <- NULL
-      message(paste("YY observeEvent: new row. original inn (should be NULL):", shared_values$crop_name_0,"-", shared_values$ideotype_0,"-", shared_values$scenario_0))
+      message(paste("S4. YY observeEvent: new row. original inn (should be NULL):", shared_values$crop_name_0,"-", shared_values$ideotype_0,"-", shared_values$scenario_0))
       
       editing_mode("edit")  # Set to "edit" mode
       shared_values$inn_type_1 <- "new"#  Set to "new" innovation mode
@@ -222,7 +222,7 @@ bslib_screen4_module_v3_Server <- function(id, shared_values, switch_screen) {
 
       if (changed) {
         enable("save_row_btn")
-        message(paste("XX observeEvent crop_name text inputs:", selected_row()$crop_name," - ", input$edit_crop_name))    } else {
+        message(paste("S4. XX observeEvent crop_name text inputs:", selected_row()$crop_name," - ", input$edit_crop_name))    } else {
           disable("save_row_btn")}
     })
     
@@ -238,7 +238,7 @@ bslib_screen4_module_v3_Server <- function(id, shared_values, switch_screen) {
       
       if (changed) {
         enable("save_row_btn")
-        message(paste("XX observeEvent ideotype text inputs:", selected_row()$ideotype," - ", input$edit_ideotype))    } else {
+        message(paste("S4. XX observeEvent ideotype text inputs:", selected_row()$ideotype," - ", input$edit_ideotype))    } else {
           disable("save_row_btn")        }
     })
     
@@ -259,7 +259,7 @@ bslib_screen4_module_v3_Server <- function(id, shared_values, switch_screen) {
         enable("save_row_btn")
         message(
           paste(
-            "XX observeEvent scenario selected_row:",
+            "S4. XX observeEvent scenario selected_row:",
             selected_row()$scenario,
             " - input:",
             input$edit_scenario,
@@ -276,16 +276,16 @@ bslib_screen4_module_v3_Server <- function(id, shared_values, switch_screen) {
     
     # observeEvent Save edited row and validate (for duplication or adding new rows)----
    observeEvent(ns(input$save_row_btn), {
-     message(paste("2a observeEvent: save_row_btn Edit mode:", editing_mode()))
-     message(paste("2a observeEvent: save_row_btn forget:", shared_values$forget))
-     message(paste("2a observeEvent: save_row_btn inn details:", shared_values$crop_name_1,"-", shared_values$ideotype_1,"-", shared_values$scenario_1))
+     message(paste("S4. 2a observeEvent: save_row_btn Edit mode:", editing_mode()))
+     message(paste("S4. 2a observeEvent: save_row_btn forget:", shared_values$forget))
+     message(paste("S4. 2a observeEvent: save_row_btn inn details:", shared_values$crop_name_1,"-", shared_values$ideotype_1,"-", shared_values$scenario_1))
      
      if (shared_values$forget > 0 ) {
        
-      message(paste("2b observeEvent: save_row_btn Edit mode:", editing_mode()))
+      message(paste("S4. 2b observeEvent: save_row_btn Edit mode:", editing_mode()))
        
       if (!is.null(selected_row())){ #added
-        message(paste("2c observeEvent: save_row_btn Edit mode:", editing_mode()))  
+        message(paste("S4. 2c observeEvent: save_row_btn Edit mode:", editing_mode()))  
       edited_row <- data.frame(
         inn_ID = selected_row()$inn_ID,
         crop_name = input$edit_crop_name,
@@ -346,22 +346,22 @@ bslib_screen4_module_v3_Server <- function(id, shared_values, switch_screen) {
       }
       } #added
      shared_values$forget <- (shared_values$forget + 1)
-     message(paste("2c observeEvent: shared_values$forget = ", shared_values$forget))
+     message(paste("S4. 2c observeEvent: shared_values$forget = ", shared_values$forget))
     }, ignoreInit = TRUE)
     
     
     # observeEvent cancel_btn editing and clear the UI----
     observeEvent(ns(input$cancel_btn), {
       
-      message(paste("3a observeEvent: cancel_btn. Edit mode:", editing_mode()))
-      message(paste("3a observeEvent: cancel_btn. forget:", shared_values$forget))
-      message(paste("3a observeEvent: cancel_btn. inn details:", shared_values$crop_name_1,"-", shared_values$ideotype_1,"-", shared_values$scenario_1))
+      message(paste("S4. 3a observeEvent: cancel_btn. Edit mode:", editing_mode()))
+      message(paste("S4. 3a observeEvent: cancel_btn. forget:", shared_values$forget))
+      message(paste("S4. 3a observeEvent: cancel_btn. inn details:", shared_values$crop_name_1,"-", shared_values$ideotype_1,"-", shared_values$scenario_1))
       
       
       if (shared_values$forget > 1 ) { 
         
       editing_mode("view")  # Reset editing mode
-      message(paste("3a observeEvent: cancel_btn. shared_values$forget = ", shared_values$forget))
+      message(paste("S4. a observeEvent: cancel_btn. shared_values$forget = ", shared_values$forget))
       selected_row(NULL)  # Clear selection
       }
     }, ignoreInit = TRUE)
@@ -371,15 +371,15 @@ bslib_screen4_module_v3_Server <- function(id, shared_values, switch_screen) {
     # output Render validation buttons (for "edit" mode)----
     output$validate_butons <- renderUI({
       
-      message(paste("1", shared_values$forget))
+      message(paste("S4. 1", shared_values$forget))
       req(selected_row())
       
-      message(paste("2",  shared_values$forget))
+      message(paste("S4. 2",  shared_values$forget))
       req(input$edit_crop_name)
-      message(paste("3",  shared_values$forget))
+      message(paste("S4. 3",  shared_values$forget))
       
       if (editing_mode() == "edit") {
-        message(paste("4",  shared_values$forget))
+        message(paste("S4. 4",  shared_values$forget))
         row <- selected_row()
         tagList(
           h4("Validate"),
@@ -394,22 +394,22 @@ bslib_screen4_module_v3_Server <- function(id, shared_values, switch_screen) {
     # outputs from previous screens----
     
     output$num_innovations_display <- renderText({
-      paste("Number of innovations:", shared_values$num_innovations)
+      paste("S4. Number of innovations:", shared_values$num_innovations)
     })
     
     output$innovation_system_display <- renderText({
       if (shared_values$num_innovations == "two_inn") {
-        paste("Innovation System:", shared_values$innovation_system)
+        paste("S4. Innovation System:", shared_values$innovation_system)
       }
     })    
     
     output$spatres_display <- renderText({
-      paste("Your spatial resolution is:", shared_values$resolution)
+      paste("S4. Your spatial resolution is:", shared_values$resolution)
     })
 
     
     output$aggregation_display <- renderText({
-      paste("Your aggregation level is:", shared_values$aggregation)
+      paste("S4. Your aggregation level is:", shared_values$aggregation)
     })
     #     
     # output$value_display <- renderText({
@@ -419,7 +419,7 @@ bslib_screen4_module_v3_Server <- function(id, shared_values, switch_screen) {
     
     output$level_display <- renderText({
       req(shared_values$level)
-      paste("You selected level on Screen 1:", shared_values$level)
+      paste("S4. You selected level on Screen 1:", shared_values$level)
     })
     
     output$selection_display <- renderText({
@@ -427,7 +427,7 @@ bslib_screen4_module_v3_Server <- function(id, shared_values, switch_screen) {
       
       if (shared_values$level == "woreda") {
         paste(
-          "You selected geography:",
+          "S4. You selected geography:",
           shared_values$selected_region,
           shared_values$selected_zone,
           shared_values$selected_woreda
@@ -435,16 +435,16 @@ bslib_screen4_module_v3_Server <- function(id, shared_values, switch_screen) {
       } else {
         if (shared_values$level == "zone") {
           paste(
-            "You selected geography:",
+            "S4. You selected geography:",
             shared_values$selected_region,
             shared_values$selected_zone
           )
         } else {
           if (shared_values$level == "region") {
-            paste("You selected geography:",
+            paste("S4. You selected geography:",
                   shared_values$selected_region)
           } else {
-            paste("You selected geography: Ethiopia")
+            paste("S4. You selected geography: Ethiopia")
           }
         }
       }
@@ -463,9 +463,9 @@ bslib_screen4_module_v3_Server <- function(id, shared_values, switch_screen) {
       # if existing innovation selected then edit mode is view
       # do nothing - load using values for shared_values$crop_name_1 etc.
       if (shared_values$inn_type_1 == "existing")  {
-        message(paste("ZZ1 observeEvent newscreen: existing inn", shared_values$crop_name_0,"-", shared_values$ideotype_0,"-", shared_values$scenario_0))
-        message(paste("ZZ1 observeEvent newscreen: new inn", shared_values$crop_name_1,"-", shared_values$ideotype_1,"-", shared_values$scenario_1))
-        message(paste("ZZ1 observeEvent newscreen: shared_values$current_tree", shared_values$current_tree))
+        message(paste("S4. ZZ1 observeEvent newscreen: existing inn", shared_values$crop_name_0,"-", shared_values$ideotype_0,"-", shared_values$scenario_0))
+        message(paste("S4. ZZ1 observeEvent newscreen: new inn", shared_values$crop_name_1,"-", shared_values$ideotype_1,"-", shared_values$scenario_1))
+        message(paste("S4. ZZ1 observeEvent newscreen: shared_values$current_tree", shared_values$current_tree))
         
         switch_screen("screen5")
       }
@@ -474,8 +474,8 @@ bslib_screen4_module_v3_Server <- function(id, shared_values, switch_screen) {
       # create a new requirements table using values for shared_values$crop_name_0 etc.
       
       if (shared_values$inn_type_1 == "duplicate" && !is.null(shared_values$crop_name_0))  {
-        message(paste("ZZ2 observeEvent newscreen: existing inn", shared_values$crop_name_0,"-", shared_values$ideotype_0,"-", shared_values$scenario_0))
-        message(paste("ZZ2 observeEvent newscreen: new inn", shared_values$crop_name_1,"-", shared_values$ideotype_1,"-", shared_values$scenario_1))
+        message(paste("S4. ZZ2 observeEvent newscreen: existing inn", shared_values$crop_name_0,"-", shared_values$ideotype_0,"-", shared_values$scenario_0))
+        message(paste("S4. ZZ2 observeEvent newscreen: new inn", shared_values$crop_name_1,"-", shared_values$ideotype_1,"-", shared_values$scenario_1))
         
         file.copy(
           # existing innovation requirements to be duplicated----
@@ -598,8 +598,8 @@ bslib_screen4_module_v3_Server <- function(id, shared_values, switch_screen) {
       # create a new requirements table using filename from shared_values$crop_name_1 etc. and completely generic values from a generic requirements file
       
       if (shared_values$inn_type_1 == "new" && is.null(shared_values$crop_name_0))  {
-        message(paste("ZZ3 observeEvent newscreen: existing inn", shared_values$crop_name_0,"-", shared_values$ideotype_0,"-", shared_values$scenario_0))
-        message(paste("ZZ3 observeEvent newscreen: new inn", shared_values$crop_name_1,"-", shared_values$ideotype_1,"-", shared_values$scenario_1))
+        message(paste("S4. ZZ3 observeEvent newscreen: existing inn", shared_values$crop_name_0,"-", shared_values$ideotype_0,"-", shared_values$scenario_0))
+        message(paste("S4. ZZ3 observeEvent newscreen: new inn", shared_values$crop_name_1,"-", shared_values$ideotype_1,"-", shared_values$scenario_1))
         file.copy(
           # generic requirements
           "E:/repos/raise_fs/shiny/data/generic-generic-generic.csv", 

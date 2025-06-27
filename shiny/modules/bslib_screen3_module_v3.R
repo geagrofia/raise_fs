@@ -50,23 +50,23 @@ bslib_screen3_module_v3_Server <- function(id, shared_values, switch_screen) {
     # output$value <- renderText({ input$aggregation })
     
     output$num_innovations_display <- renderText({
-      paste("Number of innovations:", shared_values$num_innovations)
+      paste("S3. Number of innovations:", shared_values$num_innovations)
     })
     
     output$innovation_system_display <- renderText({
       #if (shared_values$num_innovations == "two_inn") {
       if (input$num_innovations == "two_inn") {
-        paste("Innovation System:", shared_values$innovation_system)
+        paste("S3. Innovation System:", shared_values$innovation_system)
       }
     })    
     
     output$spatres_display <- renderText({
-      paste("Your spatial resolution is:", shared_values$resolution)
+      paste("S3. Your spatial resolution is:", shared_values$resolution)
     })
 
     
     output$aggregation_display <- renderText({
-      paste("Your aggregation level is:", shared_values$aggregation)
+      paste("S3. Your aggregation level is:", shared_values$aggregation)
     })
     #     
     # output$value_display <- renderText({
@@ -76,7 +76,7 @@ bslib_screen3_module_v3_Server <- function(id, shared_values, switch_screen) {
     
     output$level_display <- renderText({
       req(shared_values$level)
-      paste("You selected level on Screen 1:", shared_values$level)
+      paste("S3. You selected level on Screen 1:", shared_values$level)
     })
     
     output$selection_display <- renderText({
@@ -84,7 +84,7 @@ bslib_screen3_module_v3_Server <- function(id, shared_values, switch_screen) {
       
       if (shared_values$level == "woreda") {
         paste(
-          "You selected geography:",
+          "S3. You selected geography:",
           shared_values$selected_region,
           shared_values$selected_zone,
           shared_values$selected_woreda
@@ -92,16 +92,16 @@ bslib_screen3_module_v3_Server <- function(id, shared_values, switch_screen) {
       } else {
         if (shared_values$level == "zone") {
           paste(
-            "You selected geography:",
+            "S3. You selected geography:",
             shared_values$selected_region,
             shared_values$selected_zone
           )
         } else {
           if (shared_values$level == "region") {
-            paste("You selected geography:",
+            paste("S3. You selected geography:",
                   shared_values$selected_region)
           } else {
-            paste("You selected geography: Ethiopia")
+            paste("S3. You selected geography: Ethiopia")
           }
         }
       }
@@ -109,7 +109,7 @@ bslib_screen3_module_v3_Server <- function(id, shared_values, switch_screen) {
     
     #1 observe radio buttons ----
     observe({
-      message(paste("1 observe: radio buttons", shared_values$innovation_system))
+      message(paste("S3. 1 observe: radio buttons", shared_values$innovation_system))
       shared_values$num_innovations <- input$num_innovations
       shared_values$innovation_system <- input$innovation_system
 
@@ -117,7 +117,7 @@ bslib_screen3_module_v3_Server <- function(id, shared_values, switch_screen) {
     
     #1 observeevent radio button 2 ----
     observeEvent(ns(input$innovation_system), {
-      message(paste("2 observeevent: radio button 2", shared_values$innovation_system))
+      message(paste("S3. 2 observeevent: radio button 2", shared_values$innovation_system))
       shared_values$num_innovations <- input$num_innovations
       shared_values$innovation_system <- input$innovation_system
       
@@ -131,7 +131,7 @@ bslib_screen3_module_v3_Server <- function(id, shared_values, switch_screen) {
     #2 observeEvent to_screen3 ----
     observeEvent(input$to_screen4, {
       switch_screen("screen4")
-      message(paste("To screen 4. forget:", shared_values$forget))
+      message(paste("S3. To screen 4. forget:", shared_values$forget))
     })
     
   })

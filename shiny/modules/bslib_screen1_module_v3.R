@@ -102,7 +102,7 @@ bslib_screen1_module_v3_Server <- function(id, shared_values, switch_screen) {
     output$woreda_ui <- renderUI({
       req(input$level == "woreda")
       req(input$region, input$zone)
-      message("0 output$woreda_ui")
+      message("S1. 0 output$woreda_ui")
       filtered_woredas <- unique(df_woreda$ADM3_EN[df_woreda$ADM2_EN == input$zone])
       selectInput(ns("woreda"), "Woreda:",
                   choices = filtered_woredas,
@@ -113,13 +113,13 @@ bslib_screen1_module_v3_Server <- function(id, shared_values, switch_screen) {
     #0 Update test text in main UI----
     output$main_output <- renderText({
       req(shared_values$dropdown)
-      paste("You selected:", shared_values$dropdown)
+      paste("S1. You selected:", shared_values$dropdown)
     })
     
     #0 Update geo level text in main UI----
     output$main_level_output <- renderText({
       req(shared_values$level)
-      paste("You selected level:", shared_values$level)
+      paste("S1. You selected level:", shared_values$level)
     })
     
     #0 Update geography text in main UI----
@@ -128,7 +128,7 @@ bslib_screen1_module_v3_Server <- function(id, shared_values, switch_screen) {
       
       if (shared_values$level == "woreda") {
         paste(
-          "You selected geography:",
+          "S1. You selected geography:",
           shared_values$selected_region,
           shared_values$selected_zone,
           shared_values$selected_woreda
@@ -136,16 +136,16 @@ bslib_screen1_module_v3_Server <- function(id, shared_values, switch_screen) {
       } else {
         if (shared_values$level == "zone") {
           paste(
-            "You selected geography:",
+            "S1. You selected geography:",
             shared_values$selected_region,
             shared_values$selected_zone
           )
         } else {
           if (shared_values$level == "region") {
-            paste("You selected geography:",
+            paste("S1. You selected geography:",
                   shared_values$selected_region)
           } else {
-            paste("You selected geography: Ethiopia")
+            paste("S1. You selected geography: Ethiopia")
           }
         }
       }
@@ -194,7 +194,7 @@ bslib_screen1_module_v3_Server <- function(id, shared_values, switch_screen) {
       map |> clearShapes()
       
       if (input$level == "nation") {
-        message("1 Leaflet update observe: nation")
+        message("S1. 1 Leaflet update observe: nation")
         nation_ext <- unlist(unname(as.vector(ext(vect_nation)))) # Extent of nation as unnamed vector
         map |>
           addPolygons(data = vect_nation, color = "blue", weight = 2) %>%
@@ -202,7 +202,7 @@ bslib_screen1_module_v3_Server <- function(id, shared_values, switch_screen) {
       }
       
       if (input$level == "region" && !is.null(input$region)) {
-        message("1 Leaflet update observe: region")
+        message("S1. 1 Leaflet update observe: region")
         region_id <- df_region |> filter(ADM1_EN == input$region) |> pull(ADM1_EN)
         region_data <- vect_region |> subset(vect_region$ADM1_EN == region_id)
         region_ext <- unlist(unname(as.vector(ext(region_data)))) # Extent of selected region as unnamed vector
@@ -212,7 +212,7 @@ bslib_screen1_module_v3_Server <- function(id, shared_values, switch_screen) {
       }
       
       if (input$level == "zone" && !is.null(input$zone)) {
-        message("1 Leaflet update observe: zone")
+        message("S1. 1 Leaflet update observe: zone")
         zone_id <- df_zone %>% filter(ADM2_EN == input$zone) %>% pull(ADM2_EN)
         zone_data <- vect_zone %>% subset(vect_zone$ADM2_EN == zone_id)
         zone_ext <- unlist(unname(as.vector(ext(zone_data)))) # Extent of selected zone as unnamed vector
@@ -222,7 +222,7 @@ bslib_screen1_module_v3_Server <- function(id, shared_values, switch_screen) {
       }
       
       if (input$level == "woreda" && !is.null(input$woreda)) {
-        message("1 Leaflet update observe: woreda")
+        message("S1. 1 Leaflet update observe: woreda")
         woreda_id <- df_woreda %>% filter(ADM3_EN == input$woreda) %>% pull(ADM3_EN)
         woreda_data <- vect_woreda %>% subset(vect_woreda$ADM3_EN == woreda_id)
         woreda_ext <- unlist(unname(as.vector(ext(woreda_data)))) # Extent of selected woreda as unnamed vector
@@ -239,13 +239,13 @@ bslib_screen1_module_v3_Server <- function(id, shared_values, switch_screen) {
     
     #3 observeEvent input$level ----
     observeEvent(input$level, {
-      message("3 input$level observeEvent")
+      message("S1. 3 input$level observeEvent")
       shared_values$level <- input$level
     })
 
     #4 observeEvent input$to_screen2 ----
     observeEvent(input$to_screen2, {
-      message("4 input$to_screen2 observeEvent")
+      message("S1. 4 input$to_screen2 observeEvent")
       switch_screen("screen2")
     })
     
@@ -267,7 +267,7 @@ bslib_screen1_module_v3_Server <- function(id, shared_values, switch_screen) {
       shared_values$selected_zone <- input$zone
       shared_values$selected_woreda <- input$woreda
       
-      message("5 observe level and selected geography name from input")
+      message("S1. 5 observe level and selected geography name from input")
       
     })
     
@@ -294,7 +294,7 @@ bslib_screen1_module_v3_Server <- function(id, shared_values, switch_screen) {
       
       #if (input$level == "nation") {
       if (shared_values$level == "nation") {
-        message("7 Leaflet update observeEvent level = nation, screen changed to: ", switch_screen())
+        message("S1. 7 Leaflet update observeEvent level = nation, screen changed to: ", switch_screen())
         nation_ext <- unlist(unname(as.vector(ext(vect_nation)))) # Extent of nation as unnamed vector
         map |>
           addPolygons(data = vect_nation, color = "blue", weight = 2)%>%
@@ -302,7 +302,7 @@ bslib_screen1_module_v3_Server <- function(id, shared_values, switch_screen) {
       }
       
       if (input$level == "region" && !is.null(input$region)) {
-        message("7 Leaflet update observeEvent level = region, screen changed to: ", switch_screen())
+        message("S1. 7 Leaflet update observeEvent level = region, screen changed to: ", switch_screen())
         region_id <- df_region |> filter(ADM1_EN == input$region) |> pull(ADM1_EN)
         region_data <- vect_region |> subset(vect_region$ADM1_EN == region_id)
         region_ext <- unlist(unname(as.vector(ext(region_data)))) # Extent of selected region as unnamed vector
@@ -312,7 +312,7 @@ bslib_screen1_module_v3_Server <- function(id, shared_values, switch_screen) {
       }
       
       if (input$level == "zone" && !is.null(input$zone)) {
-        message("7 Leaflet update observeEvent level = zone, screen changed to: ", switch_screen())
+        message("S1. 7 Leaflet update observeEvent level = zone, screen changed to: ", switch_screen())
         zone_id <- df_zone %>% filter(ADM2_EN == input$zone) %>% pull(ADM2_EN)
         zone_data <- vect_zone %>% subset(vect_zone$ADM2_EN == zone_id)
         zone_ext <- unlist(unname(as.vector(ext(zone_data)))) # Extent of selected zone as unnamed vector
@@ -322,7 +322,7 @@ bslib_screen1_module_v3_Server <- function(id, shared_values, switch_screen) {
       }
       
       if (input$level == "woreda" && !is.null(input$woreda)) {
-        message("7 Leaflet update observeEvent level = woreda, screen changed to: ", switch_screen())
+        message("S1. 7 Leaflet update observeEvent level = woreda, screen changed to: ", switch_screen())
         woreda_id <- df_woreda %>% filter(ADM3_EN == input$woreda) %>% pull(ADM3_EN)
         woreda_data <- vect_woreda %>% subset(vect_woreda$ADM3_EN == woreda_id)
         woreda_ext <- unlist(unname(as.vector(ext(woreda_data)))) # Extent of selected woreda as unnamed vector
@@ -335,12 +335,12 @@ bslib_screen1_module_v3_Server <- function(id, shared_values, switch_screen) {
     
     #8 observeEvent switch_screen() message----
     observeEvent(switch_screen(), {
-      message("8 switch_screen() observeEvent.Screen changed back to: ", switch_screen())
+      message("S1. 8 switch_screen() observeEvent.Screen changed to: ", switch_screen())
     })
     
     #9 observeEvent auto_reload ----
     observeEvent(input$auto_reload, {
-      message("9 input$auto_reload observeEvent")
+      message("S1. 9 input$auto_reload observeEvent")
       map <- leafletProxy(ns("base_map"), session) 
       map |> fitBounds(50, 51, 0, 1)
     })

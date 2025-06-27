@@ -48,11 +48,11 @@ bslib_screen2_module_v3_Server <- function(id, shared_values, switch_screen) {
     # output$value <- renderText({ input$aggregation })
     
     output$spatres_display <- renderText({
-      paste("Your spatial resolution is:", shared_values$resolution)
+      paste("S2. Your spatial resolution is:", shared_values$resolution)
     })
     
     output$aggregation_display <- renderText({
-      paste("Your aggregation level is:", shared_values$aggregation)
+      paste("S2. Your aggregation level is:", shared_values$aggregation)
     })
     #     
     # output$value_display <- renderText({
@@ -62,7 +62,7 @@ bslib_screen2_module_v3_Server <- function(id, shared_values, switch_screen) {
     
     output$level_display <- renderText({
       req(shared_values$level)
-      paste("You selected level on Screen 1:", shared_values$level)
+      paste("S2. You selected level on Screen 1:", shared_values$level)
     })
     
     output$selection_display <- renderText({
@@ -70,7 +70,7 @@ bslib_screen2_module_v3_Server <- function(id, shared_values, switch_screen) {
       
       if (shared_values$level == "woreda") {
         paste(
-          "You selected geography:",
+          "S2. You selected geography:",
           shared_values$selected_region,
           shared_values$selected_zone,
           shared_values$selected_woreda
@@ -78,16 +78,16 @@ bslib_screen2_module_v3_Server <- function(id, shared_values, switch_screen) {
       } else {
         if (shared_values$level == "zone") {
           paste(
-            "You selected geography:",
+            "S2. You selected geography:",
             shared_values$selected_region,
             shared_values$selected_zone
           )
         } else {
           if (shared_values$level == "region") {
-            paste("You selected geography:",
+            paste("S2. You selected geography:",
                   shared_values$selected_region)
           } else {
-            paste("You selected geography: Ethiopia")
+            paste("S2. You selected geography: Ethiopia")
           }
         }
       }
