@@ -4,7 +4,7 @@ library(tidyverse)
 library(shinylogs)
 library(shinyjs)
 library(data.table)
-#library(DT)
+library(DT)
 
 source("E:/repos/raise_fs/shiny/modules/bslib_screen1_module_v3.R")
 source("E:/repos/raise_fs/shiny/modules/bslib_screen2_module_v3.R")
@@ -12,6 +12,9 @@ source("E:/repos/raise_fs/shiny/modules/bslib_screen3_module_v3.R")
 source("E:/repos/raise_fs/shiny/modules/bslib_screen4_module_v3.R")
 source("E:/repos/raise_fs/shiny/modules/bslib_screen5_module_v3.R")
 source("E:/repos/raise_fs/shiny/modules/bslib_screen6_module_v3.R")
+source("E:/repos/raise_fs/shiny/modules/bslib_screen7_module_v3.R")
+source("E:/repos/raise_fs/shiny/modules/bslib_screen8_module_v3.R")
+
 
 ui <- fluidPage(
   
@@ -37,29 +40,6 @@ server <- function(input, output, session) {
   # )
   
   current_screen <- reactiveVal("screen1")
-  # shared_values <- reactiveValues(dropdown = NULL)
-  # 
-  # # save the geography
-  # shared_values <- reactiveValues(level = NULL)
-  # shared_values <- reactiveValues(selected_nation = NULL)
-  # shared_values <- reactiveValues(selected_region = NULL)
-  # shared_values <- reactiveValues(selected_zone = NULL)
-  # shared_values <- reactiveValues(selected_woreda = NULL)
-  # 
-  # # save the spatial resolution
-  # shared_values <- reactiveValues(resolution = NULL)
-  # shared_values <- reactiveValues(aggregation = NULL)
-  # 
-  # # save the innovation system
-  # shared_values <- reactiveValues(num_innovations = NULL)
-  # shared_values <- reactiveValues(innovation_system = NULL)
-  # 
-  # shared_values <- reactiveValues(forget = 0)
-  # 
-  # # save the innovation details
-  # shared_values <- reactiveValues(scenario_1 = "low labour")
-  # shared_values <- reactiveValues(crop_name_1 = "potato")
-  # shared_values <- reactiveValues(ideotype_1 = "cruiser")
 
   shared_values <- reactiveValues(
     # geography details
@@ -113,6 +93,10 @@ server <- function(input, output, session) {
       bslib_screen5_module_v3_SidebarUI("screen5", shared_values)
     } else if (current_screen() == "screen6") {
       bslib_screen6_module_v3_SidebarUI("screen6", shared_values)
+    } else if (current_screen() == "screen7") {
+      bslib_screen7_module_v3_SidebarUI("screen7", shared_values)
+    } else if (current_screen() == "screen8") {
+      bslib_screen8_module_v3_SidebarUI("screen8", shared_values)
     }
   })
   
@@ -129,6 +113,10 @@ server <- function(input, output, session) {
       bslib_screen5_module_v3_MainUI("screen5")
     } else if (current_screen() == "screen6") {
       bslib_screen6_module_v3_MainUI("screen6")
+    } else if (current_screen() == "screen7") {
+      bslib_screen7_module_v3_MainUI("screen7")
+    } else if (current_screen() == "screen8") {
+      bslib_screen8_module_v3_MainUI("screen8")
     }
   })
   
@@ -138,6 +126,8 @@ server <- function(input, output, session) {
   bslib_screen4_module_v3_Server("screen4", shared_values, switch_screen)
   bslib_screen5_module_v3_Server("screen5", shared_values, switch_screen)
   bslib_screen6_module_v3_Server("screen6", shared_values, switch_screen)  
+  bslib_screen7_module_v3_Server("screen7", shared_values, switch_screen)
+  bslib_screen8_module_v3_Server("screen8", shared_values, switch_screen)
 }
 
 shinyApp(ui, server)
