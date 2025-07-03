@@ -108,7 +108,6 @@ bslib_screen6_module_v3_Server <- function(id, shared_values, switch_screen) {
       
       # this has now been done in the previous screen but still needed for Ad
       
-       
        df_used_codes_req <- df_inn_requirements_mod |> dplyr::select("crit_code") |> dplyr::distinct()
        used_codes_req <- df_used_codes_req[["crit_code"]]
        df_used_codes_tree <- df_inn_tree_net |> dplyr::select("stack_code", "stack") |> dplyr::distinct()
@@ -228,18 +227,19 @@ bslib_screen6_module_v3_Server <- function(id, shared_values, switch_screen) {
       }
     })
     
-    observeEvent(input$conclusions_data_table_cell_edit, {
-      message("S6. str(input$editable_table_cell_edit)")
-      str(input$editable_table_cell_edit)
-    })
+    # observeEvent(input$conclusions_data_table_cell_edit, {
+    #   message("S6. str(input$editable_table_cell_edit)")
+    #   str(input$editable_table_cell_edit)
+    # })
     
     
     #observeEvent Update table on cell edit----
     observeEvent(input$conclusions_data_table_cell_edit, {
       info <- input$conclusions_data_table_cell_edit
       
+      
       message("S6. str(input$editable_table_cell_edit)")
-      str(input$editable_table_cell_edit)
+      str(info)
       
       dt <- copy(current_data())
       message("S6. 1 str(dt)")
@@ -259,9 +259,14 @@ bslib_screen6_module_v3_Server <- function(id, shared_values, switch_screen) {
         as(info$value, old_class)
       }, error = function(e) info$value)
       
+      message("S6. print(info$value)")
+      print(info$value)
+      message("S6. print(coerced_val)")
+      print(coerced_val)
+      
       dt[info$row, (colname) := coerced_val]
-      message("S6. 2 str(dt)")
-      str(dt)
+      message("S6. print(dt)")
+      print(dt)
       
       table_data(dt)
     })
@@ -328,11 +333,11 @@ bslib_screen6_module_v3_Server <- function(id, shared_values, switch_screen) {
       
       # save logic here
       
-      # overwrite and produce a new version of the requirements table
-      #df_inn_req_mod <- dt,df_inn_requirements
+      # saves the conc_table separately
       
-      
-        fwrite(dt, file = paste0(
+      fwrite(
+        dt,
+        file = paste0(
           "E:/repos/raise_fs/shiny/data/",
           shared_values$crop_name_1,
           "_",
@@ -340,7 +345,43 @@ bslib_screen6_module_v3_Server <- function(id, shared_values, switch_screen) {
           "_",
           shared_values$scenario_1,
           "_saved_conc_table.csv"
-        ))
+        )
+      )
+      
+      # overwrite and produce a new version of the requirements table
+      
+      df_inn_requirements_mod <- read.csv(
+        paste0(
+          "E:/repos/raise_fs/shiny/data/",
+          shared_values$crop_name_1,
+          "_",
+          shared_values$ideotype_1,
+          "_",
+          shared_values$scenario_1,
+          "_requirements_mod.csv"
+        )
+      )
+      
+      # saves the update requirements table separately      
+      #df_inn_requirements_mod_s6 <- merge(dt, df_inn_requirements_mod,  by = "crit_code")  # seems self-documenting
+      
+      df_inn_requirements_mod <- df_inn_requirements_mod |>
+        rows_update(dt, by = "crit_code")
+      
+      
+      fwrite(
+        df_inn_requirements_mod,
+        file = paste0(
+          "E:/repos/raise_fs/shiny/data/",
+          shared_values$crop_name_1,
+          "_",
+          shared_values$ideotype_1,
+          "_",
+          shared_values$scenario_1,
+          "_requirements_mod_s6.csv"
+        )
+      )
+        
         showModal(modalDialog(
           title = "Success",
           "Table saved successfully.",
