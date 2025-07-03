@@ -154,7 +154,7 @@ bslib_screen5_module_v3_Server <- function(id, shared_values, switch_screen) {
           shared_values$ideotype_1,
           "_",
           shared_values$scenario_1,
-          "_requirements.csv"
+          "_links.csv"
         )
       ) |> dplyr::select("crit_code") |> dplyr::distinct()
       used_codes <- df_used_codes[["crit_code"]]
@@ -349,18 +349,9 @@ bslib_screen5_module_v3_Server <- function(id, shared_values, switch_screen) {
     # observeEvent save button is clicked ----
     observeEvent(input$save_dyn_button, {
       
-      #message(paste("observeEvent: save_button  print(input$tree):"))
-      #print(input$tree)
       message("S5. str(input$tree)")
       print(str(input$tree))
       saved_tree <- input$tree  # Retrieve the current state from the input
-      
-      #message(paste("observeEvent: save_button  print(saved_tree):"))
-      #print(saved_tree)
-      
-      #message(paste("observeEvent: save_button  print(shared_values$current_tree):"))
-      #print(shared_values$current_tree)
-      
       
       if (!is.null(saved_tree)) {
         shared_values$current_tree <- saved_tree  # Update the reactive value
@@ -423,6 +414,8 @@ bslib_screen5_module_v3_Server <- function(id, shared_values, switch_screen) {
         #   print("Tree conversion failed.")
         # }
         
+        # export as a tree network
+        
         if (is.null(input$tree)) return()
         
         root_name <- names(input$tree)[1]
@@ -444,6 +437,87 @@ bslib_screen5_module_v3_Server <- function(id, shared_values, switch_screen) {
           "_",
           shared_values$scenario_1 ,
           "_saved_tree_network.csv"))
+        
+        
+        # join to original links csv file, overwrite but retain original weights----
+        df_inn_links_weight <- read.csv(paste0("E:/repos/raise_fs/shiny/data/",
+                                      shared_values$crop_name_1,
+                                      "_",
+                                      shared_values$ideotype_1,
+                                      "_",
+                                      shared_values$scenario_1,
+                                      "_links.csv")) |> dplyr::select("crit_code", "weight")
+        
+        df_inn_links_mod <- left_join(df_edges_code,
+                                      df_inn_links_weight,
+                                      by = c("crit_code"),
+                                      keep = F)
+        
+        write.csv(df_inn_links_mod, paste0(
+          "data/",
+          shared_values$crop_name_1,
+          "_",
+          shared_values$ideotype_1,
+          "_",
+          shared_values$scenario_1 ,
+          "_links_mod.csv"), row.names = F)
+        
+        df_inn_links_mod <- left_join(df_edges_code,
+                                      df_inn_links_weight,
+                                      by = c("crit_code"),
+                                      keep = F)
+        
+        write.csv(df_inn_links_mod, paste0(
+          "data/",
+          shared_values$crop_name_1,
+          "_",
+          shared_values$ideotype_1,
+          "_",
+          shared_values$scenario_1 ,
+          "_links_mod.csv"), row.names = F)
+        
+        # save the modified requirements----
+        # get the requirements 
+        
+        df_inn_requirements <- read.csv(
+          paste0(
+            "E:/repos/raise_fs/shiny/data/",
+            shared_values$crop_name_1,
+            "_",
+            shared_values$ideotype_1,
+            "_",
+            shared_values$scenario_1,
+            "_requirements.csv"
+          )
+        )
+
+        # expand df_inn_links_mod to get all stacks
+        codes1 <- dplyr::select(df_inn_links_mod, "crit_code", "criterion")
+        codes2 <- dplyr::select(df_inn_links_mod, "stack_code", "stack") |> rename("crit_code" = "stack_code") |> rename("criterion" = "stack")
+        codes3 <- rbind(codes1, codes2) |> dplyr::distinct() # gets distinct codes
+        
+        df_inn_requirements_updated <- left_join(
+          #dplyr::select(df_inn_links_mod, -c("stack_code", "stack", "weight")),
+          codes3,
+          dplyr::select(df_inn_requirements, -c("criterion")),
+          df_inn_requirements,
+          by = c("crit_code"),
+          keep = F)
+        
+        write.csv(
+          df_inn_requirements_updated,
+          paste0(
+            "data/",
+            shared_values$crop_name_1,
+            "_",
+            shared_values$ideotype_1,
+            "_",
+            shared_values$scenario_1 ,
+            "_requirements_mod.csv"
+          ),
+          row.names = F
+        )
+          
         
       }
     })
