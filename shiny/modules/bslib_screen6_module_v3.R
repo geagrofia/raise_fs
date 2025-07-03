@@ -34,27 +34,35 @@ bslib_screen6_module_v3_MainUI <- function(id) {
 
 bslib_screen6_module_v3_Server <- function(id, shared_values, switch_screen) {
   moduleServer(id, function(input, output, session) {
+    
     ns <- session$ns
     
     # Allowed values ----
-    allowed_values <- c("suboptimal", "optimal", "good", "moderate", "poor", "high", "low")
+    allowed_values <- c("suboptimal",
+                        "optimal",
+                        "good",
+                        "moderate",
+                        "poor",
+                        "high",
+                        "low")
     
-    # Load the initial data ----
+    # Load the initial data----
     initial_data <- reactive({
-      
       message(paste("S6. switch screen()", switch_screen()))
       
-      if (file.exists(paste0(
-        "E:/repos/raise_fs/shiny/data/",
-        shared_values$crop_name_1,
-        "_",
-        shared_values$ideotype_1,
-        "_",
-        shared_values$scenario_1,
-        "_saved_tree_network.csv"
-      ))) {
-      
-      message(
+      if (file.exists(
+        paste0(
+          "E:/repos/raise_fs/shiny/data/",
+          shared_values$crop_name_1,
+          "_",
+          shared_values$ideotype_1,
+          "_",
+          shared_values$scenario_1,
+          #"_saved_tree_network.csv"
+          "_links_mod.csv"
+        )
+      )) {
+        message(
         paste(
           "S6. Initiation. inn details1:",
           shared_values$crop_name_1,
@@ -72,15 +80,17 @@ bslib_screen6_module_v3_Server <- function(id, shared_values, switch_screen) {
           shared_values$ideotype_1,
           "_",
           shared_values$scenario_1,
-          "_saved_tree_network.csv"
+          #"_saved_tree_network.csv"
+          "_links_mod.csv"
         )
       )
       
       df_inn_tree_net_stack <- dplyr::select(df_inn_tree_net, "stack_code") |> distinct()
       print(str(df_inn_tree_net_stack))
+      message("S6. df_inn_tree_net_stack")
       print(df_inn_tree_net_stack)
       
-      df_inn_requirements <- read.csv(
+      df_inn_requirements_mod <- read.csv(
         paste0(
           "E:/repos/raise_fs/shiny/data/",
           shared_values$crop_name_1,
@@ -88,24 +98,27 @@ bslib_screen6_module_v3_Server <- function(id, shared_values, switch_screen) {
           shared_values$ideotype_1,
           "_",
           shared_values$scenario_1,
-          "_requirements.csv"
+          "_requirements_mod.csv"
         )
       )
-      
-      print(str(df_inn_requirements))
+      message("S6. df_inn_requirements_mod")
+      print(str(df_inn_requirements_mod))
       
       # add new rows to requirements based on tree network ----
       
-      df_used_codes_req <- df_inn_requirements |> dplyr::select("crit_code") |> dplyr::distinct()
-      used_codes_req <- df_used_codes_req[["crit_code"]]
-      df_used_codes_tree <- df_inn_tree_net |> dplyr::select("stack_code", "stack") |> dplyr::distinct()
-      used_codes_tree <- df_used_codes_tree[["stack_code"]]
+      # this has now been done in the previous screen but still needed for Ad
       
-      # Find codes in df_used_codes_tree that are not in df_used_codes_req
-      new_codes <- setdiff(used_codes_tree, used_codes_req)
-      
-      # if there are new codes ----
-      
+       
+       df_used_codes_req <- df_inn_requirements_mod |> dplyr::select("crit_code") |> dplyr::distinct()
+       used_codes_req <- df_used_codes_req[["crit_code"]]
+       df_used_codes_tree <- df_inn_tree_net |> dplyr::select("stack_code", "stack") |> dplyr::distinct()
+       used_codes_tree <- df_used_codes_tree[["stack_code"]]
+       
+      ## Find codes in df_used_codes_tree that are not in df_used_codes_req
+       new_codes <- setdiff(used_codes_tree, used_codes_req)
+       
+       # if there are new codes ----
+
       if (length(new_codes) > 0) {
         df_new_codes <- data.frame(crit_code = new_codes)
         df_new_codes_stackname <- left_join(df_new_codes,
@@ -113,7 +126,7 @@ bslib_screen6_module_v3_Server <- function(id, shared_values, switch_screen) {
                                             join_by(crit_code == stack_code))
         message("S6. df_new_codes_stackname")
         print(df_new_codes_stackname)
-        
+
         v_req_names <- c(
           "weight",
           "threshold_1",
@@ -139,21 +152,21 @@ bslib_screen6_module_v3_Server <- function(id, shared_values, switch_screen) {
           "prec_temp",
           "texture"
         )
-        
+
         df_new_codes_stackname[, v_req_names] <- NA
         message("S6. df_new_codes_stackname")
         print(df_new_codes_stackname)
-        
+
         #df_new_codes_stackname <- mutate(df_new_codes_stackname, criterion == stack)
         df_new_codes_stackname <- df_new_codes_stackname |> rename(criterion = stack)
         message("S6. df_new_codes_stackname")
         print(df_new_codes_stackname)
-        
-        # Append new rows to df_inn_requirements
-        df_inn_requirements_updated <- rbind(df_inn_requirements, df_new_codes_stackname)
+
+        # Append new rows to df_inn_requirements_mod
+        df_inn_requirements_updated <- rbind(df_inn_requirements_mod, df_new_codes_stackname)
       } else {
         # if there are no new codes ----
-        df_inn_requirements_updated <- df_inn_requirements
+        df_inn_requirements_updated <- df_inn_requirements_mod
       }
       
       df_inn_conc <- dplyr::left_join(
@@ -263,10 +276,13 @@ bslib_screen6_module_v3_Server <- function(id, shared_values, switch_screen) {
     })
     
     
-    # handle save----
+    # observeEvent Save button ----
     observeEvent(input$save_btn, {
       req(current_data())
       dt <- table_data()
+      message("S6. print(dt)")
+      print(dt)
+      
       
       # validate NAs 
       if (anyNA(dt$conc_level_1) || anyNA(dt$conc_level_2)) {
@@ -311,6 +327,11 @@ bslib_screen6_module_v3_Server <- function(id, shared_values, switch_screen) {
       
       
       # save logic here
+      
+      # overwrite and produce a new version of the requirements table
+      #df_inn_req_mod <- dt,df_inn_requirements
+      
+      
         fwrite(dt, file = paste0(
           "E:/repos/raise_fs/shiny/data/",
           shared_values$crop_name_1,
@@ -329,81 +350,11 @@ bslib_screen6_module_v3_Server <- function(id, shared_values, switch_screen) {
     })
     
     
-    # handle reset----
+    # observeEvent Reset button----
     observeEvent(input$reset_btn, {
       #req(initial_data())  # only proceed if non-NULL
       table_data(initial_data())
     })
-    
-    
-    
-    
-    
-    
-    
-    # 
-    # 
-    # #observeEvent Update table on cell edit----
-    # 
-    # observeEvent(input$conclusions_data_table_cell_edit, {
-    #   
-    #   print(str(input$conclusions_data_table_cell_edit))
-    #   
-    #   message(paste("observeEvent Update table on cell edit"))
-    #   info <- input$conclusions_data_table_cell_edit
-    #   print(str(info))
-    #   dt <- data.table::copy(as.data.table(conc_data()))  # Ensure reactivity
-    #   print(str(dt))
-    #   message(paste("is.data.table(dt) =", is.data.table(dt)))
-    #   
-    #   colname <- colnames(dt)[info$col]
-    #   message(paste("observeEvent Update table on cell edit - colname", (colname)))
-    #   row <- info$row
-    #   message(paste("observeEvent Update table on cell edit - row", row))
-    #   val <- info$value
-    #   message(paste("observeEvent Update table on cell edit - val", val))
-    #   
-    # 
-    #   dt[row, "conc_level_1" := val]
-    #   conc_data(as.data.frame(dt))
-    #   print(conc_data())
-    #   
-    # })
-    
-#     # render the buttons UI output ----
-#     output$dyanamic_save_reset <- renderUI({
-#       
-#       dt <- as.data.table(conc_data())
-#       message(paste("render the buttons UI output"))
-#       req(dt)
-#       
-#       
-#       # observe whether conclusions are filled to determine button visibility----
-#       target_column <- "conc_level_1"
-#       
-#       message(paste("dt[[target_column]]"))
-#       print(dt[[target_column]])
-#       
-#       
-# #      if (any(is.na(dt[[target_column]])) ||
-# #          any(dt[[target_column]] == "")) {
-# #        return(NULL)  # Don't render button if any NAs
-# #      }
-#       
-#       tagList(
-#         actionButton(ns("save_dyn_button"), "Save Changes / Re-load"),
-#         # Button to save changes
-#         actionButton(ns("reset_dyn_button"), "Reset to Original")
-#       ) # Button to reset to original
-#       
-#     })
-#     
-#     # Save action
-#     observeEvent(input$save_dyn_button, {
-#       showModal(modalDialog("Data saved successfully!", easyClose = TRUE))
-#       # Add your save logic here
-#     })
-    
     
     
     # _----

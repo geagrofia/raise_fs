@@ -53,93 +53,6 @@ bslib_screen5_module_v3_Server <- function(id, shared_values, switch_screen) {
     
     ns <- session$ns
     
-     # df_inn_req <- reactive(read.csv(paste0("E:/repos/raise_fs/shiny/data/", 
-     #                               shared_values$crop_name_1,
-     #                               "_",
-     #                               shared_values$ideotype_1,
-     #                               "_", 
-     #                               shared_values$scenario_1,
-     #                               "_links.csv")))
-    
-    #print(df_inn_req())
-    
-    # FROM IRM AUTOMATE - Return a logical vector indicating which cases are complete, i.e., have no missing values
-    # df_inn_complete <- reactive(df_inn_req()[complete.cases(df_inn_req()$crit_code, df_inn_req()$criterion), ])
-    # 
-    #print(df_inn_req())
-    
-    # df_short <- reactive(dplyr::select(df_inn_complete(), stack, criterion, weight))
-    
-    # Render the data table
-    # output$inn_req_data_table <- renderDT({
-    #   
-    #   # alternative
-    #   
-    #   df_inn_req <- read.csv(paste0("E:/repos/raise_fs/shiny/data/",
-    #                                          shared_values$crop_name_1,
-    #                                          "_",
-    #                                          shared_values$ideotype_1,
-    #                                          "_",
-    #                                          shared_values$scenario_1,
-    #                                          "_links.csv"))
-    #   
-    #   #print(df_inn_req())
-    #   
-    #   # FROM IRM AUTOMATE - Return a logical vector indicating which cases are complete, i.e., have no missing values
-    #   df_inn_complete <- df_inn_req[complete.cases(df_inn_req$crit_code, df_inn_req$criterion), ]
-    #   # # 
-    #   df_short <-  df_inn_complete |> dplyr::select("stack", "criterion", "weight")
-    #   # print(df_short)
-    #   
-    #   df_short$stack[is.na(df_short$stack)] <- "root2"
-    # 
-    #  
-    #  # Convert to tree
-    #  tree_plot <- FromDataFrameNetwork(df_short, c("weight"))
-    #  
-    #  # Add icon attributes to nodes
-    #  set_icons <- function(node) {
-    #    if (node$isLeaf) {
-    #      node$icon <- "map"  # data criteria
-    #    } else {
-    #      node$icon <- "layer-group"  # non-data criteria
-    #    }
-    #    for (child in node$children) {
-    #      set_icons(child)
-    #    }
-    #  }
-    #  set_icons(tree_plot)
-    # # 
-    # # 
-    # # 
-    # # # Convert to json for rendering
-    #  testjson <- treeToJSON(tree_plot)
-    #  
-    #  # Reactive value to hold the current tree structure
-    #  current_tree <- reactiveVal(testjson)
-    # # 
-    # # # Print the result
-    #  #print(testjson)
-    #   
-    #   datatable(
-    #     df_short,
-    #     rownames = F,
-    #     filter = "bottom",
-    #     selection = list(mode = "single"),
-    #     editable = FALSE#,
-    #     # options = list(
-    #     #   columnDefs = list(list(
-    #     #     visible = FALSE, targets = c(0) # hide the inn_ID
-    #     #   )),
-    #     #   lengthMenu = c(10, 20, 50, 100),
-    #     #   pageLength = 20,
-    #     #   order = list(list(1, 'asc'), list(2, 'asc'), list(3, 'asc'))
-    #     # )
-    #   )
-    # }, server = FALSE)
-    
-    #print(df_short())
-    
     # --- STEP 1: Recursive cleaner to convert 0 to list() and remove attrs ----
     clean_tree <- function(tree) {
       if (is.null(tree)) return(NULL)
@@ -175,44 +88,7 @@ bslib_screen5_module_v3_Server <- function(id, shared_values, switch_screen) {
       }
       return(edges)
     }
-    
-    # # gives NA values
-    # get_edges_with_codes <- function(node) {
-    #   edges <- list()
-    #   
-    #   from_code <- attr(node, "crit_code")
-    #   
-    #   for (child in node$children) {
-    #     to_code <- attr(child, "crit_code")
-    #     
-    #     edges[[length(edges) + 1]] <- data.frame(
-    #       from = node$name,
-    #       to = child$name,
-    #       from_code = if (!is.null(from_code)) from_code else NA,
-    #       to_code = if (!is.null(to_code)) to_code else NA,
-    #       stringsAsFactors = FALSE
-    #     )
-    #     
-    #     # Recurse on the child
-    #     child_edges <- get_edges_with_codes(child)
-    #     if (nrow(child_edges) > 0) {
-    #       edges[[length(edges) + 1]] <- child_edges
-    #     }
-    #   }
-    #   
-    #   # Combine all into a single data.frame
-    #   if (length(edges) > 0) {
-    #     do.call(rbind, edges)
-    #   } else {
-    #     data.frame(from = character(), to = character(),
-    #                from_code = character(), to_code = character(),
-    #                stringsAsFactors = FALSE)
-    #   }
-    # }
-    
-    
-    # 20/06/2025----
-    
+
     # Recursive function to build a data.tree Node from the shinyTree-style list
     build_tree <- function(name, node_data) {
       node <- Node$new(name)
