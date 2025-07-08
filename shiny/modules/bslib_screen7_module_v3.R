@@ -63,7 +63,7 @@ bslib_screen7_module_v3_Server <- function(id, shared_values, switch_screen) {
         shared_values$ideotype_1,
         "_",
         shared_values$scenario_1,
-        "_links_mod.csv"
+        "_links_s5.csv"
       ))) {
       
       message(
@@ -84,7 +84,7 @@ bslib_screen7_module_v3_Server <- function(id, shared_values, switch_screen) {
           shared_values$ideotype_1,
           "_",
           shared_values$scenario_1,
-          "_links_mod.csv"
+          "_links_s5.csv"
         )
       )
         
@@ -100,14 +100,14 @@ bslib_screen7_module_v3_Server <- function(id, shared_values, switch_screen) {
       #     shared_values$ideotype_1,
       #     "_",
       #     shared_values$scenario_1,
-      #     "_requirements_mod_s6.csv"
+      #     "_requirements_s6.csv"
       #   )
       # ))
       #   
       # {
-      #   message("S7. ..._requirements_mod_s6 file exists")
+      #   message("S7. ..._requirements_s6 file exists")
       #   
-      #   df_inn_requirements_mod_s6 <- read.csv(
+      #   df_inn_requirements_s6 <- read.csv(
       #     paste0(
       #       "E:/repos/raise_fs/shiny/data/",
       #       shared_values$crop_name_1,
@@ -115,18 +115,18 @@ bslib_screen7_module_v3_Server <- function(id, shared_values, switch_screen) {
       #       shared_values$ideotype_1,
       #       "_",
       #       shared_values$scenario_1,
-      #       "_requirements_mod_s6.csv"
+      #       "_requirements_s6.csv"
       #     )
       #   )
       # }
       # 
       # 
-      # message("S7. df_inn_requirements_mod_s6")
-      # print(str(df_inn_requirements_mod_s6))
+      # message("S7. df_inn_requirements_s6")
+      # print(str(df_inn_requirements_s6))
       # 
       # # add new rows to requirements based on tree network ----
       # 
-      # df_used_codes_req <- df_inn_requirements_mod_s6 |> dplyr::select("crit_code") |> dplyr::distinct()
+      # df_used_codes_req <- df_inn_requirements_s6 |> dplyr::select("crit_code") |> dplyr::distinct()
       # used_codes_req <- df_used_codes_req[["crit_code"]]
       # df_used_codes_tree <- df_inn_tree_net |> dplyr::select("stack_code", "stack") |> dplyr::distinct()
       # used_codes_tree <- df_used_codes_tree[["stack_code"]]
@@ -180,22 +180,22 @@ bslib_screen7_module_v3_Server <- function(id, shared_values, switch_screen) {
       #   print(df_new_codes_stackname)
       #   
       #   # Append new rows to df_inn_requirements
-      #   df_inn_requirements_mod_s6_updated <- rbind(df_inn_requirements_mod_s6, df_new_codes_stackname)
+      #   df_inn_requirements_s6_updated <- rbind(df_inn_requirements_s6, df_new_codes_stackname)
       # } else {
       #   # if there are no new codes ----
-      #   df_inn_requirements_mod_s6_updated <- df_inn_requirements_mod_s6
+      #   df_inn_requirements_s6_updated <- df_inn_requirements_s6
       # }
       # 
       # message("S7. df_inn_tree_net")
       # print(df_inn_tree_net)
       # 
-      # message("S7. df_inn_requirements_mod_s6_updated")
-      # print(df_inn_requirements_mod_s6_updated)
+      # message("S7. df_inn_requirements_s6_updated")
+      # print(df_inn_requirements_s6_updated)
       # 
       # 
       # df_inn_weight <- dplyr::left_join(
       #   df_inn_tree_net_stack,
-      #   df_inn_requirements_mod_s6_updated,
+      #   df_inn_requirements_s6_updated,
       #   join_by(stack_code == crit_code),
       #   keep = T
       # ) 
@@ -406,8 +406,8 @@ bslib_screen7_module_v3_Server <- function(id, shared_values, switch_screen) {
     })
     
     observeEvent(input$weights_data_table_cell_edit, {
-      message("S7. str(input$editable_table_cell_edit)")
-      str(input$editable_table_cell_edit)
+      message("S7. str(input$weights_data_table_cell_edit)")
+      str(input$weights_data_table_cell_edit)
     })
     
     
@@ -415,8 +415,8 @@ bslib_screen7_module_v3_Server <- function(id, shared_values, switch_screen) {
     observeEvent(input$weights_data_table_cell_edit, {
       info <- input$weights_data_table_cell_edit
       
-      message("S7. str(input$editable_table_cell_edit)")
-      str(input$editable_table_cell_edit)
+      message("S7. str(input$weights_data_table_cell_edit)")
+      str(input$weights_data_table_cell_edit)
       
       dt <- copy(current_weights_data())
       message("S7. 1 str(dt)")
@@ -457,7 +457,7 @@ bslib_screen7_module_v3_Server <- function(id, shared_values, switch_screen) {
       dt <- weights_table_data()
       
       problems <- list()
-      NA_weights <- NULL
+      NA_weights <- 0
       
       
       for (gid in unique(dt$group_id)) {
@@ -469,7 +469,7 @@ bslib_screen7_module_v3_Server <- function(id, shared_values, switch_screen) {
         if (is.na(group_sum)) {
           NA_weights <- 1
         } else {
-          if (group_sum < 0.9 || group_sum > 1.1) {
+          if (group_sum < 0.95 || group_sum > 1.05) {
             problems <- c(problems, sprintf("Group %s sums to %.2f", gid, group_sum))
           }
         }
@@ -478,6 +478,7 @@ bslib_screen7_module_v3_Server <- function(id, shared_values, switch_screen) {
       #if (anyNA(dt$weight)) {problems <- c(problems, sprintf("NAs", "gid", "group_sum"))}
       
       if (length(problems) > 0) {
+        removeModal()
         showModal(
           modalDialog(
             title = "Validation Error",
@@ -488,12 +489,16 @@ bslib_screen7_module_v3_Server <- function(id, shared_values, switch_screen) {
       } else  {
         
         if ( NA_weights == 1) { 
+          removeModal()
           showModal(
             modalDialog(
               title = "Check NAs",
               paste("Some rule bases have no weight values"),
               easyClose = TRUE)
             )
+          
+          NA_weights <- 0
+          
           }
       
     # save logic here
@@ -504,9 +509,44 @@ bslib_screen7_module_v3_Server <- function(id, shared_values, switch_screen) {
           shared_values$ideotype_1,
           "_",
           shared_values$scenario_1,
-          "_saved_weight_table.csv"
+          "_weights_s7.csv"
         ))
         
+        # overwrite and produce a new version of the requirements table
+        
+        df_inn_requirements_s6 <- read.csv(
+          paste0(
+            "E:/repos/raise_fs/shiny/data/",
+            shared_values$crop_name_1,
+            "_",
+            shared_values$ideotype_1,
+            "_",
+            shared_values$scenario_1,
+            "_requirements_s6.csv"
+          )
+        )
+        
+        # saves the update requirements table separately      
+        #df_inn_requirements_s6 <- merge(dt, df_inn_requirements_s5,  by = "crit_code")  # seems self-documenting
+        
+        df_inn_requirements_s7 <- df_inn_requirements_s6 |> 
+          rows_update(dplyr::select(dt, -c( "stack_code", "stack", "group_id")), by = "crit_code")
+        
+        
+        fwrite(
+          df_inn_requirements_s7,
+          file = paste0(
+            "E:/repos/raise_fs/shiny/data/",
+            shared_values$crop_name_1,
+            "_",
+            shared_values$ideotype_1,
+            "_",
+            shared_values$scenario_1,
+            "_requirements_s7.csv"
+          )
+        )
+        
+        removeModal()
         showModal(modalDialog(
           title = "Success",
           "Table saved successfully.",

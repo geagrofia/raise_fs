@@ -374,7 +374,7 @@ bslib_screen5_module_v3_Server <- function(id, shared_values, switch_screen) {
             shared_values$ideotype_1,
             "_",
             shared_values$scenario_1 ,
-            "_saved_tree.json"
+            "_tree_s5.json"
           ))
         
         write.csv(treeToDf(saved_tree), paste0(
@@ -384,7 +384,7 @@ bslib_screen5_module_v3_Server <- function(id, shared_values, switch_screen) {
           shared_values$ideotype_1,
           "_",
           shared_values$scenario_1 ,
-          "_saved_tree.csv"))
+          "_tree_s5.csv"))
         
         # # Step 1: Clean the tree (remove attrs, fix leaves)
         # cleaned <- clean_tree(input$tree)
@@ -436,7 +436,7 @@ bslib_screen5_module_v3_Server <- function(id, shared_values, switch_screen) {
           shared_values$ideotype_1,
           "_",
           shared_values$scenario_1 ,
-          "_saved_tree_network.csv"))
+          "_tree_network_s5.csv"))
         
         
         # join to original links csv file, overwrite but retain original weights----
@@ -448,33 +448,33 @@ bslib_screen5_module_v3_Server <- function(id, shared_values, switch_screen) {
                                       shared_values$scenario_1,
                                       "_links.csv")) |> dplyr::select("crit_code", "weight")
         
-        df_inn_links_mod <- left_join(df_edges_code,
+        df_inn_links_s5 <- left_join(df_edges_code,
                                       df_inn_links_weight,
                                       by = c("crit_code"),
                                       keep = F)
         
-        write.csv(df_inn_links_mod, paste0(
+        write.csv(df_inn_links_s5, paste0(
           "data/",
           shared_values$crop_name_1,
           "_",
           shared_values$ideotype_1,
           "_",
           shared_values$scenario_1 ,
-          "_links_mod.csv"), row.names = F)
+          "_links_s5.csv"), row.names = F)
         
-        df_inn_links_mod <- left_join(df_edges_code,
+        df_inn_links_s5 <- left_join(df_edges_code,
                                       df_inn_links_weight,
                                       by = c("crit_code"),
                                       keep = F)
         
-        write.csv(df_inn_links_mod, paste0(
+        write.csv(df_inn_links_s5, paste0(
           "data/",
           shared_values$crop_name_1,
           "_",
           shared_values$ideotype_1,
           "_",
           shared_values$scenario_1 ,
-          "_links_mod.csv"), row.names = F)
+          "_links_s5.csv"), row.names = F)
         
         # save the modified requirements----
         # get the requirements 
@@ -491,13 +491,13 @@ bslib_screen5_module_v3_Server <- function(id, shared_values, switch_screen) {
           )
         )
 
-        # expand df_inn_links_mod to get all stacks
-        codes1 <- dplyr::select(df_inn_links_mod, "crit_code", "criterion")
-        codes2 <- dplyr::select(df_inn_links_mod, "stack_code", "stack") |> rename("crit_code" = "stack_code") |> rename("criterion" = "stack")
+        # expand df_inn_links_s5 to get all stacks
+        codes1 <- dplyr::select(df_inn_links_s5, "crit_code", "criterion")
+        codes2 <- dplyr::select(df_inn_links_s5, "stack_code", "stack") |> rename("crit_code" = "stack_code") |> rename("criterion" = "stack")
         codes3 <- rbind(codes1, codes2) |> dplyr::distinct() # gets distinct codes
         
         df_inn_requirements_updated <- left_join(
-          #dplyr::select(df_inn_links_mod, -c("stack_code", "stack", "weight")),
+          #dplyr::select(df_inn_links_s5, -c("stack_code", "stack", "weight")),
           codes3,
           dplyr::select(df_inn_requirements, -c("criterion")),
           df_inn_requirements,
@@ -513,7 +513,7 @@ bslib_screen5_module_v3_Server <- function(id, shared_values, switch_screen) {
             shared_values$ideotype_1,
             "_",
             shared_values$scenario_1 ,
-            "_requirements_mod.csv"
+            "_requirements_s5.csv"
           ),
           row.names = F
         )
