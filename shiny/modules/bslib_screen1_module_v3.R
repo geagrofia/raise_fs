@@ -62,7 +62,7 @@ bslib_screen1_module_v3_Server <- function(id, shared_values, switch_screen) {
     
     #0 ---- Render initial map ----
     output$base_map <- renderLeaflet({
-      message("0 output$base_map")
+      message("S1. 0 output$base_map")
       
       req(switch_screen())
       #req(switch_screen() == "screen2")
@@ -78,7 +78,7 @@ bslib_screen1_module_v3_Server <- function(id, shared_values, switch_screen) {
     #0 ----Update region dropdown UI----
     output$region_ui <- renderUI({
       if (input$level %in% c("region", "zone", "woreda")) {
-        message("0 output$region_ui")
+        message("S1. 0 output$region_ui")
         selectInput(ns("region"), "Region:",
                     choices = unique(df_region$ADM1_EN), 
                     #selected = isolate(input$region))
@@ -90,7 +90,7 @@ bslib_screen1_module_v3_Server <- function(id, shared_values, switch_screen) {
     output$zone_ui <- renderUI({
       req(input$level %in% c("zone", "woreda"))
       req(input$region)
-      message("0 output$zone_ui")
+      message("S1. 0 output$zone_ui")
       filtered_zones <- unique(df_zone$ADM2_EN[df_zone$ADM1_EN == input$region])
       selectInput(ns("zone"), "Zone:",
         choices = filtered_zones,
@@ -280,7 +280,7 @@ bslib_screen1_module_v3_Server <- function(id, shared_values, switch_screen) {
       if (input$level == "zone")   shared_values$selected_zone <- input$zone
       if (input$level == "woreda") shared_values$selected_woreda <- input$woreda
       
-      message("6 observe level")
+      message("S1. 6 observe level")
       
     })
 
