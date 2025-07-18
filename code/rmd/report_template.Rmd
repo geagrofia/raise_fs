@@ -1,0 +1,991 @@
+---
+title: Hierarchies of criteria in IRM
+author: ""
+date: "`r Sys.Date()`"
+output:
+  html_document:  
+    code_folding: "hide"
+    theme: united
+    number_sections: no
+    toc: yes
+    toc_float: true
+    toc_depth: 6
+    css: js/style.css
+params:
+  INT: NULL
+  SYS: NULL
+  Agg: NULL
+  MASK: NULL
+  EXT: NULL
+  DIVCODEVAR: NULL
+  DIVCODEVAL: NULL
+  DIVNAMEVAR: NULL
+  SUBDIVNAMEVAR: NULL
+  INN1: NULL
+  RES1: NULL
+  SOS1: NULL
+  FAOCLASS1: NULL
+  LIMITS1: NULL
+  CONCCLASS1: NULL
+  TRIAD1: Adoption
+  TRIBA1: Aptitude
+  TRISE1: Feasible
+  INN2: NULL
+  RES2: NULL
+  SOS2: NULL
+  FAOCLASS2: NULL
+  LIMITS2: NULL
+  CONCCLASS2: NULL
+  TRIAD2: Adoption
+  TRIBA2: Aptitude
+  TRISE2: Feasible
+---
+
+```{r}
+# sets the style for the output
+```
+
+<style>
+pre {
+  overflow-x: auto;
+}
+pre code {
+  word-wrap: normal;
+  white-space: pre;
+}
+
+div.INN { background-color:#e6f0ff; border-radius: 5px; padding: 10px; font-size: 200%;  color: orange;}
+div.Agg { background-color:#e6f0ff; border-radius: 5px; padding: 10px; font-size: 150%;  color: orange;}
+
+</style>
+
+<script src="js/hideOutput.js"></script>
+
+```{r parameter_description, echo=FALSE, message=FALSE, warning=FALSE}
+
+# The parameters above are set to NA here, but when this rmd script is run from the shiny app then the parameters are passed with values.
+
+# The first four parameters are general: 
+
+# INT defines whether interface provides the parameter values - any value other than NA passed from the interface will tell this rmd script to use all parameters. The interface passes a value of 1 automatically.
+
+# SYS is only relevant when more than one innovation is being tested. It sets whether the system is an intercrop, a comparison between crops or a rotation. Allowed values are "comparison","intercrop" and  "rotation"
+
+# Agg defines the aggregation factor. This can be set above in the header with an integer value, or can be passed from the interface. The larger the aggregation factor the quicker the computation. The minimum value is 1.
+
+# MASK defines the spatial resolution of the mask in metres
+
+# EXT defines the extent of the general modelling usually a country - this is used to load the division dataset
+
+# LOC defines the location of the model - this is a division name within the EXT dataset
+
+# The following parameters are specific to each innovation: 
+
+# INN denotes the innovation, this is a unique code for each location/innovation and is used to locate the data and parameters that are used in IRM
+
+# SOS sets whether the season onset is spatially defined. If so, SOS has a value of 1 and the start of the growing period is set using a raster rather than the value in the growth stage csv file. Otherwise SOS is 0.
+
+# RES defines whether 3-class adoption (2 class aptitude), or FAO style 5-class adoption (5-class aptitude with added maps on the limitations) or both classes are computed. Computing both classes will increase the time to run the script!
+
+#A value of 1 will only compute the 3-class suitability maps. A value of 2 will only compute the 5-class suitability map. A value of 3 will compute both suitability class maps. Other classified maps will be shown but only require a re-classification of the other results.
+
+# TRIAD is the field name used for the triangulation points for Adoption
+
+# TRIBA is the field name used for the triangulation points for Biophysical Aptitude
+
+# TRISE is the field name used for the triangulation points for Socio-economic Feasibility
+
+# SUBDIV is the field name used to identify the subdivision polygons
+
+# FAOCLASS defines how many levels in the hierarchy of rule bases to produce classified FAO maps
+
+# LIMITS defines how many levels in the hierarchy of rule bases to produce classified limitation maps
+
+
+```
+
+```{r folding_outputs_chunks, echo=FALSE, message=FALSE, warning=FALSE}
+
+# Folding outputs chunks
+
+# hideOutput.js and style.css courtesy of Martin Schmelzer https://stackoverflow.com/users/1777111/martin-schmelzer
+# https://stackoverflow.com/questions/37755037/how-to-add-code-folding-to-output-chunks-in-rmarkdown-html-documents
+ 
+
+```
+
+```{r setup, include=FALSE, echo=FALSE, message=FALSE, warning=FALSE}
+
+# initialisation
+
+library(dplyr)
+library(tidyr)
+library(data.tree)
+library(knitr)
+library(kableExtra)
+library(here)
+library(irm)
+library(fuZR)
+library(sf)
+library(terra)
+library(stringr)
+library(purrr)
+library(tidyterra)
+library(tidyverse)
+library(scales)
+library(tinytex)
+library(ggplot2)
+library(conflicted)
+library(leaflet)
+library(tibble)
+library(sf)
+library(widgetframe)
+library(patchwork)
+library(here)
+library(DiagrammeR)
+library(lava)
+library(svgPanZoom)
+library(scales)
+library(lubridate)
+
+```
+
+```{r initialise, echo=FALSE, message=FALSE, warning=FALSE}
+
+r_filename <- function(filename) {
+  here::here("code/r/", filename)
+}
+
+source(r_filename("irm_functions.R"))
+
+
+#set (chunk) options - figure path is necessary to avoid an error message
+opts_chunk$set(
+  comment = NA,
+  dpi = 96,
+  echo = FALSE,
+  fig.path = paste0("figures/", params$INN1,"/"),
+  warning = FALSE,
+  cache = FALSE,
+  include = TRUE
+)
+
+options(width = 250, dplyr.width = 120)
+
+knitr::knit_hooks$set(time_it = local({
+  now <- NULL
+  function(before, options) {
+    if (before) {
+      # record the current time before each chunk
+      now <<- Sys.time()
+    } else {
+      # calculate the time difference after a chunk
+      res <- difftime(Sys.time(), now, units = "secs")
+      # return a character string to show the time
+      paste("Time for the chunk",
+            options$label,
+            "to run:",
+            round(res,
+                  2),
+            "seconds")
+    }
+  }
+}))
+
+```
+
+```{r general_parameters, echo=FALSE, message=FALSE, warning=FALSE, results='asis'}
+
+
+
+
+cat("\n\n# General Parameters\n\n")
+
+
+cat("<div class='INN'>")
+cat("\nGeography DIVCODEVAR =", params$DIVCODEVAR, "\n")
+cat("\nGeography DIVCODEVAL =", params$DIVCODEVAL, "\n")
+cat("\nGeography DIVNAMEVAR =", params$DIVNAMEVAR, "\n")
+cat("\nGeography SUBDIVNAMEVAR =", params$SUBDIVNAMEVAR, "\n\n")
+
+
+cat("\nSystem =", params$SYS, "\n\n")
+cat("</div>")
+
+cat("<div class='Agg'>")
+cat("Mask Resolution =", params$MASK)
+cat("\n\nSpatial Aggregation =", params$Agg)
+cat("\n\nFilename: ", knitr::current_input(dir = TRUE))
+cat("</div>")
+
+```
+
+```{r i1_innovation_parameters, echo=FALSE, message=FALSE, warning=FALSE, results='asis'}
+
+cat("\n\n# First Innovation\n\n")
+cat("<div class='INN'>")
+cat("Innovation name =", params$INN1)
+cat("</div>")
+cat("<div class='Agg'>")
+cat("\n\nSpatially Dynamic Growing Season = ", params$SOS1)
+cat("</div>")
+
+
+
+
+# season onset non-spatial?
+# this enables the script to skip the non relevant chunks when using console
+
+if (params$SOS1 != 1){
+    nonsos_crit_i1 <- TRUE
+} else {nonsos_crit_i1 <- FALSE}
+
+# season onset spatial?
+if (params$SOS1 == 1){
+    sos_crit_i1 <- TRUE
+} else {sos_crit_i1 <- FALSE}
+
+```
+
+
+# Basic Settings
+
+## Critera Parameters
+
+Here we load most of the parameters used in the IRM model. These parameters are stored in an external text file, in comma separated format (.csv). 
+
+The parameters include the criteria names, the rule base stack which they contribute to, and information to construct the rule bases.
+
+The lowest level rule bases will have a spatial data source, with threshold values, and where relevant their weights. These criteria will have information about the propositions _and_ conclusions that are used to construct the rule base.
+
+Higher level rule bases are combinations of the lower level criteria and do not have associated spatial data, but will often have weights. These criteria will only have information about the conclusions that are used to construct the rule base - the propositions are derived from the lower level rule bases.
+
+The file will also contain information about how to aggregate and resample the spatial data, whether the data are for soil texture, precipitation or temperature, whether the criterion contributes to the yield estimation, the temporal resolution of any climate data, and a code used for mapping the limitations.
+
+
+The criteria are organised hierarchically and can be displayed as a table and in a graphical diagram.  
+
+
+```{r i1_load_criteria}
+
+lower_filename_i1 <-
+  as.character(paste(
+    "E:/repos/raise_fs/shiny/data/",
+    params$INN1,
+    "_requirements_s10.csv",
+    sep = ""
+  ))
+
+df_lower_i1 <-
+  read.csv(lower_filename_i1, na.strings = c("NA",""))
+
+str(df_lower_i1)
+
+links_filename_i1 <-
+  as.character(paste(
+    "E:/repos/raise_fs/shiny/data/",
+    params$INN1,
+    "_links_s5.csv",
+    sep = ""
+  ))
+
+df_links_i1 <-
+  read.csv(links_filename_i1, na.strings = c("NA",""))
+
+str(df_links_i1)
+
+df_requirements_i1 <- dplyr::left_join(df_lower_i1, dplyr::select(df_links_i1, "stack_code",	"stack","crit_code"), by = c("crit_code"))
+
+df_requirements_i1 <- df_requirements_i1 |> relocate("stack", .before = "crit_code") |> relocate("stack_code", .before = "stack")
+
+str(df_requirements_i1)
+
+```
+
+## Check that the parameters file has been corrctly formatted
+
+```{r i1_check_criteria}
+
+# check that proposition names are not repeated
+
+# Find the rows where any two of prop_level_1, prop_level_2, and prop_level_3 have the same values
+matching_rows <- which(df_requirements_i1$prop_level_1 == df_requirements_i1$prop_level_2 | df_requirements_i1$prop_level_1 == df_requirements_i1$prop_level_3 | df_requirements_i1$prop_level_2 == df_requirements_i1$prop_level_3)
+
+## Output the rows where any two columns have matching values
+if (length(matching_rows) > 0) {
+  stop("Rows with matching values in any two of prop_level_1, prop_level_2, and prop_level_3:", matching_rows)
+
+} else {
+  print("No matching values found in any two columns of prop_level_1, prop_level_2, and prop_level_3")
+}
+
+
+# check that the number of propositions is consistent with the number of thresholds
+
+# Find the rows where threshold has a value but prop_level_1 or prop_level_2 is NA (or missing)
+invalid_rows <- which((is.na(df_requirements_i1$prop_level_1) | is.na(df_requirements_i1$prop_level_2)) & !is.na(df_requirements_i1$threshold_1))
+
+## Output the rows where where threshold_1 has a value but prop_level_1 or prop_level_2 is NA (or missing)
+if (length(invalid_rows) > 0) {
+  stop("Rows where threshold_1 has a value but prop_level_1 or prop_level_2 do not:", invalid_rows)
+} else {
+  print("All rows with values in threshold_1 also have values in prop_level_1 and prop_level_2")
+}
+
+# Find the rows where threshold_2 has a value but prop_level_2 or prop_level_3 is NA (or missing)
+invalid_rows <- which((is.na(df_requirements_i1$prop_level_3) | is.na(df_requirements_i1$prop_level_2)) & !is.na(df_requirements_i1$threshold_2))
+
+## Output the rows where where threshold_2 has a value but prop_level_2 or prop_level_3 is NA (or missing)
+if (length(invalid_rows) > 0) {
+  stop("Rows where threshold_2 has a value but prop_level_2 or prop_level_3 do not:", invalid_rows)
+} else {
+  print("All rows with values in threshold_2 also have values in prop_level_2 and prop_level_3")
+}
+
+# check the threshold widths
+
+# Find the rows where there are two thresholds and where either of the boundary widths is too large h
+
+# Boundary widths overlap
+
+invalid_rows <- which(!is.na(df_requirements_i1$threshold_2) &
+                        ((df_requirements_i1$threshold_1 + (df_requirements_i1$width_1 / 2)) > (df_requirements_i1$threshold_2 - (df_requirements_i1$width_2 /2))
+                        )) 
+
+## Output the rows where where threshold_2 has a value and boundary widths overlap)
+if (length(invalid_rows) > 0) {
+  stop("Rows where boundary widths overlap:", df_requirements_i1[invalid_rows,4])
+} else {
+  print("No rows with values in threshold_2 have overlapping boundary widths")
+}
+
+
+# Check that all rows with values in prop_level_1 have a value in conclusion_1
+
+prop_1_conc_1_NA_rows <- which(!is.na(df_requirements_i1$prop_level_1)  & is.na(df_requirements_i1$conclusion_1))
+
+# Output the rows where where prop_level_1 has a value and conclusion_1 is NA)
+if (length(prop_1_conc_1_NA_rows) > 0) {
+  stop("Rows where prop_level_1 has a value and conclusion_1 is NA:", df_requirements_i1[prop_1_conc_1_NA_rows,4])
+} else {
+  print("All rows with values in prop_level_1 have a value in conclusion_1")
+}
+
+#Check that all rows with values in prop_level_2 have a value in conclusion_2
+
+prop_2_conc_2_NA_rows <- which(!is.na(df_requirements_i1$prop_level_2)  & is.na(df_requirements_i1$conclusion_2))
+
+# Output the rows where where prop_level_2 has a value and conclusion_2 is NA)
+if (length(prop_2_conc_2_NA_rows) > 0) {
+  stop("Rows where prop_level_2 has a value and conclusion_2 is NA:", df_requirements_i1[prop_2_conc_2_NA_rows,4])
+} else {
+  print("All rows with values in prop_level_2 have a value in conclusion_2")
+}
+
+#Check that all rows with values in prop_level_3 have a value in conclusion_3
+
+prop_3_conc_3_NA_rows <- which(!is.na(df_requirements_i1$prop_level_3)  & is.na(df_requirements_i1$conclusion_3))
+
+# Output the rows where where prop_level_3 has a value and conclusion_3 is NA)
+if (length(prop_3_conc_3_NA_rows) > 0) {
+  stop("Rows where prop_level_3 has a value and conclusion_3 is NA:", df_requirements_i1[prop_3_conc_3_NA_rows,4])
+} else {
+  print("All rows with values in prop_level_3 have a value in conclusion_3")
+}
+
+```
+
+
+```{r i1_create_tree}
+# remove any rows without data in the crit_code or criterion
+
+df_requirements_i1 <- df_requirements_i1[complete.cases(df_requirements_i1$crit_code, df_requirements_i1$criterion), ]
+
+
+df_requirements_short_i1 <-
+  df_requirements_i1 %>% dplyr::select(stack, criterion, weight, threshold_1, threshold_2,	width_1,	width_2)
+
+
+df_requirements_short_i1$stack[is.na(df_requirements_short_i1$stack)] <-
+  "root2"
+
+# Convert to tree
+tree_plot_i1 <- FromDataFrameNetwork(df_requirements_short_i1, c("weight", "threshold_1",	"threshold_2",	"width_1",	"width_2"
+))
+
+# Display the tree
+print(tree_plot_i1, "weight", "threshold_1",	"threshold_2",	"width_1",	"width_2", "level") %>% kable(digits = 3, caption = "Hierarchies") %>% kable_styling("striped", full_width = T) %>%  row_spec(0, angle = -45) %>%  scroll_box(height = "500px")
+
+```
+
+
+```{r i1_get_hierarchy, results='asis' }
+## Get the tree hierarchy for plotting
+
+tree_max_level_i1 <- max(tree_plot_i1$Get('level')) - 1
+cat("\n\nNumber of hierarchy levels", tree_max_level_i1, "\n\n")
+
+hierarchies_new_i1 <- ToDataFrameTree(
+  tree_plot_i1,
+  level1 = function(x)
+    x$path[2],
+  level2 = function(x)
+    x$path[3],
+  level3 = function(x)
+    x$path[4],
+  level4 = function(x)
+    x$path[5],
+  level5 = function(x)
+    x$path[6],
+  level6 = function(x)
+    x$path[7],
+  level7 = function(x)
+    x$path[8],
+  
+  level_number = function(x)
+    x$level - 1
+  
+)[-1, -1]
+
+# Display the df
+#hierarchies_new %>% kable(digits = 3, caption = "Hierarchies") %>% kable_styling("striped", full_width = T) %>%  row_spec(0, angle = -45) %>%  scroll_box(height = "500px")
+
+```
+
+## Lower level rule bases with spatial data
+
+```{r i1_get_leaves, results='asis', out.width="100%" }
+
+n_leaves_i1 <- tree_plot_i1$leafCount
+df_leaves_i1 <- ToDataFrameTypeCol(tree_plot_i1)
+
+df_leaves_criterion_i1 <- as.data.frame( df_leaves_i1[cbind(seq(nrow(df_leaves_i1)), max.col(!is.na(df_leaves_i1), ties.method = 'last'))])
+names(df_leaves_criterion_i1) <- c("criterion")
+  
+df_leaves_i1 %>% dplyr::select(- level_1) %>% kable(digits = 3, caption = "Criteria with spatial data") %>% kable_styling("striped", full_width = T) %>%  scroll_box(height = "500px")
+
+```
+
+## Rule base hierarchy diagram
+
+```{r i1_plot_hierarchy_diagram, results='asis', out.width="100%" }
+# 
+SetGraphStyle(
+  tree_plot_i1,
+  rankdir = "RL",
+  overlap = "scalexy",
+  fontsize = 400,
+  fontname = "Calibri",
+  label = paste("Rule bases for",params$INN1),
+  labelloc = "t",
+  ranksep = 1
+)
+
+SetNodeStyle(
+  tree_plot_i1,
+  shape = "box",
+  fontsize = 200,
+  fontname = "Helvetica",
+  fontcolor = "black",
+  fixedsize = "false",
+  color = "DarkOliveGreen4",
+  fillcolor = "OliveDrab2",
+  style = "filled,rounded",
+  penwidth = 10,
+  tooltip = GetDefaultTooltip
+)
+
+SetEdgeStyle(
+  tree_plot_i1,
+  arrowhead = "none",
+  color = "blue",
+  penwidth = function(node) (node$weight * 50),
+  dir = "back",
+  label = function(node) paste("weight = :",node$weight),
+  fontsize = 150,
+  fontcolor = "blue"
+)
+
+level1 <- Traverse(tree_plot_i1, filterFun = function(x) x$level == 1)
+
+Do(level1, function(node)
+  SetEdgeStyle(
+    node,
+    inherit = FALSE,
+    arrowhead = "none",
+    color = "white",
+    penwidth = function(node)
+      (node$weight * 50),
+    dir = "back",
+    label = function(node)
+      paste("weight = :", node$weight),
+    fontsize = 150,
+    fontcolor = "white"
+  ))
+
+Do(level1, function(node)
+  SetNodeStyle(
+    node,
+    inherit = FALSE,
+    shape = "oval",
+    fixedsize = "false",
+    width = 0.9,
+    color = "white",
+    fillcolor = "white",
+    fontsize = 1,
+    fontname = "Helvetica",
+    fontcolor = "white",
+    style = "filled"
+  ))
+
+level2 <- Traverse(tree_plot_i1, filterFun = function(x) x$level == 2)
+
+Do(level2, function(node)
+  SetNodeStyle(
+    node,
+    inherit = FALSE,
+    shape = "oval",
+    fixedsize = "false",
+    width = 0.9,
+    color = "lightblue",
+    fillcolor = "darkgreen",
+    fontsize = 200,
+    fontname = "Helvetica",
+    fontcolor = "white",
+    style = "filled",
+    tooltip = GetDefaultTooltip
+  ))
+
+Do(level2, function(node)
+  SetEdgeStyle(
+    node,
+    inherit = FALSE,
+    arrowhead = "none",
+    color = "white",
+    penwidth = function(node)
+      (node$weight * 50),
+    dir = "back",
+    label = function(node)
+      paste("weight = :", node$weight),
+    fontsize = 150,
+    fontcolor = "white",
+    tooltip = GetDefaultTooltip
+  ))
+
+level3 <- Traverse(tree_plot_i1, filterFun = function(x) x$level == 3)
+
+Do(level3, function(node)
+ SetEdgeStyle(
+  node,
+  inherit = TRUE,
+  arrowhead = "none",
+  color = "blue",
+  penwidth = function(node) (node$weight * 50),
+  dir = "back",
+  label = function(node) paste("weight = :",node$weight),
+  fontsize = 150,
+  fontcolor = "blue",
+  tooltip = GetDefaultTooltip
+))
+
+Do(level3, function(node)
+  SetNodeStyle(
+    node,
+    inherit = TRUE,
+    shape = "oval",
+    fixedsize = "false",
+    width = 0.9,
+    color = "lightblue",
+    fillcolor = "blue",
+    fontsize = 200,
+    fontname = "Helvetica",
+    fontcolor = "white",
+    style = "filled",
+    tooltip = GetDefaultTooltip
+  ))
+
+Do(tree_plot_i1$leaves, function(node)
+  SetNodeStyle(
+    node,
+    shape = "box",
+    fontsize = 200,
+    fontname = "Helvetica",
+    fontcolor = "black",
+    fixedsize = "false",
+    color = "DarkOliveGreen4",
+    fillcolor = "OliveDrab2",
+    style = "filled,rounded",
+    penwidth = 10,
+    tooltip = GetDefaultTooltip
+  ))
+
+Do(tree_plot_i1$leaves, function(node)
+  SetEdgeStyle(
+  node,
+  arrowhead = "none",
+  color = "blue",
+  penwidth = function(node) (node$weight * 50),
+  dir = "back",
+  label = function(node) paste("weight = :",node$weight),
+  fontsize = 150,
+  fontcolor = "blue",
+  tooltip = GetDefaultTooltip
+))
+
+plot(tree_plot_i1)
+
+```
+
+```{r i1_criteria_codes}
+
+df_requirements_short_i1 <-
+  df_requirements_i1 %>% dplyr::select(stack_code, crit_code, weight, threshold_1, threshold_2,	width_1,	width_2)
+
+
+df_requirements_short_i1$stack_code[is.na(df_requirements_short_i1$stack_code)] <-
+  "root2"
+
+# Convert to tree
+tree_new_i1 <- FromDataFrameNetwork(df_requirements_short_i1, c("weight", "threshold_1",	"threshold_2",	"width_1",	"width_2"
+))
+
+# Display the tree
+#print(tree_new, "weight", "threshold_1",	"threshold_2",	"width_1",	"width_2", "level")
+
+```
+
+```{r i1_criteria_codes_get_hierarchy}
+## Get the tree hierarchy
+
+tree_max_level_i1 <- max(tree_new_i1$Get('level')) - 1
+#cat("\n\nNumber of levels", tree_max_level, "\n\n")
+
+hierarchies_new_i1 <- ToDataFrameTree(
+  tree_new_i1,
+  level1 = function(x)
+    x$path[2],
+  level2 = function(x)
+    x$path[3],
+  level3 = function(x)
+    x$path[4],
+  level4 = function(x)
+    x$path[5],
+  level5 = function(x)
+    x$path[6],
+  level6 = function(x)
+    x$path[7],
+  level7 = function(x)
+    x$path[8],
+  
+  level_number = function(x)
+    x$level - 1
+  
+)[-1, -1]
+
+# Display the df
+# hierarchies_new %>% kable(digits = 3, caption = "Hierarchies") %>% kable_styling("striped", full_width = T) %>%  row_spec(0, angle = -45) %>%  scroll_box(height = "500px")
+
+```
+
+```{r i1_criteria_codes_get_leaves}
+## Get the tree leaves
+
+n_leaves_i1 <- tree_new_i1$leafCount
+df_leaves_i1 <- ToDataFrameTypeCol(tree_new_i1)
+
+df_leaves_criterion_i1 <- as.data.frame( df_leaves_i1[cbind(seq(nrow(df_leaves_i1)), max.col(!is.na(df_leaves_i1), ties.method = 'last'))])
+names(df_leaves_criterion_i1) <- c("crit_code")
+  
+```
+
+# Load Spatial Data
+
+Here we load all the spatial data. The data are used in different chunks below but it is easier to modify file names if all the spatial data are imported in the same chunk.
+
+## Vector Data
+
+The vector data include the sub-divisions of the area that is being modelled, and triangulation points if available.
+
+The vector data are not projected and in geojson format. Here they are loaded and projected to the working crs.
+
+<div class="fold o">   
+```{r i1_spatialdataload_vector_01, cache = FALSE, out.width="100%", include = TRUE, echo=FALSE}
+
+wkt_geo <-  paste0( "
+  GEOGCRS[\"WGS 84 (with axis order normalized for visualization)\",
+          ENSEMBLE[\"World Geodetic System 1984 ensemble\",
+                   MEMBER[\"World Geodetic System 1984 (Transit)\",
+                          ID[\"EPSG\",1166]],
+                   MEMBER[\"World Geodetic System 1984 (G730)\",
+                          ID[\"EPSG\",1152]],
+                   MEMBER[\"World Geodetic System 1984 (G873)\",
+                          ID[\"EPSG\",1153]],
+                   MEMBER[\"World Geodetic System 1984 (G1150)\",
+                          ID[\"EPSG\",1154]],
+                   MEMBER[\"World Geodetic System 1984 (G1674)\",
+                          ID[\"EPSG\",1155]],
+                   MEMBER[\"World Geodetic System 1984 (G1762)\",
+                          ID[\"EPSG\",1156]],
+                   MEMBER[\"World Geodetic System 1984 (G2139)\",
+                          ID[\"EPSG\",1309]],
+                   ELLIPSOID[\"WGS 84\",6378137,298.257223563,
+                             LENGTHUNIT[\"metre\",1],
+                             ID[\"EPSG\",7030]],
+                   ENSEMBLEACCURACY[2.0],
+                   ID[\"EPSG\",6326]],
+          PRIMEM[\"Greenwich\",0,
+                 ANGLEUNIT[\"degree\",0.0174532925199433],
+                 ID[\"EPSG\",8901]],
+          CS[ellipsoidal,2],
+          AXIS[\"geodetic longitude (Lon)\",east,
+               ORDER[1],
+               ANGLEUNIT[\"degree\",0.0174532925199433,
+                         ID[\"EPSG\",9122]]],
+          AXIS[\"geodetic latitude (Lat)\",north,
+               ORDER[2],
+               ANGLEUNIT[\"degree\",0.0174532925199433,
+                         ID[\"EPSG\",9122]]],
+          USAGE[
+            SCOPE[\"Horizontal component of 3D system.\"],
+            AREA[\"World.\"],
+            BBOX[-90,-180,90,180]],
+          REMARK[\"Axis order reversed compared to EPSG:4326\"]]")
+
+# load the divsions extent
+vect_ext_i1 <- load_vector_data(paste0("admin_", params$EXT))
+
+# select the location to be modelled
+vect_subdiv_i1 <- select_location(vect_ext_i1, params$DIVCODEVAR, params$DIVCODEVAL)
+
+vect_subdiv_i1$ID <- seq.int(nrow(vect_subdiv_i1))# add an id field
+vect_subdiv_i1$id <- formatC(vect_subdiv_i1$ID, width = 2, format = "d", flag = "0") #format the id field
+
+df_subdiv_area_i1 <- as.data.frame(expanse(vect_subdiv_i1, unit="ha"))
+df_subdiv_area_i1 <- cbind(df_subdiv_area_i1, as.data.frame(vect_subdiv_i1)$ID)
+names(df_subdiv_area_i1) <- c("ha","ID")
+#names(df_subdiv_area) <- c("ha")
+max_area_i1 <- max(df_subdiv_area_i1)
+ 
+ 
+vect_subdiv_extent_i1 <- ext(vect_subdiv_i1) # get the extent
+nudge_xval_i1 <-
+  ((vect_subdiv_extent_i1[2] - vect_subdiv_extent_i1[1]) / (nrow(vect_subdiv_i1) * 2.5))
+nudge_yval_i1 <-
+  ((vect_subdiv_extent_i1[4] - vect_subdiv_extent_i1[3]) / (nrow(vect_subdiv_i1) * 2.5))
+
+vect_subdiv_pt_i1 <- centroids(vect_subdiv_i1)
+expr <- paste0("vect_subdiv_pt_i1$", params$SUBDIVNAMEVAR)
+vect_subdiv_pt_i1$subdiv_label <- paste(vect_subdiv_pt_i1$id, "=", eval(parse(text=(expr))))
+vect_subdiv_pt_i1$subdiv_label <- factor(vect_subdiv_pt_i1$subdiv_label)
+
+g_i1 <- ggplot()
+gsubdiv_i1 <- add_subdiv_plot(g_i1, vect_subdiv_i1, vect_subdiv_pt_i1, nudge_xval_i1, nudge_yval_i1)
+gsubdiv_i1
+
+```
+</div>
+
+<div class="fold o">   
+```{r i1_spatialdataload_vector_02, cache = FALSE, out.width="100%", include = TRUE, echo=FALSE}
+
+vect_triangulation_i1 <- load_vector_data( paste0("triangulation_", params$DIVCODEVAL,"_", params$INN1))
+
+vect_triangulation_i1$ID <- seq.int(nrow(vect_triangulation_i1))# add an id field
+vect_triangulation_i1$id <- formatC(vect_triangulation_i1$ID, width = 2, format = "d", flag = "0") #format the id field
+
+vect_triangulation_extent_i1 <- ext(vect_triangulation_i1) # get the extent
+nudge_xvaltri_i1 <-
+  ((vect_triangulation_extent_i1[2] - vect_triangulation_extent_i1[1]) /  (nrow(vect_triangulation_i1) * 2.5))
+#cat("nudge_xvaltri =", nudge_xvaltri)
+nudge_yvaltri_i1 <-
+  ((vect_triangulation_extent_i1[4] - vect_triangulation_extent_i1[3]) /  (nrow(vect_triangulation_i1) * 2.5))
+#cat("nudge_yvaltri =", nudge_yvaltri)
+
+
+if (!is.na(params$TRIAD1)) {
+  expr <- paste0("vect_triangulation_i1$", params$TRIAD1)
+  vect_triangulation_i1$tri_label_ad <-
+    paste(vect_triangulation_i1$id, "=", eval(parse(text = (expr))))
+  vect_triangulation_i1$tri_label_ad <-
+    factor(vect_triangulation_i1$tri_label_ad)
+  g_ad_i1 <- ggplot() +
+      labs(title = paste("\nAdoption Triangulation Points - ", params$INN1))
+  gtriangulation_ad_i1 <- add_triangulation_plot_no_labels_ad(g_ad_i1, vect_triangulation_i1)
+  gtriangulation_ad_i1 <- add_subdiv_simple_plot(gtriangulation_ad_i1, vect_subdiv_i1)
+  gtriangulation_ad_i1
+}
+
+if (!is.na(params$TRIBA1)) {
+  expr <- paste0("vect_triangulation_i1$", params$TRIBA1)
+  vect_triangulation_i1$tri_label_ba <-
+    paste(vect_triangulation_i1$id, "=", eval(parse(text = (expr))))
+  vect_triangulation_i1$tri_label_ba <-
+    factor(vect_triangulation_i1$tri_label_ba)
+  g_ba_i1 <- ggplot() +
+      labs(title = paste("\nBiophysical Aptitude\nTriangulation Points - ", params$INN1))
+  gtriangulation_ba_i1 <- add_triangulation_plot_no_labels_ba(g_ba_i1, vect_triangulation_i1)
+  gtriangulation_ba_i1 <- add_subdiv_simple_plot(gtriangulation_ba_i1, vect_subdiv_i1)
+  gtriangulation_ba_i1
+}
+
+if (!is.na(params$TRISE1)) {
+  expr <- paste0("vect_triangulation_i1$", params$TRISE1)
+  vect_triangulation_i1$tri_label_se <-
+    paste(vect_triangulation_i1$id, "=", eval(parse(text = (expr))))
+  vect_triangulation_i1$tri_label_se <-
+    factor(vect_triangulation_i1$tri_label_se)
+  g_se_i1 <- ggplot() +
+      labs(title = paste("\nSocio-economic Feasibility\nTriangulation Points - ", params$INN1))
+  gtriangulation_se_i1 <- add_triangulation_plot_no_labels_se(g_se_i1, vect_triangulation_i1)
+  gtriangulation_se_i1 <- add_subdiv_simple_plot(gtriangulation_se_i1, vect_subdiv_i1)
+  gtriangulation_se_i1
+}
+
+```
+</div>
+
+
+## Raster Data
+
+The raster spatial data are loaded first.
+Only the mask need be in the working crs.
+
+<div class="fold o">   
+```{r i1_spatialdataload_raster_01, results='asis', warning=FALSE}
+
+# set the working crs using WKT arguments
+
+wkt_lam <-  paste0(
+    "PROJCRS[\"unknown\",
+    BASEGEOGCRS[\"unknown\",
+        DATUM[\"World Geodetic System 1984\",
+            ELLIPSOID[\"WGS 84\",6378137,298.257223563,
+                LENGTHUNIT[\"metre\",1]],
+            ID[\"EPSG\",6326]],
+        PRIMEM[\"Greenwich\",0,
+            ANGLEUNIT[\"degree\",0.0174532925199433],
+            ID[\"EPSG\",8901]]],
+    CONVERSION[\"unknown\",
+        METHOD[\"Lambert Azimuthal Equal Area\",
+            ID[\"EPSG\",9820]],
+        PARAMETER[\"Latitude of natural origin\",",
+vect_subdiv_extent_i1[3],
+    ",ANGLEUNIT[\"degree\",0.0174532925199433],
+            ID[\"EPSG\",8801]],
+        PARAMETER[\"Longitude of natural origin\",",
+vect_subdiv_extent_i1[1],
+    ",ANGLEUNIT[\"degree\",0.0174532925199433],
+            ID[\"EPSG\",8802]],
+        PARAMETER[\"False easting\",1000000,
+            LENGTHUNIT[\"metre\",1],
+            ID[\"EPSG\",8806]],
+        PARAMETER[\"False northing\",1000000,
+            LENGTHUNIT[\"metre\",1],
+            ID[\"EPSG\",8807]]],
+    CS[Cartesian,2],
+        AXIS[\"(E)\",east,
+            ORDER[1],
+            LENGTHUNIT[\"metre\",1,
+                ID[\"EPSG\",9001]]],
+        AXIS[\"(N)\",north,
+            ORDER[2],
+            LENGTHUNIT[\"metre\",1,
+                ID[\"EPSG\",9001]]]]"
+  )
+
+
+# project the country boundary to LAM
+
+vect_subdiv_proj_i1 <-  project(vect_subdiv_i1, wkt_lam)
+vect_subdiv_proj_extent_i1 <- terra::ext(vect_subdiv_proj_i1)
+
+# make a basic raster with dimensions with 100m resolution 
+# and projected crs 
+
+rast_subdiv_mask_proj_extent_i1 <- rast(crs = wkt_lam, extent = vect_subdiv_proj_extent_i1, resolution = params$MASK, vals=c(1))
+
+# make the mask based on the country boundary
+
+rast_subdiv_mask_proj_i1 <- terra::rasterize(
+      vect_subdiv_proj_i1,
+      rast_subdiv_mask_proj_extent_i1,
+      field = 1,
+      background = NA, 
+      touches = T
+    ) 
+
+
+# subset the priorities dataframe to keep only the records that have distinct raster data files
+
+df_raster_data_i1 <- droplevels(distinct(df_requirements_i1,
+                                      data_file_prefix,
+                                      .keep_all = T)) %>% drop_na(data_file_prefix)
+
+
+# for each record in the df_raster_data data frame use the data file prefix and the raster or brick variable to load the raster data, the name of the raster is generated automatically from the data file name
+# these rasters needn't have the same crs as the working crs but must have the crs in the metadata (e.g. geotiff format)
+
+for (i in seq(from = 1,
+              to = nrow(df_raster_data_i1),
+              by = 1)) {
+  assign(
+    paste0("rast_", df_raster_data_i1[i, 12]),
+    load_raster_data(
+      as.character(df_raster_data_i1[i, 12]),
+      paste0("rast_", df_raster_data_i1[i, 12])
+    )
+  )
+  cat(paste0("\n **rast_", df_raster_data_i1[i, 12], "** :\n"))
+  print(get(paste0(
+    "rast_", df_raster_data_i1[i, 12]
+  )))
+  cat(paste0("\n"))
+}
+
+
+```
+</div>
+
+
+# Common spatial resolution and extent
+
+## Mask
+
+Let's start with creating a 'mask', _i.e._, a raster map of the area of interest (1 = area to be modelled, NA = ignored). 
+
+The properties of this map are shown below:
+
+<div class="fold o">  
+```{r i1_mask_make_plot, cache = TRUE, cache.whatever=params$Agg, out.width="100%", warning=FALSE, results='asis'}
+
+if (params$Agg == 1){rast_mask_proj_i1 <- rast_subdiv_mask_proj_i1 } else {
+  rast_mask_proj_i1 <- aggregate(rast_subdiv_mask_proj_i1, fact = params$Agg, na.rm=TRUE)}
+
+rast_mask_proj_filename_i1 <-
+  paste0("spatial_data/input/rast_mask_proj_i1.tif")
+
+writeRaster(rast_mask_proj_i1,
+            here(rast_mask_proj_filename_i1),
+            overwrite = TRUE)
+
+res_rast_mask_proj_comma_i1 <- scales::label_comma(accuracy = NULL)(res(rast_mask_proj_i1))
+
+g_i1 <- base_raster_plot(rast_mask_proj_i1, "layer", 'red', 'blue', paste0("Aggregated mask - Resolution = ", res_rast_mask_proj_comma_i1, "m"))
+
+gsubdivsimple_i1 <- add_subdiv_simple_plot(g_i1, vect_subdiv_i1)
+gsubdivsimple_i1
+
+```
+</div>
+
+A factor is calculated to determine the area of each raster cell in hectares.
+
+```{r i1_mask_area, cache = FALSE, warning=FALSE, results='asis' }
+
+Stat_factor_ha_i1 <- ((xres(rast_mask_proj_i1)^2) / 10000) # factor used for statistical calculations divides the area of a raster cell (in m2) by 10000 to give the area of the cell in hectares
+
+Stat_factor_ha_comma_i1 <- scales::label_comma(accuracy = NULL)(Stat_factor_ha_i1)
+
+cat(paste(Stat_factor_ha_comma_i1, "hectares in each cell"))
+
+```
