@@ -12,6 +12,8 @@ bslib_screen10_module_v3_SidebarUI <- function(id, shared_values) {
   )
 }
 
+
+
 bslib_screen10_module_v3_MainUI <- function(id) {
   ns <- NS(id)
   tagList(
@@ -528,7 +530,38 @@ bslib_screen10_module_v3_Server <- function(id, shared_values, switch_screen) {
         }
       } 
       
-      # (11) yield code must be allowed by database protocol
+      # (11) add columns to growth stages table if precipitation or temperature criteria are specific to growth stages 
+      
+      # get growth stages
+      message("S10. growth stages")
+      p_gs_codes <- c()
+      t_gs_codes <- c()
+      
+      # 
+      for (i in 1:nrow(dt)) {
+        pattern <- dt[i, 11]
+        
+        if ((pattern == "p")) {
+          p_gs_codes <- c(p_gs_codes, dt[i, 9] )}
+        if ((pattern == "t")) {
+          t_gs_codes <- c(t_gs_codes, dt[i, 9] )}
+        }
+      
+      # add variables to growth stages table
+      df_gs_s10 <- mutate(df_gs_s9, prec_criteria = ifelse(gs_name %in% p_gs_codes, 1, 0), temp_criteria = ifelse(gs_name %in% t_gs_codes, 1, 0))
+      
+      message("S10. df_gs_s10")
+      print(str(df_gs_s10))
+      
+      # save growth stages table
+      fwrite(
+        df_gs_s10, file = paste0(
+          "E:/repos/raise_fs/shiny/data/", shared_values$crop_name_1, "_", shared_values$ideotype_1, "_", shared_values$scenario_1, "_gs_s10.csv"
+        )
+      )
+      
+      
+      # (12) yield code must be allowed by database protocol
       
       allowed_yield <- c(
         "NA",
@@ -599,7 +632,6 @@ bslib_screen10_module_v3_Server <- function(id, shared_values, switch_screen) {
       
       df_inn_requirements_s10 <- df_inn_requirements_s8 |>
         rows_update(dplyr::select(dt, -c("group_id")), by = "crit_code")
-      
       
       fwrite(
         df_inn_requirements_s10, file = paste0(
