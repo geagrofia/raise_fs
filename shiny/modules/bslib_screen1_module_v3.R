@@ -51,14 +51,14 @@ bslib_screen1_module_v3_Server <- function(id, shared_values, switch_screen) {
     vect_nation <- terra::vect("E:/repos/raise_fs/shiny/data/eth_nation.geojson")
     df_nation <- as.data.frame(vect_nation)
     
-    vect_region <- vect("E:/repos/raise_fs/shiny/data/eth_region.geojson")
+    vect_region <- vect("E:/repos/raise_fs/shiny/data/admin_Ethiopia_region.geojson")
     df_region <- as.data.frame(vect_region)
     
-    vect_zone <- vect("E:/repos/raise_fs/shiny/data/eth_zone_2.geojson")
-    df_zone <- as.data.frame(vect_zone)[, c("ADM2_EN", "ADM1_EN")]
+    vect_zone <- vect("E:/repos/raise_fs/shiny/data/admin_Ethiopia_zone.geojson")
+    df_zone <- as.data.frame(vect_zone)[, c("ADM2_EN", "ADM1_EN", "ADM2_CODE", "ADM1_CODE")]
     
-    vect_woreda <- vect("E:/repos/raise_fs/shiny/data/eth_woreda.geojson")
-    df_woreda <- as.data.frame(vect_woreda)[, c("ADM3_EN", "ADM2_EN")]
+    vect_woreda <- vect("E:/repos/raise_fs/shiny/data/admin_Ethiopia_woreda.geojson")
+    df_woreda <- as.data.frame(vect_woreda)[, c("ADM3_EN", "ADM2_EN", "ADM2_CODE", "ADM3_CODE")]
     
     #0 ---- Render initial map ----
     output$base_map <- renderLeaflet({
@@ -203,7 +203,7 @@ bslib_screen1_module_v3_Server <- function(id, shared_values, switch_screen) {
       
       if (input$level == "region" && !is.null(input$region)) {
         message("S1. 1 Leaflet update observe: region")
-        region_id <- df_region |> filter(ADM1_EN == input$region) |> pull(ADM1_EN)
+        region_id <- df_region |> dplyr::filter(ADM1_EN == input$region) |> pull(ADM1_EN)
         region_data <- vect_region |> subset(vect_region$ADM1_EN == region_id)
         region_ext <- unlist(unname(as.vector(ext(region_data)))) # Extent of selected region as unnamed vector
         map |>
@@ -213,7 +213,7 @@ bslib_screen1_module_v3_Server <- function(id, shared_values, switch_screen) {
       
       if (input$level == "zone" && !is.null(input$zone)) {
         message("S1. 1 Leaflet update observe: zone")
-        zone_id <- df_zone %>% filter(ADM2_EN == input$zone) %>% pull(ADM2_EN)
+        zone_id <- df_zone %>% dplyr::filter(ADM2_EN == input$zone) %>% pull(ADM2_EN)
         zone_data <- vect_zone %>% subset(vect_zone$ADM2_EN == zone_id)
         zone_ext <- unlist(unname(as.vector(ext(zone_data)))) # Extent of selected zone as unnamed vector
         map %>%
@@ -223,7 +223,7 @@ bslib_screen1_module_v3_Server <- function(id, shared_values, switch_screen) {
       
       if (input$level == "woreda" && !is.null(input$woreda)) {
         message("S1. 1 Leaflet update observe: woreda")
-        woreda_id <- df_woreda %>% filter(ADM3_EN == input$woreda) %>% pull(ADM3_EN)
+        woreda_id <- df_woreda %>% dplyr::filter(ADM3_EN == input$woreda) %>% pull(ADM3_EN)
         woreda_data <- vect_woreda %>% subset(vect_woreda$ADM3_EN == woreda_id)
         woreda_ext <- unlist(unname(as.vector(ext(woreda_data)))) # Extent of selected woreda as unnamed vector
         map %>%
@@ -275,10 +275,47 @@ bslib_screen1_module_v3_Server <- function(id, shared_values, switch_screen) {
     #6 observe Store selected value in shared reactiveValues (optional) ----
     observe({
       req(input$level)
-      if (input$level == "nation") shared_values$selected_nation <- "Ethiopia"
-      if (input$level == "region") shared_values$selected_region <- input$region
-      if (input$level == "zone")   shared_values$selected_zone <- input$zone
-      if (input$level == "woreda") shared_values$selected_woreda <- input$woreda
+      if (input$level == "nation") {
+        
+      shared_values$selected_nation <- "Ethiopia"
+      shared_values$DIVCODEVAR <- "ADM0_CODE"
+      shared_values$DIVCODEVAL <- "ET"
+      shared_values$DIVNAMEVAR <- "ADM0_EN"
+      shared_values$SUBDIVNAMEVAR <- "ADM1_EN"
+      }
+      
+      if (input$level == "region") {
+      req(input$region)  
+      shared_values$selected_region <- input$region
+      shared_values$DIVCODEVAR <- "ADM1_CODE"
+      shared_values$DIVCODEVAL <- dplyr::filter(df_region, ADM1_EN == input$region) |> pull(ADM1_CODE)
+      message("S1. shared_values$DIVCODEVAL")
+      print(shared_values$DIVCODEVAL)
+      shared_values$DIVNAMEVAR <- "ADM1_EN"
+      shared_values$SUBDIVNAMEVAR <- "ADM2_EN"
+      }
+      
+      if (input$level == "zone")   {
+      req(input$zone)   
+      shared_values$selected_zone <- input$zone
+      shared_values$DIVCODEVAR <- "ADM2_CODE"
+      shared_values$DIVCODEVAL <- dplyr::filter(df_zone, ADM2_EN == input$zone) |> pull(ADM2_CODE)
+      message("S1. shared_values$DIVCODEVAL")
+      print(shared_values$DIVCODEVAL)
+      shared_values$DIVNAMEVAR <- "ADM2_EN"
+      shared_values$SUBDIVNAMEVAR <- "ADM3_EN"
+      }
+      
+      if (input$level == "woreda") {
+      req(input$woreda)     
+      shared_values$selected_woreda <- input$woreda
+      shared_values$DIVCODEVAR <- "ADM3_CODE"
+      shared_values$DIVCODEVAL <- dplyr::filter(df_woreda, ADM3_EN == input$woreda) |> pull(ADM3_CODE)
+      message("S1. shared_values$DIVCODEVAL")
+      print(shared_values$DIVCODEVAL)
+      shared_values$DIVNAMEVAR <- "ADM3_EN"
+      shared_values$SUBDIVNAMEVAR <- "ADM4_EN"
+      }
       
       message("S1. 6 observe level")
       
