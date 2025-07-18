@@ -16,6 +16,7 @@ source("E:/repos/raise_fs/shiny/modules/bslib_screen7_module_v3.R")
 source("E:/repos/raise_fs/shiny/modules/bslib_screen8_module_v3.R")
 source("E:/repos/raise_fs/shiny/modules/bslib_screen9_module_v3.R")
 source("E:/repos/raise_fs/shiny/modules/bslib_screen10_module_v3.R")
+source("E:/repos/raise_fs/shiny/modules/bslib_screen11_module_v3.R")
 
 ui <- fluidPage(
   
@@ -102,6 +103,8 @@ server <- function(input, output, session) {
       bslib_screen9_module_v3_SidebarUI("screen9", shared_values)
     } else if (current_screen() == "screen10") {
       bslib_screen10_module_v3_SidebarUI("screen10", shared_values)
+    } else if (current_screen() == "screen11") {
+      bslib_screen11_module_v3_SidebarUI("screen11", shared_values)
     }
   })
   
@@ -126,6 +129,8 @@ server <- function(input, output, session) {
       bslib_screen9_module_v3_MainUI("screen9")
     } else if (current_screen() == "screen10") {
       bslib_screen10_module_v3_MainUI("screen10")
+    } else if (current_screen() == "screen11") {
+      bslib_screen11_module_v3_MainUI("screen11")
     }
   })
   
@@ -138,7 +143,8 @@ server <- function(input, output, session) {
   bslib_screen7_module_v3_Server("screen7", shared_values, switch_screen)
   bslib_screen8_module_v3_Server("screen8", shared_values, switch_screen)
   bslib_screen9_module_v3_Server("screen9", shared_values, switch_screen) 
-  bslib_screen10_module_v3_Server("screen10", shared_values, switch_screen)   
+  bslib_screen10_module_v3_Server("screen10", shared_values, switch_screen)
+  bslib_screen11_module_v3_Server("screen11", shared_values, switch_screen)
 }
 
 shinyApp(ui, server)
