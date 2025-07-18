@@ -89,6 +89,17 @@ bslib_screen5_module_v3_Server <- function(id, shared_values, switch_screen) {
       return(edges)
     }
 
+    # Recursive function to find the maximum depth of a shinytree object----
+    get_tree_depth <- function(node) {
+      if (!is.list(node)) return(1)
+      if (!"children" %in% names(node)) return(1)
+      
+      children <- node$children
+      if (!is.list(children)) return(1)
+      
+      return(1 + max(sapply(children, get_tree_depth)))
+    }
+    
     # Recursive function to build a data.tree Node from the shinyTree-style list
     build_tree <- function(name, node_data) {
       node <- Node$new(name)
@@ -310,6 +321,13 @@ bslib_screen5_module_v3_Server <- function(id, shared_values, switch_screen) {
       }
       set_icons(tree_plot)
       
+      # If tree_data is a list of top-level nodes, apply the function to each
+      max_depth <- max(sapply(tree_plot, get_tree_depth))
+      
+      # Now max_depth holds the number of hierarchical levels
+      message("tree_plot max_depth")
+      
+      print(max_depth)
       # 
       # 
       # 
