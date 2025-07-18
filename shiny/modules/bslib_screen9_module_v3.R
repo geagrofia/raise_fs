@@ -8,6 +8,8 @@ bslib_screen9_module_v3_SidebarUI <- function(id, shared_values) {
   
   tagList(
     h3("Growth Stages, Soil and Yield:"),
+    checkboxInput(ns("sos1"), "Spatially Dynamic Growing Season Map", value = FALSE),
+    numericInput(ns("sowdate1"), "Sowing Day Number (1-365)", value = 190),
     # UI actionButtons screen navigation ----
     actionButton(ns("back_to_screen8"), "Back to Screen 8"),
     actionButton(ns("to_screen10"), "Go to Screen 10")
@@ -390,6 +392,30 @@ bslib_screen9_module_v3_Server <- function(id, shared_values, switch_screen) {
     
     # _----
     
+    # observe parameters ----
+    observe({
+      message("S9. observe parameters")
+      shared_values$sos1 <- ifelse(input$sos1, 1, 0)
+      
+      # shared_values$limitsclass1 <- input$limitsclass1
+      # shared_values$concclass1 <- input$concclass1
+      
+      message("S9. observe parameters")
+      print(shared_values$sos1)
+      
+      # print(shared_values$limitsclass1)
+      # print(shared_values$concclass1)
+    })
+    
+    observeEvent(input$sos1, {
+      message("S9. observeEvent parameters")
+      shared_values$sowdate1 <- ifelse(input$sos1, NA, input$sowdate1)
+      message("S9. observeEvent parameters")
+      print(shared_values$sowdate1)
+    })
+    
+    # _----
+    
     #observeEvent add row button growth_stages_table ----
     observeEvent(input$add_btn, {
       new_row <- data.frame(
@@ -461,19 +487,14 @@ bslib_screen9_module_v3_Server <- function(id, shared_values, switch_screen) {
       i <- info_gs$row
       j <- info_gs$col
       
-      message("S9. info_gs$col")
-      print(info_gs$col)
-      
-      message("S9. info_gs$col")
-      print(info_gs$col)
-      
       dt_gs <- copy(current_growth_stages_data())
       
       colname_gs <- names(dt_gs)[j + 1]  # adjust for 0-based to 1-based
       
-      # Prevent editing 'gs_length' of the total row
-      if (dt_gs$gs_name[i] == "total" && colname_gs == "gs_length") {
-        showNotification("Cannot edit 'total' row amount.", type = "error")
+           # Prevent editing 'gs_length' of the total row
+      if (dt_gs$gs_name[i] == "total" && (colname_gs == "gs_length" | colname_gs == "gs_name")) {
+        message("S9. if TRUE")
+        showNotification("Cannot edit 'total' row", type = "error")
         return()
       }
       
@@ -656,6 +677,10 @@ bslib_screen9_module_v3_Server <- function(id, shared_values, switch_screen) {
         dt_gs <- rbind(non_total, total_row)
         growth_stages_data_table_data(dt_gs)
         
+        # add sow date to the top row
+        dt_gs <- mutate(dt_gs, gs_day = NA)
+        dt_sow_date <- data.table(gs_name = c("sow_date"), gs_day = c(ifelse(shared_values$sos1==1, 0, input$sowdate1)), gs_length = NA, gs_source = c("User"))
+        dt_gs <- rbind(dt_sow_date, dt_gs)
         
         # overwrite and produce a new version of the gs table
         
@@ -1024,44 +1049,44 @@ bslib_screen9_module_v3_Server <- function(id, shared_values, switch_screen) {
     })
     
     output$crop_1_display <- renderText({
-      message(paste("S10. crop details:", shared_values$crop_name_1))
+      message(paste("S9. crop details:", shared_values$crop_name_1))
       req(shared_values$crop_name_1)
-      paste("S10. You selected crop on Screen 4:",
+      paste("S9. You selected crop on Screen 4:",
             shared_values$crop_name_1)
     })
     
     
     output$ideotype_1_display <- renderText({
-      message(paste("S10. ideotype details:", shared_values$ideotype_1))
+      message(paste("S9. ideotype details:", shared_values$ideotype_1))
       req(shared_values$ideotype_1)
-      paste("S10. You selected ideotype on Screen 4:",
+      paste("S9. You selected ideotype on Screen 4:",
             shared_values$ideotype_1)
     })
     
     
     output$scenario_1_display <- renderText({
-      message(paste("S10. scenario details:", shared_values$scenario_1))
+      message(paste("S9. scenario details:", shared_values$scenario_1))
       req(shared_values$scenario_1)
-      paste("S10. You selected scenario on Screen 4:",
+      paste("S9. You selected scenario on Screen 4:",
             shared_values$scenario_1)
     })
     
     
     output$inn_type_1_display <- renderText({
-      message(paste("S10. Innovation type:", shared_values$inn_type_1))
+      message(paste("S9. Innovation type:", shared_values$inn_type_1))
       req(shared_values$inn_type_1)
-      paste("S10. You selected Innovation type on Screen 4:",
+      paste("S9. You selected Innovation type on Screen 4:",
             shared_values$inn_type_1)
     })
     
     # _ navigation----
     
-    # observeEvent back_to_screen9 ----
+    # observeEvent back_to_screen98 ----
     observeEvent(input$back_to_screen8, {
       switch_screen("screen8")
     })
     
-    # observeEvent to_screen11 ----
+    # observeEvent to_screen10 ----
     observeEvent(input$to_screen10, {
       switch_screen("screen10")
       
