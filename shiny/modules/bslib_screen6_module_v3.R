@@ -13,7 +13,9 @@ bslib_screen6_module_v3_SidebarUI <- function(id, shared_values) {
 }
 
 bslib_screen6_module_v3_MainUI <- function(id) {
+  
   ns <- NS(id)
+  
   tagList(
     textOutput(ns("value_display")),
     textOutput(ns("level_display")),
@@ -48,7 +50,6 @@ bslib_screen6_module_v3_Server <- function(id, shared_values, switch_screen) {
     
     # Load the initial data----
     initial_data <- reactive({
-      message(paste("S6. switch screen()", switch_screen()))
       
       if (file.exists(
         paste0(
