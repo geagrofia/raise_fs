@@ -3605,9 +3605,28 @@ for (i in hierarchy_level_max_i1:1) {
       print(plot_fpm_i1)
       
       
-      if (i <= params$FAOCLASS1) {
+      # if (i <= params$FAOCLASS1) {
+      #   
+      #   assign(paste0("FAO_leaflet_widget_i1"),
+      #   classify_maps_FAO(
+      #       n_i1,
+      #       fpm_conc_var_i1,
+      #       fpm_conc_name_i1,
+      #       df_irm_i1,
+      #       fpm_plot_title_i1,
+      #       df_one_many_i1,
+      #       rast_mask_proj_i1,
+      #       list_rast_clas_FAO_cat,
+      #       vect_subdiv_i1,
+      #       params$INN1
+      #     ) 
+      #   , .GlobalEnv)
+      #     
+      # }
+      
+            if (i <= params$FAOCLASS1) {
         
-        #assign(paste0("FAO_leaflet_widget_i1"),
+        assign(paste0("FAO_leaflet_widget_i1"),
         classify_maps_FAO(
             n_i1,
             fpm_conc_var_i1,
@@ -3620,9 +3639,8 @@ for (i in hierarchy_level_max_i1:1) {
             vect_subdiv_i1,
             params$INN1
           ) 
-        #, .GlobalEnv)
-          
-      }
+        , envir = results_env)
+        }
       
       if (i <= params$LIMITS1) {
         
@@ -3688,3 +3706,213 @@ for (i in hierarchy_level_max_i1:1) {
 
 ```
 
+
+```{r temp_resultsenv, results = 'asis', out.width="100%"}
+
+cat("### Results Env:")
+cat("\n---\n")
+    
+ls(results_env)
+cat("\n---\n")
+```
+
+```{r temp_globenv, results = 'asis', out.width="100%"}
+
+
+cat("### Global Env:")
+cat("\n---\n")
+
+ls(.GlobalEnv)
+
+# knitr::knit_exit()
+
+```
+
+
+```{r i1_leaflet_FAO, results = 'asis', out.width="100%"}
+ if ( params$FAOCLASS1 > 0){
+
+   cat(paste("\n\n## Interactive Classified Map - FAO Suitability Classes \n\n"))
+
+   frameWidget(get(paste("FAO_leaflet_widget_i1"), envir = results_env), height = '500')}
+
+```
+
+```{r i1_leaflet_FAOlimits, results = 'asis', out.width="100%"}
+#if ( params$LIMITS1 > 0){
+
+  # print(str(get(paste("FAO_limits_leaflet_widget_i1")), .GlobalEnv))
+  # 
+  # cat(paste("\n\n## Interactive Classified Map - FAO Limitations Classes \n\n"))
+  # 
+  # frameWidget(get(paste("FAO_limits_leaflet_widget_i1"), .GlobalEnv), height = '500')}
+
+```
+
+# Sub-division statistics
+
+This section gets the statistics for each sub-division, taking into account the dynamically created limitations for adoption, suitability and feasibility.
+
+
+The existing function expects arguments showing:
+
+1) the number of maps to produce - one per class (of whatever output)
+2) a vector of the variables (classes) that need to be mapped (1 and 2 are linked and 1 is not really necessary)
+3) a palette of colours with the same number of colours as classes - these are 
+
+The palettes in the current IRM do not match with the any of the colours used in the classified maps.
+Instead they are just a distinct colour.
+
+The variables and colour palette names are currently hard coded. The names of the palettes are from the ggplot2 package but derive from colorbrewer, all palettes are sequential. There are 18 named sequential palettes, they can be referenced by name or as an index from the list.
+
+The index works as long as the values do not exceed 18, so need to wrap.
+
+## Area
+
+### FAO Classes
+
+```{r i1_subdiv_area_FAO, results = 'asis', out.width="100%"}
+
+# create a list of valid names of colorbrewer palettes for sequential data
+palettes_i1 <-
+  c("Blues",
+    "YlGn",
+    "Greys",
+    "Oranges",
+    "YlOrRd"
+  )
+
+
+cat("\n\n\n Local list_rast_clas_FAO_cat:\n\n")
+print(list_rast_clas_FAO_cat)
+
+
+cat("\n\n\n results_env list_rast_clas_FAO_cat:\n\n")
+print(get(paste("list_rast_clas_FAO_cat"), envir = results_env))
+
+
+cat("\n\n\n .GlobalEnv list_rast_clas_FAO_cat:\n\n")
+print(get(paste("list_rast_clas_FAO_cat"), .GlobalEnv))
+
+# loop through the FAO class rasters created above
+
+cat("\n\n\n length(list_rast_clas_FAO_cat):\n\n")
+print(length(list_rast_clas_FAO_cat))
+
+plot(get(paste("rast_clas_fao_catLikelihood of Adoption"), .GlobalEnv))
+
+
+for (i in 1:length(get(paste("list_rast_clas_FAO_cat"), .GlobalEnv)))   {
+  
+   tryCatch({
+    # Debug print
+     cat("\n\n\n ### Processing raster:", names(get(
+       paste("list_rast_clas_FAO_cat"), .GlobalEnv
+     ))[i], "\n")
+     
+     cat("\n--\n")
+     print(get(paste("list_rast_clas_FAO_cat"), .GlobalEnv)[i])
+     cat("\n Local \n")
+     
+     plot(get(paste("rast_clas_fao_catLikelihood of Adoption")))
+     
+     cat("\n Global \n")
+     plot(get(paste("list_rast_clas_FAO_cat"), .GlobalEnv)[i])     
+  
+  
+  # get the name of the criteria from the raster name - this is used in the plotting
+  subdiv_criteria_name_i1 <- get(paste("list_rast_clas_FAO_cat"), .GlobalEnv)[i]
+  subdiv_criteria_name_i1 <-
+    sub(paste0(".*", "fao_cat"), "", subdiv_criteria_name_i1)
+  
+  cat("\n\n\n")
+  cat("###", subdiv_criteria_name_i1, "\n") # add headings
+  cat("\n\n\n")
+  
+  # get the raster for which statistics are derived for each limitation
+  rast_to_plot_i1 <- get(paste0(list_rast_clas_FAO_cat[i]))
+  
+  # get the cellsize for each raster
+  rast_to_plot_cellsize_i1 <- cellSize(rast_to_plot_i1, unit = "ha")
+  
+  
+  # extract the raster class to a data frame using the subdivisions
+  df_extr_i1 <-
+    terra::extract(rast_to_plot_i1, vect_subdiv_i1, na.rm = TRUE, ID = T, weights = T)
+  
+    # extract the raster cellsize to a data frame using the subdivisions
+  df_extr_cellsize_i1 <-
+    terra::extract(rast_to_plot_cellsize_i1, vect_subdiv_i1, na.rm = TRUE, ID = T, weights = T)
+  
+  df_extr_i1 <- mutate(df_extr_i1, df_extr_cellsize_i1)
+  
+   # summarise the class for each subdivision raster ID
+  df_extr_summary_i1 <- df_extr_i1 %>%
+    group_by(ID) %>%
+    count(FAO, wt = (area * weight), .drop = FALSE)
+  
+  # get the names of the FAO classes
+  FAO <- as.vector(unique(df_extr_summary_i1$FAO))
+  FAO <- FAO[!is.na(FAO)]
+  
+  df_extr_summary_i1_pivot <- df_extr_summary_i1 %>% pivot_wider(names_from = FAO, values_from = n)
+  
+  # join the summary data frame to the original subdivision data spatvector
+  vect_subdiv_extr_i1 <<-
+    left_join(vect_subdiv_i1, df_extr_summary_i1_pivot, by = 'ID')
+    
+      # save as geojson and csv files
+  output_vect(vect_subdiv_extr_i1, paste0(subdiv_criteria_name_i1, "_FAO_area_", params$INN1)) # save as a geojson file
+  output_csv(as_tibble(vect_subdiv_extr_i1), paste0(subdiv_criteria_name_i1, "_FAO_area_", params$INN1)) # save as a csv file 
+  
+
+  # loop through each existing class type 
+  for (class_type in FAO) {
+    
+    # Get the current iteration number
+    j_i1 <- match(class_type, FAO)
+
+    # get the palette using the iteration number
+    colour_index_i1 <- j_i1
+    colour_index_mod_i1 <- (colour_index_i1 %% 18)
+    colour_index_mod_i1 <-
+      ifelse(colour_index_mod_i1 == 0, 18, colour_index_mod_i1)
+    result_i1 <- palettes_i1[colour_index_mod_i1]
+    
+    # Filter the joined data for the current limitation
+    # Filter the joined data for the current limitation
+    filtered_data_i1 <-
+      vect_subdiv_extr_i1 %>% select(any_of(class_type))
+    #print(filtered_data)
+    
+    if (nrow(filtered_data_i1) == 0) {next} 
+
+  
+    # Create a ggplot for count value per subdivision for the current class type using the palette from above
+    subdiv_plot_i1 <- ggplot() +
+      geom_spatvector(data = filtered_data_i1, aes(group = params$SUBDIVNAMEVAR, fill = eval(parse(text = FAO[j_i1])))) +
+      labs(
+        title = paste(subdiv_criteria_name_i1, "\nClass = ", class_type),
+        fill = "Area (ha)"
+      ) +
+      scale_fill_distiller(
+        type = "seq",
+        palette = result_i1,
+        direction = 1,
+        limits = c(0, max_area_i1),
+        guide = "legend", labels = comma
+      ) 
+    
+    print(subdiv_plot_i1)
+  }
+  
+} , error = function(e) {
+    cat("Error in rast:", names(list_rast_clas_FAO_cat)[i], "\n")
+    cat("Message:", conditionMessage(e), "\n")
+    return(NULL)  # or some placeholder
+})  
+    
+}  
+
+
+```

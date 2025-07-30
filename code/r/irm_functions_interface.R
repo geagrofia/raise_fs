@@ -18,6 +18,8 @@
 #    return(raster_name)
 #  }
 
+results_env <- new.env()
+
 # in terra there is no brick, just the same rast method
 load_raster_data <-
   function(data_file_prefix,
@@ -1643,7 +1645,10 @@ classify_maps_FAO <-
            fpm_plot_title,
            df_one_many,
            rast_mask_proj,
-           list_rast_clas_FAO_cat, vect_subdiv, innovation) {
+           list_rast_clas_FAO_cat, 
+           vect_subdiv, 
+           innovation) {
+    
     df_plot <- df_data %>%
       dplyr::select(unlist(as.character(noquote(fpm_conc_var)))) %>%
       na.omit %>%
@@ -1651,11 +1656,11 @@ classify_maps_FAO <-
     
     #cat("str(df_one_many) = ", str(df_one_many),"\n")
     stack_code <<- unique(df_one_many[['stack']])
-    cat("stack_code = ", stack_code,"\n")
+    cat("Classify FAO: stack_code = ", stack_code,"\n")
     
     if ("optimal" %in% fpm_conc_name) { # biophysical aptitude criteria
       
-      cat("OPTIMAL")           
+      cat("Classify FAO: OPTIMAL")           
       print(match("optimal",fpm_conc_name))
       opt_match <- match("optimal",fpm_conc_name)
       opt_match_glob <<- opt_match
@@ -1668,7 +1673,7 @@ classify_maps_FAO <-
     } else {
       # socio-economic feasibility criteria
       
-      cat("GOOD")
+      cat("Classify FAO: GOOD")
       match_set <- c("good", "high")
       print(match(match_set, fpm_conc_name))
       good_match <- max(match(match_set, fpm_conc_name), na.rm = T)
@@ -1681,7 +1686,7 @@ classify_maps_FAO <-
       
       if (length(fpm_conc_name) == 3) {# only run when a moderate conclusion
         
-        cat("MODERATE")  
+        cat("Classify FAO: MODERATE")  
         match_set <- c("moderate")
         print(match(match_set, fpm_conc_name))
         moderate_match <- max(match(match_set, fpm_conc_name), na.rm = T)
@@ -1749,6 +1754,12 @@ classify_maps_FAO <-
     list_rast_clas_FAO_cat <<-
       append(list_rast_clas_FAO_cat,
              paste0("rast_clas_fao_cat", fpm_plot_title))
+    
+    assign(paste0("list_rast_clas_FAO_cat"), append(list_rast_clas_FAO_cat,
+                                                   paste0("rast_clas_fao_cat", fpm_plot_title)), envir = results_env)
+    
+    # assign(paste0("list_rast_clas_FAO_cat"), append(list_rast_clas_FAO_cat,
+    #                                                 paste0("rast_clas_fao_cat", fpm_plot_title)), .GlobalEnv)
     
     g <-  ggplot() +
       geom_spatraster(data = rast_clas_fao_cat, na.rm = TRUE, aes(fill = FAO)) +
@@ -1837,7 +1848,8 @@ classify_maps_limits <-
            weights,
            rast_mask_proj,
            vect_subdiv,
-           list_rast_limits_max_FAO, innovation) {
+           list_rast_limits_max_FAO, 
+           innovation) {
     
   
   # what are the previous level inputs - the rows in the one-to-many table
@@ -1889,41 +1901,71 @@ classify_maps_limits <-
     expr_w_score <- parse(text = paste0(weights[[l]]," * ", score_var)) # weighted score
     
     
-    if (paste0(rbs_names[[l]], "_m") %in% colnames(df_limits)) {
+    if ((paste0(rbs_names[[l]], "_m") %in% colnames(df_limits)) &&
+        (paste0(rbs_names[[l]], "_p") %in% colnames(df_limits))) {
       #print("moderate")# there is a moderate conclusion
-      expr_score <- parse(text = paste0(rbs_names[[l]], "_p + (", rbs_names[[l]], "_m * 0.5)" ))
+      expr_score <- parse(text = paste0(rbs_names[[l]], "_p + (", rbs_names[[l]], "_m * 0.5)"))
       df_limits <- mutate(
-        df_limits,
-        !!score_var := eval(expr_score), !!w_score_var := eval(expr_w_score), .keep = c("all"))
+        df_limits,!!score_var := eval(expr_score),
+        !!w_score_var := eval(expr_w_score),
+        .keep = c("all")
+      )
       #str(df_limits)
       
-    } else {
+    } else  {
+      if ((paste0(rbs_names[[l]], "_m") %in% colnames(df_limits)) &&
+          (paste0(rbs_names[[l]], "_l") %in% colnames(df_limits))) {
+        #print("moderate")# there is a moderate conclusion
+        expr_score <- parse(text = paste0(rbs_names[[l]], "_l + (", rbs_names[[l]], "_m * 0.5)"))
+        df_limits <- mutate(
+          df_limits,
+          !!score_var := eval(expr_score),!!w_score_var := eval(expr_w_score),
+          .keep = c("all")
+        )
+        #str(df_limits)
+      } else {
       if (paste0(rbs_names[[l]], "_p") %in% colnames(df_limits)) {
         #print("poor") # there is a poor conclusion
         expr_score <-
           parse(text = paste0(rbs_names[[l]], "_p"))
-        df_limits <- mutate(df_limits,!!score_var := eval(expr_score), !!w_score_var := eval(expr_w_score),  .keep = c("all"))
+        df_limits <- mutate(
+          df_limits,
+          !!score_var := eval(expr_score),
+          !!w_score_var := eval(expr_w_score),
+          .keep = c("all")
+        )
         #str(df_limits)
       } else {
         if (paste0(rbs_names[[l]], "_l") %in% colnames(df_limits)) {
           #print("low") # there is a low conclusion
           expr_score <-
             parse(text = paste0(rbs_names[[l]], "_l"))
-          df_limits <- mutate(df_limits,!!score_var := eval(expr_score), !!w_score_var := eval(expr_w_score),  .keep = c("all"))
+          df_limits <- mutate(
+            df_limits,
+            !!score_var := eval(expr_score),
+            !!w_score_var := eval(expr_w_score),
+            .keep = c("all")
+          )
           #str(df_limits)
         } else {
           #print("suboptimal") # there is a suboptimal conclusion
           expr_score <-
             parse(text = paste0(rbs_names[[l]], "_s"))
-          df_limits <- mutate(df_limits,!!score_var := eval(expr_score), !!w_score_var := eval(expr_w_score),  .keep = c("all"))
+          df_limits <- mutate(
+            df_limits,
+            !!score_var := eval(expr_score),
+            !!w_score_var := eval(expr_w_score),
+            .keep = c("all")
+          )
           #str(df_limits)
         }
       }
+      }
     }
-  }
+    }
   
   # get the max value
-  cat("\n\nmax value\n\n")
+  cat("\n\nClassify FAO limits: max value\n\n")
   df_limits_w_score <<-
     select(df_limits, unlist(w_score_list)) %>%
     mutate(across(everything(), ~ replace_na(.x, 0)))
@@ -2048,10 +2090,10 @@ classify_maps_limits <-
         grepl("BA", FAO_limit) ~ 0.25,
         grepl("SE", FAO_limit) ~ 0.75,
         grepl("LU", FAO_limit) ~ 0,
-        grepl("Cl", FAO_limit) ~ 0.2,
-        grepl("Ls", FAO_limit) ~ 0.4,
-        grepl("SF", FAO_limit) ~ 0.6,
-        grepl("SP", FAO_limit) ~ 0.8,
+        grepl("CA", FAO_limit) ~ 0.2,
+        grepl("LsA", FAO_limit) ~ 0.4,
+        grepl("SFA", FAO_limit) ~ 0.6,
+        grepl("SPA", FAO_limit) ~ 0.8,
         grepl("MA", FAO_limit) ~ 0.5,
         grepl("FP", FAO_limit) ~ 1,
         TRUE ~ 0.9  # Default value if none of the conditions are met
@@ -2065,10 +2107,10 @@ classify_maps_limits <-
         grepl("BA", FAO_limit) ~ 0.8,
         grepl("SE", FAO_limit) ~ 0.8,
         grepl("LU", FAO_limit) ~ 0.5,
-        grepl("Cl", FAO_limit) ~ 0.5,
-        grepl("Ls", FAO_limit) ~ 0.5,
-        grepl("SF", FAO_limit) ~ 0.5,
-        grepl("SP", FAO_limit) ~ 0.5,
+        grepl("CA", FAO_limit) ~ 0.5,
+        grepl("LsA", FAO_limit) ~ 0.5,
+        grepl("SFA", FAO_limit) ~ 0.5,
+        grepl("SPA", FAO_limit) ~ 0.5,
         grepl("MA", FAO_limit) ~ 0.5,
         grepl("FP", FAO_limit) ~ 0.5,
         TRUE ~ 0.4  # Default value if none of the conditions are met
@@ -2177,12 +2219,12 @@ classify_maps_CONC <-
     
     #cat("str(df_one_many) = ", str(df_one_many),"\n")
     stack_code <<- unique(df_one_many[['stack']])
-    cat("stack_code = ", stack_code, "\n")
+    cat("Classify Conc: stack_code = ", stack_code, "\n")
     
     if ("optimal" %in% fpm_conc_name) {
       # biophysical aptitude criteria
       
-      cat("OPTIMAL")
+      cat("Classify Conc: OPTIMAL")
       print(match("optimal", fpm_conc_name))
       opt_match <- match("optimal", fpm_conc_name)
       opt_match_glob <<- opt_match
@@ -2192,7 +2234,7 @@ classify_maps_CONC <-
         rasterize(df_plot, rast_mask_proj, fpm_conc_var[[opt_match]])
       names(rast_plot_opt) <- fpm_conc_name[[opt_match]]
       
-      cat("SUBOPTIMAL")
+      cat("Classify Conc: SUBOPTIMAL")
       print(match("suboptimal", fpm_conc_name))
       subopt_match <- match("suboptimal", fpm_conc_name)
       subopt_match_glob <<- subopt_match
@@ -2307,7 +2349,7 @@ classify_maps_CONC <-
     } else {
       # socio-economic feasibility or adoption criteria
       
-      cat("GOOD")
+      cat("Classify Conc: GOOD")
       match_set <- c("good", "high")
       print(match(match_set, fpm_conc_name))
       good_match <- max(match(match_set, fpm_conc_name), na.rm = T)
@@ -2318,7 +2360,7 @@ classify_maps_CONC <-
         rasterize(df_plot, rast_mask_proj, fpm_conc_var[[good_match]])
       names(rast_plot_good) <- fpm_conc_name[[good_match]]
       
-      cat("POOR")
+      cat("Classify Conc: POOR")
       match_set <- c("poor", "bad", "low")
       print(match(match_set, fpm_conc_name))
       poor_match <- max(match(match_set, fpm_conc_name), na.rm = T)
@@ -2333,7 +2375,7 @@ classify_maps_CONC <-
       if (length(fpm_conc_name) == 3) {
         # only run when a moderate conclusion
         
-        cat("MODERATE")
+        cat("Classify Conc: MODERATE")
         match_set <- c("moderate", "medium")
         print(match(match_set, fpm_conc_name))
         moderate_match <- max(match(match_set, fpm_conc_name), na.rm = T)
