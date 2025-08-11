@@ -1,0 +1,5306 @@
+---
+title: Hierarchies of criteria in IRM
+author: ""
+date: "`r Sys.Date()`"
+output:
+  html_document:  
+    code_folding: "hide"
+    theme: united
+    number_sections: no
+    toc: yes
+    toc_float: true
+    toc_depth: 6
+    css: js/style.css
+params:
+  INT: 1
+  SYS: NULL
+  Agg: NULL
+  MASK: NULL
+  EXT: NULL
+  DIVCODEVAR: NULL
+  DIVCODEVAL: NULL
+  DIVNAMEVAR: NULL
+  SUBDIVNAMEVAR: NULL
+  INN1: NULL
+  RES1: NULL
+  SOS1: NULL
+  FAOCLASS1: NULL
+  LIMITS1: NULL
+  CONCCLASS1: NULL
+  TRIAD1: Adoption
+  TRIBA1: Aptitude
+  TRISE1: Feasible
+  INN2: NULL
+  RES2: NULL
+  SOS2: NULL
+  FAOCLASS2: NULL
+  LIMITS2: NULL
+  CONCCLASS2: NULL
+  TRIAD2: Adoption
+  TRIBA2: Aptitude
+  TRISE2: Feasible
+---
+
+```{r}
+# sets the style for the output
+```
+
+<style>
+pre {
+  overflow-x: auto;
+}
+pre code {
+  word-wrap: normal;
+  white-space: pre;
+}
+
+div.INN { background-color:#e6f0ff; border-radius: 5px; padding: 10px; font-size: 200%;  color: orange;}
+div.Agg { background-color:#e6f0ff; border-radius: 5px; padding: 10px; font-size: 150%;  color: orange;}
+
+</style>
+
+<script src="js/hideOutput.js"></script>
+
+```{r parameter_description, echo=FALSE, message=FALSE, warning=FALSE}
+
+# The parameters above are set to NA here, but when this rmd script is run from the shiny app then the parameters are passed with values.
+
+# The first four parameters are general: 
+
+# INT defines whether interface provides the parameter values - any value other than NA passed from the interface will tell this rmd script to use all parameters. The interface passes a value of 1 automatically.
+
+# SYS is only relevant when more than one innovation is being tested. It sets whether the system is an intercrop, a comparison between crops or a rotation. Allowed values are "comparison","intercrop" and  "rotation"
+
+# Agg defines the aggregation factor. This can be set above in the header with an integer value, or can be passed from the interface. The larger the aggregation factor the quicker the computation. The minimum value is 1.
+
+# MASK defines the spatial resolution of the mask in metres
+
+# EXT defines the extent of the general modelling usually a country - this is used to load the division dataset
+
+# LOC defines the location of the model - this is a division name within the EXT dataset
+
+# The following parameters are specific to each innovation: 
+
+# INN denotes the innovation, this is a unique code for each location/innovation and is used to locate the data and parameters that are used in IRM
+
+# SOS sets whether the season onset is spatially defined. If so, SOS has a value of 1 and the start of the growing period is set using a raster rather than the value in the growth stage csv file. Otherwise SOS is 0.
+
+# RES defines whether 3-class adoption (2 class aptitude), or FAO style 5-class adoption (5-class aptitude with added maps on the limitations) or both classes are computed. Computing both classes will increase the time to run the script!
+
+#A value of 1 will only compute the 3-class suitability maps. A value of 2 will only compute the 5-class suitability map. A value of 3 will compute both suitability class maps. Other classified maps will be shown but only require a re-classification of the other results.
+
+# TRIAD is the field name used for the triangulation points for Adoption
+
+# TRIBA is the field name used for the triangulation points for Biophysical Aptitude
+
+# TRISE is the field name used for the triangulation points for Socio-economic Feasibility
+
+# SUBDIV is the field name used to identify the subdivision polygons
+
+# FAOCLASS defines how many levels in the hierarchy of rule bases to produce classified FAO maps
+
+# LIMITS defines how many levels in the hierarchy of rule bases to produce classified limitation maps
+
+
+```
+
+```{r folding_outputs_chunks, echo=FALSE, message=FALSE, warning=FALSE}
+
+# Folding outputs chunks
+
+# hideOutput.js and style.css courtesy of Martin Schmelzer https://stackoverflow.com/users/1777111/martin-schmelzer
+# https://stackoverflow.com/questions/37755037/how-to-add-code-folding-to-output-chunks-in-rmarkdown-html-documents
+ 
+
+```
+
+```{r setup, include=FALSE, echo=FALSE, message=FALSE, warning=FALSE}
+
+# initialisation
+
+library(dplyr)
+library(tidyr)
+library(data.tree)
+library(knitr)
+library(kableExtra)
+library(here)
+library(irm)
+library(fuZR)
+library(sf)
+library(terra)
+library(stringr)
+library(purrr)
+library(tidyterra)
+library(tidyverse)
+library(scales)
+library(tinytex)
+library(ggplot2)
+library(conflicted)
+library(leaflet)
+library(tibble)
+library(sf)
+library(widgetframe)
+library(patchwork)
+library(here)
+library(DiagrammeR)
+library(lava)
+library(svgPanZoom)
+library(scales)
+library(lubridate)
+
+```
+
+```{r , results='asis'}
+
+r_filename <- function(filename) {
+  here::here("code/r/", filename)
+}
+
+# source helpers into the same environment used by render()
+source(r_filename("irm_functions_interface_shared_environment.R"), local = knitr::knit_global())  # or parent.frame() or environment()
+
+#set (chunk) options - figure path is necessary to avoid an error message
+opts_chunk$set(
+  comment = NA,
+  dpi = 96,
+  echo = FALSE,
+  fig.path = paste0("figures/", params$INN1,"/"),
+  warning = FALSE,
+  cache = FALSE,
+  include = TRUE
+)
+
+options(width = 250, dplyr.width = 120)
+
+knitr::knit_hooks$set(time_it = local({
+  now <- NULL
+  function(before, options) {
+    if (before) {
+      # record the current time before each chunk
+      now <- Sys.time()
+    } else {
+      # calculate the time difference after a chunk
+      res <- difftime(Sys.time(), now, units = "secs")
+      # return a character string to show the time
+      paste("Time for the chunk",
+            options$label,
+            "to run:",
+            round(res,
+                  2),
+            "seconds")
+    }
+  }
+}))
+
+```
+
+```{r , results='asis'}
+# Now use the variables/functions from helpers.R
+
+print(var1)
+some_helper_function()
+
+cat("\n\n")
+cat("### Results Env:")
+cat("\n\n")
+
+ls()
+
+```
+
+```{r}
+
+cat("params$INN2")
+cat("\n\n")
+print(params$INN2)
+
+cat("params$SYS")
+cat("\n\n")
+print(params$SYS)
+
+
+ if (is.na(params$INN2)) {
+   
+   cat("params$INN2 == NA")
+   
+ } else {
+   
+   cat("params$INN2 != NA")}
+
+#   if (params$SYS == "comparison") {
+#    
+#     cat("Sole crop 1 yield (comparison)")
+#   } else {
+#     if (params$SYS == "intercrop") {
+#       
+#       cat("Intercrop 1 yield")
+#     } else {
+#       if (params$SYS == "rotation") {
+#         
+#         cat("Rotation crop 1 yield")
+#       }
+#     }
+#   }
+# }
+
+
+
+```
+
+```{r general_parameters, echo=FALSE, message=FALSE, warning=FALSE, results='asis'}
+
+
+
+
+cat("\n\n# General Parameters\n\n")
+
+
+cat("<div class='INN'>")
+cat("\nGeography DIVCODEVAR =", params$DIVCODEVAR, "\n")
+cat("\nGeography DIVCODEVAL =", params$DIVCODEVAL, "\n")
+cat("\nGeography DIVNAMEVAR =", params$DIVNAMEVAR, "\n")
+cat("\nGeography SUBDIVNAMEVAR =", params$SUBDIVNAMEVAR, "\n\n")
+
+
+cat("\nSystem =", params$SYS, "\n\n")
+cat("</div>")
+
+cat("<div class='Agg'>")
+cat("Mask Resolution =", params$MASK)
+cat("\n\nSpatial Aggregation =", params$Agg)
+cat("\n\nFilename: ", knitr::current_input(dir = TRUE))
+cat("</div>")
+
+```
+
+```{r i1_innovation_parameters, echo=FALSE, message=FALSE, warning=FALSE, results='asis'}
+
+cat("\n\n# First Innovation\n\n")
+cat("<div class='INN'>")
+cat("Innovation name =", params$INN1)
+cat("</div>")
+cat("<div class='Agg'>")
+cat("\n\nSpatially Dynamic Growing Season = ", params$SOS1)
+cat("</div>")
+
+
+
+
+# season onset non-spatial?
+# this enables the script to skip the non relevant chunks when using console
+
+if (params$SOS1 != 1){
+    nonsos_crit_i1 <- TRUE
+} else {nonsos_crit_i1 <- FALSE}
+
+# season onset spatial?
+if (params$SOS1 == 1){
+    sos_crit_i1 <- TRUE
+} else {sos_crit_i1 <- FALSE}
+
+if (params$INT == 1)
+  shiny::setProgress(0.02, message = "Get requirements")  # set progress to 17%
+```
+
+
+
+```{r , results='asis'}
+
+# Example: create some dummy rasters (you can skip this if you already have a list)
+r1 <- rast(nrows=10, ncols=10)
+values(r1) <- runif(ncell(r1))
+
+r2 <- rast(nrows=10, ncols=10)
+values(r2) <- runif(ncell(r2))
+
+raster_list <- list(r1, r2)  # your list of SpatRaster objects
+
+# Loop and plot
+for (i in seq_along(raster_list)) {
+  plot(raster_list[[i]], main = paste("Raster", i))
+}
+
+```
+
+
+```{r TEST_i1_reclass_soil_texture, results='asis'}
+
+#soil_texture_filename_i1 <-
+#  as.character(paste("tab_data/input/usda_texture_", params$INN1, ".csv", sep = ""))
+
+soil_texture_filename_i1 <-
+  as.character(paste(
+    "E:/repos/raise_fs/shiny/data/",
+    params$INN1,
+    "_texture_s9.csv",
+    sep = ""
+  ))
+
+cat("soil_texture_filename_i1")
+print(soil_texture_filename_i1)
+cat("print(file.exists(soil_texture_filename_i1))")
+print(file.exists(soil_texture_filename_i1))
+
+if (file.exists(soil_texture_filename_i1)) {
+  
+  cat("EXISTS")
+  
+  
+  df_soil_texture_i1 <- read.csv(soil_texture_filename_i1)
+  
+  cat("print(file.exists(df_soil_texture_i1))")
+  print(df_soil_texture_i1)
+  
+  df_soil_texture_i1 %>%
+    kable(digits = 3, caption = "Soil Texture ") %>% kable_styling("striped", full_width = T) 
+  
+}
+
+
+```
+
+# Basic Settings
+
+## Critera Parameters
+
+Here we load most of the parameters used in the IRM model. These parameters are stored in an external text file, in comma separated format (.csv). 
+
+The parameters include the criteria names, the rule base stack which they contribute to, and information to construct the rule bases.
+
+The lowest level rule bases will have a spatial data source, with threshold values, and where relevant their weights. These criteria will have information about the propositions _and_ conclusions that are used to construct the rule base.
+
+Higher level rule bases are combinations of the lower level criteria and do not have associated spatial data, but will often have weights. These criteria will only have information about the conclusions that are used to construct the rule base - the propositions are derived from the lower level rule bases.
+
+The file will also contain information about how to aggregate and resample the spatial data, whether the data are for soil texture, precipitation or temperature, whether the criterion contributes to the yield estimation, the temporal resolution of any climate data, and a code used for mapping the limitations.
+
+
+The criteria are organised hierarchically and can be displayed as a table and in a graphical diagram.  
+
+
+```{r i1_load_criteria}
+
+lower_filename_i1 <-
+  as.character(paste(
+    "E:/repos/raise_fs/shiny/data/",
+    params$INN1,
+    "_requirements_s10.csv",
+    sep = ""
+  ))
+
+df_lower_i1 <-
+  read.csv(lower_filename_i1, na.strings = c("NA",""))
+
+str(df_lower_i1)
+
+links_filename_i1 <-
+  as.character(paste(
+    "E:/repos/raise_fs/shiny/data/",
+    params$INN1,
+    "_links_s5.csv",
+    sep = ""
+  ))
+
+df_links_i1 <-
+  read.csv(links_filename_i1, na.strings = c("NA",""))
+
+str(df_links_i1)
+
+df_requirements_i1 <- dplyr::left_join(df_lower_i1, dplyr::select(df_links_i1, "stack_code",	"stack","crit_code"), by = c("crit_code"))
+
+df_requirements_i1 <- df_requirements_i1 |> relocate("stack", .before = "crit_code") |> relocate("stack_code", .before = "stack")
+
+str(df_requirements_i1)
+
+```
+
+## Check that the parameters file has been corrctly formatted
+
+```{r i1_check_criteria}
+
+# check that proposition names are not repeated
+
+# Find the rows where any two of prop_level_1, prop_level_2, and prop_level_3 have the same values
+matching_rows <- which(df_requirements_i1$prop_level_1 == df_requirements_i1$prop_level_2 | df_requirements_i1$prop_level_1 == df_requirements_i1$prop_level_3 | df_requirements_i1$prop_level_2 == df_requirements_i1$prop_level_3)
+
+## Output the rows where any two columns have matching values
+if (length(matching_rows) > 0) {
+  stop("Rows with matching values in any two of prop_level_1, prop_level_2, and prop_level_3:", matching_rows)
+
+} else {
+  print("No matching values found in any two columns of prop_level_1, prop_level_2, and prop_level_3")
+}
+
+
+# check that the number of propositions is consistent with the number of thresholds
+
+# Find the rows where threshold has a value but prop_level_1 or prop_level_2 is NA (or missing)
+invalid_rows <- which((is.na(df_requirements_i1$prop_level_1) | is.na(df_requirements_i1$prop_level_2)) & !is.na(df_requirements_i1$threshold_1))
+
+## Output the rows where where threshold_1 has a value but prop_level_1 or prop_level_2 is NA (or missing)
+if (length(invalid_rows) > 0) {
+  stop("Rows where threshold_1 has a value but prop_level_1 or prop_level_2 do not:", invalid_rows)
+} else {
+  print("All rows with values in threshold_1 also have values in prop_level_1 and prop_level_2")
+}
+
+# Find the rows where threshold_2 has a value but prop_level_2 or prop_level_3 is NA (or missing)
+invalid_rows <- which((is.na(df_requirements_i1$prop_level_3) | is.na(df_requirements_i1$prop_level_2)) & !is.na(df_requirements_i1$threshold_2))
+
+## Output the rows where where threshold_2 has a value but prop_level_2 or prop_level_3 is NA (or missing)
+if (length(invalid_rows) > 0) {
+  stop("Rows where threshold_2 has a value but prop_level_2 or prop_level_3 do not:", invalid_rows)
+} else {
+  print("All rows with values in threshold_2 also have values in prop_level_2 and prop_level_3")
+}
+
+# check the threshold widths
+
+# Find the rows where there are two thresholds and where either of the boundary widths is too large h
+
+# Boundary widths overlap
+
+invalid_rows <- which(!is.na(df_requirements_i1$threshold_2) &
+                        ((df_requirements_i1$threshold_1 + (df_requirements_i1$width_1 / 2)) > (df_requirements_i1$threshold_2 - (df_requirements_i1$width_2 /2))
+                        )) 
+
+## Output the rows where where threshold_2 has a value and boundary widths overlap)
+if (length(invalid_rows) > 0) {
+  stop("Rows where boundary widths overlap:", df_requirements_i1[invalid_rows,4])
+} else {
+  print("No rows with values in threshold_2 have overlapping boundary widths")
+}
+
+
+# Check that all rows with values in prop_level_1 have a value in conc_level_1
+
+prop_1_conc_1_NA_rows <- which(!is.na(df_requirements_i1$prop_level_1)  & is.na(df_requirements_i1$conc_level_1))
+
+# Output the rows where where prop_level_1 has a value and conc_level_1 is NA)
+if (length(prop_1_conc_1_NA_rows) > 0) {
+  stop("Rows where prop_level_1 has a value and conc_level_1 is NA:", df_requirements_i1[prop_1_conc_1_NA_rows,4])
+} else {
+  print("All rows with values in prop_level_1 have a value in conc_level_1")
+}
+
+#Check that all rows with values in prop_level_2 have a value in conc_level_2
+
+prop_2_conc_2_NA_rows <- which(!is.na(df_requirements_i1$prop_level_2)  & is.na(df_requirements_i1$conc_level_2))
+
+# Output the rows where where prop_level_2 has a value and conc_level_2 is NA)
+if (length(prop_2_conc_2_NA_rows) > 0) {
+  stop("Rows where prop_level_2 has a value and conc_level_2 is NA:", df_requirements_i1[prop_2_conc_2_NA_rows,4])
+} else {
+  print("All rows with values in prop_level_2 have a value in conc_level_2")
+}
+
+#Check that all rows with values in prop_level_3 have a value in conc_level_3
+
+prop_3_conc_3_NA_rows <- which(!is.na(df_requirements_i1$prop_level_3)  & is.na(df_requirements_i1$conc_level_3))
+
+# Output the rows where where prop_level_3 has a value and conc_level_3 is NA)
+if (length(prop_3_conc_3_NA_rows) > 0) {
+  stop("Rows where prop_level_3 has a value and conc_level_3 is NA:", df_requirements_i1[prop_3_conc_3_NA_rows,4])
+} else {
+  print("All rows with values in prop_level_3 have a value in conc_level_3")
+}
+
+```
+
+
+```{r i1_create_tree}
+# remove any rows without data in the crit_code or criterion
+
+df_requirements_i1 <- df_requirements_i1[complete.cases(df_requirements_i1$crit_code, df_requirements_i1$criterion), ]
+
+
+df_requirements_short_i1 <-
+  df_requirements_i1 %>% dplyr::select(stack, criterion, weight, threshold_1, threshold_2,	width_1,	width_2)
+
+
+df_requirements_short_i1$stack[is.na(df_requirements_short_i1$stack)] <-
+  "root2"
+
+# Convert to tree
+tree_plot_i1 <- FromDataFrameNetwork(df_requirements_short_i1, c("weight", "threshold_1",	"threshold_2",	"width_1",	"width_2"
+))
+
+# Display the tree
+print(tree_plot_i1, "weight", "threshold_1",	"threshold_2",	"width_1",	"width_2", "level") %>% kable(digits = 3, caption = "Hierarchies") %>% kable_styling("striped", full_width = T) %>%  row_spec(0, angle = -45) %>%  scroll_box(height = "500px")
+
+```
+
+
+```{r i1_get_hierarchy, results='asis' }
+## Get the tree hierarchy for plotting
+
+tree_max_level_i1 <- max(tree_plot_i1$Get('level')) - 1
+cat("\n\nNumber of hierarchy levels", tree_max_level_i1, "\n\n")
+
+hierarchies_new_i1 <- ToDataFrameTree(
+  tree_plot_i1,
+  level1 = function(x)
+    x$path[2],
+  level2 = function(x)
+    x$path[3],
+  level3 = function(x)
+    x$path[4],
+  level4 = function(x)
+    x$path[5],
+  level5 = function(x)
+    x$path[6],
+  level6 = function(x)
+    x$path[7],
+  level7 = function(x)
+    x$path[8],
+  
+  level_number = function(x)
+    x$level - 1
+  
+)[-1, -1]
+
+# Display the df
+#hierarchies_new %>% kable(digits = 3, caption = "Hierarchies") %>% kable_styling("striped", full_width = T) %>%  row_spec(0, angle = -45) %>%  scroll_box(height = "500px")
+
+```
+
+## Lower level rule bases with spatial data
+
+```{r i1_get_leaves, results='asis', out.width="100%" }
+
+n_leaves_i1 <- tree_plot_i1$leafCount
+df_leaves_i1 <- ToDataFrameTypeCol(tree_plot_i1)
+
+df_leaves_criterion_i1 <- as.data.frame( df_leaves_i1[cbind(seq(nrow(df_leaves_i1)), max.col(!is.na(df_leaves_i1), ties.method = 'last'))])
+names(df_leaves_criterion_i1) <- c("criterion")
+  
+df_leaves_i1 %>% dplyr::select(- level_1) %>% kable(digits = 3, caption = "Criteria with spatial data") %>% kable_styling("striped", full_width = T) %>%  scroll_box(height = "500px")
+
+if (params$INT == 1)
+  shiny::setProgress(0.05, message = "Rule Base hierarchy diagram")  # set progress to 17%
+
+```
+
+## Rule base hierarchy diagram
+
+```{r i1_plot_hierarchy_diagram, results='asis', out.width="100%" }
+# 
+SetGraphStyle(
+  tree_plot_i1,
+  rankdir = "RL",
+  overlap = "scalexy",
+  fontsize = 400,
+  fontname = "Calibri",
+  label = paste("Rule bases for",params$INN1),
+  labelloc = "t",
+  ranksep = 1
+)
+
+SetNodeStyle(
+  tree_plot_i1,
+  shape = "box",
+  fontsize = 200,
+  fontname = "Helvetica",
+  fontcolor = "black",
+  fixedsize = "false",
+  color = "DarkOliveGreen4",
+  fillcolor = "OliveDrab2",
+  style = "filled,rounded",
+  penwidth = 10,
+  tooltip = GetDefaultTooltip
+)
+
+SetEdgeStyle(
+  tree_plot_i1,
+  arrowhead = "none",
+  color = "blue",
+  penwidth = function(node) (node$weight * 50),
+  dir = "back",
+  label = function(node) paste("weight = :",node$weight),
+  fontsize = 150,
+  fontcolor = "blue"
+)
+
+level1 <- Traverse(tree_plot_i1, filterFun = function(x) x$level == 1)
+
+Do(level1, function(node)
+  SetEdgeStyle(
+    node,
+    inherit = FALSE,
+    arrowhead = "none",
+    color = "white",
+    penwidth = function(node)
+      (node$weight * 50),
+    dir = "back",
+    label = function(node)
+      paste("weight = :", node$weight),
+    fontsize = 150,
+    fontcolor = "white"
+  ))
+
+Do(level1, function(node)
+  SetNodeStyle(
+    node,
+    inherit = FALSE,
+    shape = "oval",
+    fixedsize = "false",
+    width = 0.9,
+    color = "white",
+    fillcolor = "white",
+    fontsize = 1,
+    fontname = "Helvetica",
+    fontcolor = "white",
+    style = "filled"
+  ))
+
+level2 <- Traverse(tree_plot_i1, filterFun = function(x) x$level == 2)
+
+Do(level2, function(node)
+  SetNodeStyle(
+    node,
+    inherit = FALSE,
+    shape = "oval",
+    fixedsize = "false",
+    width = 0.9,
+    color = "lightblue",
+    fillcolor = "darkgreen",
+    fontsize = 200,
+    fontname = "Helvetica",
+    fontcolor = "white",
+    style = "filled",
+    tooltip = GetDefaultTooltip
+  ))
+
+Do(level2, function(node)
+  SetEdgeStyle(
+    node,
+    inherit = FALSE,
+    arrowhead = "none",
+    color = "white",
+    penwidth = function(node)
+      (node$weight * 50),
+    dir = "back",
+    label = function(node)
+      paste("weight = :", node$weight),
+    fontsize = 150,
+    fontcolor = "white",
+    tooltip = GetDefaultTooltip
+  ))
+
+level3 <- Traverse(tree_plot_i1, filterFun = function(x) x$level == 3)
+
+Do(level3, function(node)
+ SetEdgeStyle(
+  node,
+  inherit = TRUE,
+  arrowhead = "none",
+  color = "blue",
+  penwidth = function(node) (node$weight * 50),
+  dir = "back",
+  label = function(node) paste("weight = :",node$weight),
+  fontsize = 150,
+  fontcolor = "blue",
+  tooltip = GetDefaultTooltip
+))
+
+Do(level3, function(node)
+  SetNodeStyle(
+    node,
+    inherit = TRUE,
+    shape = "oval",
+    fixedsize = "false",
+    width = 0.9,
+    color = "lightblue",
+    fillcolor = "blue",
+    fontsize = 200,
+    fontname = "Helvetica",
+    fontcolor = "white",
+    style = "filled",
+    tooltip = GetDefaultTooltip
+  ))
+
+Do(tree_plot_i1$leaves, function(node)
+  SetNodeStyle(
+    node,
+    shape = "box",
+    fontsize = 200,
+    fontname = "Helvetica",
+    fontcolor = "black",
+    fixedsize = "false",
+    color = "DarkOliveGreen4",
+    fillcolor = "OliveDrab2",
+    style = "filled,rounded",
+    penwidth = 10,
+    tooltip = GetDefaultTooltip
+  ))
+
+Do(tree_plot_i1$leaves, function(node)
+  SetEdgeStyle(
+  node,
+  arrowhead = "none",
+  color = "blue",
+  penwidth = function(node) (node$weight * 50),
+  dir = "back",
+  label = function(node) paste("weight = :",node$weight),
+  fontsize = 150,
+  fontcolor = "blue",
+  tooltip = GetDefaultTooltip
+))
+
+plot(tree_plot_i1)
+
+```
+
+```{r i1_criteria_codes}
+
+df_requirements_short_i1 <-
+  df_requirements_i1 %>% dplyr::select(stack_code, crit_code, weight, threshold_1, threshold_2,	width_1,	width_2)
+
+
+df_requirements_short_i1$stack_code[is.na(df_requirements_short_i1$stack_code)] <-
+  "root2"
+
+# Convert to tree
+tree_new_i1 <- FromDataFrameNetwork(df_requirements_short_i1, c("weight", "threshold_1",	"threshold_2",	"width_1",	"width_2"
+))
+
+# Display the tree
+#print(tree_new, "weight", "threshold_1",	"threshold_2",	"width_1",	"width_2", "level")
+
+```
+
+```{r i1_criteria_codes_get_hierarchy}
+## Get the tree hierarchy
+
+tree_max_level_i1 <- max(tree_new_i1$Get('level')) - 1
+#cat("\n\nNumber of levels", tree_max_level, "\n\n")
+
+hierarchies_new_i1 <- ToDataFrameTree(
+  tree_new_i1,
+  level1 = function(x)
+    x$path[2],
+  level2 = function(x)
+    x$path[3],
+  level3 = function(x)
+    x$path[4],
+  level4 = function(x)
+    x$path[5],
+  level5 = function(x)
+    x$path[6],
+  level6 = function(x)
+    x$path[7],
+  level7 = function(x)
+    x$path[8],
+  
+  level_number = function(x)
+    x$level - 1
+  
+)[-1, -1]
+
+# Display the df
+# hierarchies_new %>% kable(digits = 3, caption = "Hierarchies") %>% kable_styling("striped", full_width = T) %>%  row_spec(0, angle = -45) %>%  scroll_box(height = "500px")
+
+```
+
+```{r i1_criteria_codes_get_leaves}
+## Get the tree leaves
+
+n_leaves_i1 <- tree_new_i1$leafCount
+df_leaves_i1 <- ToDataFrameTypeCol(tree_new_i1)
+
+df_leaves_criterion_i1 <- as.data.frame( df_leaves_i1[cbind(seq(nrow(df_leaves_i1)), max.col(!is.na(df_leaves_i1), ties.method = 'last'))])
+names(df_leaves_criterion_i1) <- c("crit_code")
+
+if (params$INT == 1)
+  shiny::setProgress(0.07, message = "Load Spatial Data - Vector")  # set progress to 17%
+```
+
+# Load Spatial Data
+
+Here we load all the spatial data. The data are used in different chunks below but it is easier to modify file names if all the spatial data are imported in the same chunk.
+
+## Vector Data
+
+The vector data include the sub-divisions of the area that is being modelled, and triangulation points if available.
+
+The vector data are not projected and in geojson format. Here they are loaded and projected to the working crs.
+
+<div class="fold o">   
+```{r i1_spatialdataload_vector_01, cache = FALSE, out.width="100%", include = TRUE, echo=FALSE}
+
+wkt_geo <-  paste0( "
+  GEOGCRS[\"WGS 84 (with axis order normalized for visualization)\",
+          ENSEMBLE[\"World Geodetic System 1984 ensemble\",
+                   MEMBER[\"World Geodetic System 1984 (Transit)\",
+                          ID[\"EPSG\",1166]],
+                   MEMBER[\"World Geodetic System 1984 (G730)\",
+                          ID[\"EPSG\",1152]],
+                   MEMBER[\"World Geodetic System 1984 (G873)\",
+                          ID[\"EPSG\",1153]],
+                   MEMBER[\"World Geodetic System 1984 (G1150)\",
+                          ID[\"EPSG\",1154]],
+                   MEMBER[\"World Geodetic System 1984 (G1674)\",
+                          ID[\"EPSG\",1155]],
+                   MEMBER[\"World Geodetic System 1984 (G1762)\",
+                          ID[\"EPSG\",1156]],
+                   MEMBER[\"World Geodetic System 1984 (G2139)\",
+                          ID[\"EPSG\",1309]],
+                   ELLIPSOID[\"WGS 84\",6378137,298.257223563,
+                             LENGTHUNIT[\"metre\",1],
+                             ID[\"EPSG\",7030]],
+                   ENSEMBLEACCURACY[2.0],
+                   ID[\"EPSG\",6326]],
+          PRIMEM[\"Greenwich\",0,
+                 ANGLEUNIT[\"degree\",0.0174532925199433],
+                 ID[\"EPSG\",8901]],
+          CS[ellipsoidal,2],
+          AXIS[\"geodetic longitude (Lon)\",east,
+               ORDER[1],
+               ANGLEUNIT[\"degree\",0.0174532925199433,
+                         ID[\"EPSG\",9122]]],
+          AXIS[\"geodetic latitude (Lat)\",north,
+               ORDER[2],
+               ANGLEUNIT[\"degree\",0.0174532925199433,
+                         ID[\"EPSG\",9122]]],
+          USAGE[
+            SCOPE[\"Horizontal component of 3D system.\"],
+            AREA[\"World.\"],
+            BBOX[-90,-180,90,180]],
+          REMARK[\"Axis order reversed compared to EPSG:4326\"]]")
+
+# load the divsions extent
+vect_ext_i1 <- load_vector_data(paste0("admin_", params$EXT))
+
+# select the location to be modelled
+vect_subdiv_i1 <- select_location(vect_ext_i1, params$DIVCODEVAR, params$DIVCODEVAL)
+
+vect_subdiv_i1$ID <- seq.int(nrow(vect_subdiv_i1))# add an id field
+vect_subdiv_i1$id <- formatC(vect_subdiv_i1$ID, width = 2, format = "d", flag = "0") #format the id field
+
+df_subdiv_area_i1 <- as.data.frame(expanse(vect_subdiv_i1, unit="ha"))
+df_subdiv_area_i1 <- cbind(df_subdiv_area_i1, as.data.frame(vect_subdiv_i1)$ID)
+names(df_subdiv_area_i1) <- c("ha","ID")
+#names(df_subdiv_area) <- c("ha")
+max_area_i1 <- max(df_subdiv_area_i1)
+ 
+ 
+vect_subdiv_extent_i1 <- ext(vect_subdiv_i1) # get the extent
+nudge_xval_i1 <-
+  ((vect_subdiv_extent_i1[2] - vect_subdiv_extent_i1[1]) / (nrow(vect_subdiv_i1) * 2.5))
+nudge_yval_i1 <-
+  ((vect_subdiv_extent_i1[4] - vect_subdiv_extent_i1[3]) / (nrow(vect_subdiv_i1) * 2.5))
+
+vect_subdiv_pt_i1 <- centroids(vect_subdiv_i1)
+expr <- paste0("vect_subdiv_pt_i1$", params$SUBDIVNAMEVAR)
+vect_subdiv_pt_i1$subdiv_label <- paste(vect_subdiv_pt_i1$id, "=", eval(parse(text=(expr))))
+vect_subdiv_pt_i1$subdiv_label <- factor(vect_subdiv_pt_i1$subdiv_label)
+
+g_i1 <- ggplot()
+gsubdiv_i1 <- add_subdiv_plot(g_i1, vect_subdiv_i1, vect_subdiv_pt_i1, nudge_xval_i1, nudge_yval_i1)
+gsubdiv_i1
+
+```
+</div>
+
+<div class="fold o">   
+```{r i1_spatialdataload_vector_02, cache = FALSE, out.width="100%", include = TRUE, echo=FALSE}
+
+vect_triangulation_i1 <- load_vector_data( paste0("triangulation_", params$DIVCODEVAL,"_", params$INN1))
+
+vect_triangulation_i1$ID <- seq.int(nrow(vect_triangulation_i1))# add an id field
+vect_triangulation_i1$id <- formatC(vect_triangulation_i1$ID, width = 2, format = "d", flag = "0") #format the id field
+
+vect_triangulation_extent_i1 <- ext(vect_triangulation_i1) # get the extent
+nudge_xvaltri_i1 <-
+  ((vect_triangulation_extent_i1[2] - vect_triangulation_extent_i1[1]) /  (nrow(vect_triangulation_i1) * 2.5))
+#cat("nudge_xvaltri =", nudge_xvaltri)
+nudge_yvaltri_i1 <-
+  ((vect_triangulation_extent_i1[4] - vect_triangulation_extent_i1[3]) /  (nrow(vect_triangulation_i1) * 2.5))
+#cat("nudge_yvaltri =", nudge_yvaltri)
+
+
+if (!is.na(params$TRIAD1)) {
+  expr <- paste0("vect_triangulation_i1$", params$TRIAD1)
+  vect_triangulation_i1$tri_label_ad <-
+    paste(vect_triangulation_i1$id, "=", eval(parse(text = (expr))))
+  vect_triangulation_i1$tri_label_ad <-
+    factor(vect_triangulation_i1$tri_label_ad)
+  g_ad_i1 <- ggplot() +
+      labs(title = paste("\nAdoption Triangulation Points - ", params$INN1))
+  gtriangulation_ad_i1 <- add_triangulation_plot_no_labels_ad(g_ad_i1, vect_triangulation_i1)
+  gtriangulation_ad_i1 <- add_subdiv_simple_plot(gtriangulation_ad_i1, vect_subdiv_i1)
+  gtriangulation_ad_i1
+}
+
+if (!is.na(params$TRIBA1)) {
+  expr <- paste0("vect_triangulation_i1$", params$TRIBA1)
+  vect_triangulation_i1$tri_label_ba <-
+    paste(vect_triangulation_i1$id, "=", eval(parse(text = (expr))))
+  vect_triangulation_i1$tri_label_ba <-
+    factor(vect_triangulation_i1$tri_label_ba)
+  g_ba_i1 <- ggplot() +
+      labs(title = paste("\nBiophysical Aptitude\nTriangulation Points - ", params$INN1))
+  gtriangulation_ba_i1 <- add_triangulation_plot_no_labels_ba(g_ba_i1, vect_triangulation_i1)
+  gtriangulation_ba_i1 <- add_subdiv_simple_plot(gtriangulation_ba_i1, vect_subdiv_i1)
+  gtriangulation_ba_i1
+}
+
+if (!is.na(params$TRISE1)) {
+  expr <- paste0("vect_triangulation_i1$", params$TRISE1)
+  vect_triangulation_i1$tri_label_se <-
+    paste(vect_triangulation_i1$id, "=", eval(parse(text = (expr))))
+  vect_triangulation_i1$tri_label_se <-
+    factor(vect_triangulation_i1$tri_label_se)
+  g_se_i1 <- ggplot() +
+      labs(title = paste("\nSocio-economic Feasibility\nTriangulation Points - ", params$INN1))
+  gtriangulation_se_i1 <- add_triangulation_plot_no_labels_se(g_se_i1, vect_triangulation_i1)
+  gtriangulation_se_i1 <- add_subdiv_simple_plot(gtriangulation_se_i1, vect_subdiv_i1)
+  gtriangulation_se_i1
+}
+
+if (params$INT == 1)
+  shiny::setProgress(0.08, message = "Load Spatial Data - Raster")  # set progress to 17%
+
+```
+</div>
+
+## Raster Data
+
+The raster spatial data are loaded first.
+Only the mask need be in the working crs.
+
+<div class="fold o">   
+```{r i1_spatialdataload_raster_01, results='asis', warning=FALSE}
+
+# set the working crs using WKT arguments
+
+wkt_lam <-  paste0(
+    "PROJCRS[\"unknown\",
+    BASEGEOGCRS[\"unknown\",
+        DATUM[\"World Geodetic System 1984\",
+            ELLIPSOID[\"WGS 84\",6378137,298.257223563,
+                LENGTHUNIT[\"metre\",1]],
+            ID[\"EPSG\",6326]],
+        PRIMEM[\"Greenwich\",0,
+            ANGLEUNIT[\"degree\",0.0174532925199433],
+            ID[\"EPSG\",8901]]],
+    CONVERSION[\"unknown\",
+        METHOD[\"Lambert Azimuthal Equal Area\",
+            ID[\"EPSG\",9820]],
+        PARAMETER[\"Latitude of natural origin\",",
+vect_subdiv_extent_i1[3],
+    ",ANGLEUNIT[\"degree\",0.0174532925199433],
+            ID[\"EPSG\",8801]],
+        PARAMETER[\"Longitude of natural origin\",",
+vect_subdiv_extent_i1[1],
+    ",ANGLEUNIT[\"degree\",0.0174532925199433],
+            ID[\"EPSG\",8802]],
+        PARAMETER[\"False easting\",1000000,
+            LENGTHUNIT[\"metre\",1],
+            ID[\"EPSG\",8806]],
+        PARAMETER[\"False northing\",1000000,
+            LENGTHUNIT[\"metre\",1],
+            ID[\"EPSG\",8807]]],
+    CS[Cartesian,2],
+        AXIS[\"(E)\",east,
+            ORDER[1],
+            LENGTHUNIT[\"metre\",1,
+                ID[\"EPSG\",9001]]],
+        AXIS[\"(N)\",north,
+            ORDER[2],
+            LENGTHUNIT[\"metre\",1,
+                ID[\"EPSG\",9001]]]]"
+  )
+
+#assign(paste("wkt_lam"), wkt_lam, envir = results_env)
+#assign(paste("wkt_lam"), wkt_lam, .GlobalEnv)
+
+# project the country boundary to LAM
+
+vect_subdiv_proj_i1 <-  project(vect_subdiv_i1, wkt_lam)
+vect_subdiv_proj_extent_i1 <- terra::ext(vect_subdiv_proj_i1)
+
+# make a basic raster with dimensions with 100m resolution 
+# and projected crs 
+
+rast_subdiv_mask_proj_extent_i1 <- rast(crs = wkt_lam, extent = vect_subdiv_proj_extent_i1, resolution = params$MASK, vals=c(1))
+
+# make the mask based on the country boundary
+
+rast_subdiv_mask_proj_i1 <- terra::rasterize(
+      vect_subdiv_proj_i1,
+      rast_subdiv_mask_proj_extent_i1,
+      field = 1,
+      background = NA, 
+      touches = T
+    ) 
+
+
+# subset the priorities dataframe to keep only the records that have distinct raster data files
+
+df_raster_data_i1 <- droplevels(distinct(df_requirements_i1,
+                                      data_file_prefix,
+                                      .keep_all = T)) %>% drop_na(data_file_prefix)
+
+
+# for each record in the df_raster_data data frame use the data file prefix and the raster or brick variable to load the raster data, the name of the raster is generated automatically from the data file name
+# these rasters needn't have the same crs as the working crs but must have the crs in the metadata (e.g. geotiff format)
+
+for (i in seq(from = 1,
+              to = nrow(df_raster_data_i1),
+              by = 1)) {
+  assign(
+    paste0("rast_", df_raster_data_i1[i, 12]),
+    load_raster_data(
+      as.character(df_raster_data_i1[i, 12]),
+      paste0("rast_", df_raster_data_i1[i, 12])
+    )
+  )
+  cat(paste0("\n **rast_", df_raster_data_i1[i, 12], "** :\n"))
+  print(get(paste0(
+    "rast_", df_raster_data_i1[i, 12]
+  )))
+  cat(paste0("\n"))
+}
+
+
+```
+</div>
+
+# Common spatial resolution and extent
+
+## Mask
+
+Let's start with creating a 'mask', _i.e._, a raster map of the area of interest (1 = area to be modelled, NA = ignored). 
+
+The properties of this map are shown below:
+
+<div class="fold o">  
+```{r i1_mask_make_plot,  cache.whatever=params$Agg, out.width="100%", warning=FALSE, results='asis'}
+
+if (params$Agg == 1){rast_mask_proj_i1 <- rast_subdiv_mask_proj_i1 } else {
+  rast_mask_proj_i1 <- aggregate(rast_subdiv_mask_proj_i1, fact = params$Agg, na.rm=TRUE)}
+
+rast_mask_proj_filename_i1 <-
+  paste0("spatial_data/input/rast_mask_proj_i1.tif")
+
+writeRaster(rast_mask_proj_i1,
+            here(rast_mask_proj_filename_i1),
+            overwrite = TRUE)
+
+res_rast_mask_proj_comma_i1 <- scales::label_comma(accuracy = NULL)(res(rast_mask_proj_i1))
+
+g_i1 <- base_raster_plot(rast_mask_proj_i1, "layer", 'red', 'blue', paste0("Aggregated mask - Resolution = ", res_rast_mask_proj_comma_i1, "m"))
+
+gsubdivsimple_i1 <- add_subdiv_simple_plot(g_i1, vect_subdiv_i1)
+gsubdivsimple_i1
+
+```
+</div>
+
+A factor is calculated to determine the area of each raster cell in hectares.
+
+```{r i1_mask_area, cache = FALSE, warning=FALSE, results='asis' }
+
+Stat_factor_ha_i1 <- ((xres(rast_mask_proj_i1)^2) / 10000) # factor used for statistical calculations divides the area of a raster cell (in m2) by 10000 to give the area of the cell in hectares
+
+Stat_factor_ha_comma_i1 <- scales::label_comma(accuracy = NULL)(Stat_factor_ha_i1)
+
+cat(paste(Stat_factor_ha_comma_i1, "hectares in each cell"))
+
+if (params$INT == 1)
+  shiny::setProgress(0.1, message = "Resampling data 1st Innovation")  # set progress to 10%
+```
+
+## Rough crop, Reproject, Aggregate and Resample
+
+In this section the input spatial data are cropped to the extent of the sub-division boundary, projected if necessary and then aggregated and resampled if necessary.
+
+
+```{r i1_agg_resample_01, message=FALSE, warning=FALSE, out.width="100%", results='hide'}
+
+# do a rough crop of the thematic data for the country extent in the CRS of the thematic data
+
+for (i in seq(from = 1,
+              to = nrow(df_raster_data_i1),
+              by = 1)) {
+  print(df_raster_data_i1[i, 4])
+  temp_crs <- crs(get(paste0("rast_", df_raster_data_i1[i, 12])))
+  assign("vect_subdiv_temp_crs_i1",
+         terra::project(vect_subdiv_i1, temp_crs))
+  assign("vect_subdiv_temp_crs_extent_i1",
+         terra::ext(vect_subdiv_temp_crs_i1))
+  
+  rast_roughcrop_filename_i1 <-
+    paste0("spatial_data/input/rast_", df_raster_data_i1[i, 12], "_roughcrop_i1.tif")
+  
+  writeRaster(
+    crop(get(paste0(
+      "rast_", df_raster_data_i1[i, 12]
+    )),
+    vect_subdiv_temp_crs_extent_i1, touches=TRUE, extend=TRUE, mask=TRUE, snap = 'out'),
+    here(rast_roughcrop_filename_i1),
+    overwrite = TRUE
+  )
+  
+  assign(paste0("rast_", df_raster_data_i1[i, 12], "_roughcrop_i1"),
+         rast(here(rast_roughcrop_filename_i1)))
+  
+  get(paste0("rast_", df_raster_data_i1[i, 12], "_roughcrop_i1"))    
+  
+#plot(get(paste0("rast_", df_raster_data_i1[i, 12], "_roughcrop_i1")) )
+
+  gc()
+  
+}  
+
+
+#knitr::knit_exit()
+
+```
+
+
+<div class="fold o"> 
+```{r i1_agg_resample_02, out.width="100%", results='asis', warning=FALSE, message=FALSE} 
+
+# initialise empty vector of rasters
+
+c_raster_data_rsmp_i1 <- c()
+
+# create an empty data frame for climatic variables
+df_raster_data_clim_i1 <- df_raster_data_i1[0,]
+
+# create an empty data frame for soil variables with multiple horizons
+df_raster_data_soil_i1 <- df_raster_data_i1[0,]
+
+# create an empty data frame for variables with single band data
+df_raster_data_single_i1 <- df_raster_data_i1[0,]
+
+
+# reproject the raster data if necessary
+
+for (i in seq(from = 1,
+              to = nrow(df_raster_data_i1),
+              by = 1)) {
+  
+  cat("\n\n")
+  cat(paste("### ", as.character(df_raster_data_i1[i, 4])))
+  cat("\n\n")
+  
+  # compare the crs of the raster with the working crs
+# when different project the raster  
+  
+  if ( paste(crs(get(paste0("rast_", df_raster_data_i1[i, 12])))) %ni% paste(wkt_lam)) {  
+  
+  cat("different crs - ")  
+  assign(
+    paste0("rast_", df_raster_data_i1[i, 12], "_prj_i1"),
+    raster_project(
+      get(paste0("rast_", df_raster_data_i1[i, 12], "_roughcrop_i1")),
+      #proj4_lam,
+      as.character(df_raster_data_i1[i, 15]), rast_mask_proj_i1
+    )
+  )
+  
+  rast_prj_filename_i1 <-
+    paste0("spatial_data/input/rast_",
+           df_raster_data_i1[i, 12],
+           "_prj_i1.tif")
+  
+  writeRaster(get(
+    paste0(
+      "rast_",
+      df_raster_data_i1[i, 12],
+      "_prj_i1"
+    )
+  ), here(rast_prj_filename_i1), overwrite = TRUE)
+  
+  } else {
+
+   cat("same crs - ") 
+# when not different just create a new raster with the same prj suffix  
+    assign(
+    paste0("rast_", df_raster_data_i1[i, 12], "_prj_i1"),
+    get(paste0("rast_", df_raster_data_i1[i, 12], "_roughcrop_i1"))
+      )
+      rast_prj_filename_i1 <-
+    paste0("spatial_data/input/rast_",
+           df_raster_data_i1[i, 12],
+           "_prj_i1.tif")
+  
+  writeRaster(get(
+    paste0(
+      "rast_",
+      df_raster_data_i1[i, 12],
+      "_prj_i1"
+    )
+  ), here(rast_prj_filename_i1), overwrite = TRUE)
+  
+  }
+
+# calculate aggregate factor for each criterion for both dimensions of the raster (these are the same for a square cell shape)
+  
+#  cat(paste(df_raster_data[i, 10],"\n"))
+
+  calc_agg_factor_i1 <-
+    (res(rast_mask_proj_i1) / res(get(paste0(
+      "rast_", df_raster_data_i1[i, 12], "_prj_i1"
+    ))))
+  cat(paste("calculated aggregate factor = ", calc_agg_factor_i1))
+  cat("\n")
+
+ if (calc_agg_factor_i1[1] < 1) {
+    calc_agg_factor_i1[1] <- 1
+    
+    # this means that the mask has a higher resolution than the precipitation raster so aggregation is not necessary and the precipitation raster will stay the same resolution
+    
+#    cat(paste("revised calculated aggregate factor 1 = ", calc_agg_factor[1],"\n"))
+  }
+  
+  
+  
+  if (calc_agg_factor_i1[2] < 1) {
+    calc_agg_factor_i1[2] <- 1
+    cat(paste("revised calculated aggregate factor 2 = ", calc_agg_factor_i1[2]))
+  }
+  
+  # for each record in the df_raster_data data frame use the data file prefix to recreate the raster name, and the aggregation and resample functions
+#  cat(paste("aggregate and resample"))
+  assign(
+    paste0("rast_", df_raster_data_i1[i, 12], "_rsmp_i1"),
+    agg_resample(
+      get(paste0("rast_", df_raster_data_i1[i, 12], "_prj_i1")),
+      calc_agg_factor_i1,
+      as.character(df_raster_data_i1[i, 14]),
+      as.character(df_raster_data_i1[i, 15]),
+      rast_mask_proj_i1
+    )
+  )
+
+c_raster_data_rsmp_i1 <- append(c_raster_data_rsmp_i1, get(paste0("rast_", df_raster_data_i1[i, 12], "_rsmp_i1"))) 
+#  plot_raster <-
+    terra::plot(
+      get(paste0("rast_", df_raster_data_i1[i, 12], "_rsmp_i1")),
+      main = paste0(
+        as.character(df_raster_data_i1[i, 11]),
+        "\n( ",
+        as.character(df_raster_data_i1[i, 14]),
+        ", ",
+        as.character(df_raster_data_i1[i, 15]),
+        ")"
+      ),
+      breaks = 10
+   )
+  #print(plot_raster)
+  
+  dim_rast_i1 <<- dim(get(paste0("rast_", df_raster_data_i1[i, 12], "_rsmp_i1")))
+
+  cat(paste("\nDim = ", dim_rast_i1))
+  cat("\n\n")
+  
+  if (dim_rast_i1[[3]] > 1) {
+    if (!is.na(df_raster_data_i1[i, 24])) {
+      df_raster_data_clim_i1 <-
+        rbind(df_raster_data_clim_i1, df_raster_data_i1[i,])
+    } else {
+      df_raster_data_soil_i1 <-
+        rbind(df_raster_data_soil_i1, df_raster_data_i1[i,])
+    }
+  } else {
+    df_raster_data_single_i1 <-
+      rbind(df_raster_data_single_i1, df_raster_data_i1[i,])
+  }
+  
+  rast_rsmp_filename_i1 <-
+    paste0("spatial_data/input/rast_",
+           df_raster_data_i1[i, 12],
+           "_rsmp_i1.tif")
+  
+  writeRaster(get(
+    paste0(
+      "rast_",
+      df_raster_data_i1[i, 12],
+      "_rsmp_i1"
+    )
+  ), here(rast_rsmp_filename_i1), overwrite = TRUE)
+  
+  gc()    
+
+#  plot_raster
+#  terra::plot(rast_mask_proj, title = "") # this is needed (even if it is not actually plotted) to enable the plot of the raster
+  
+}
+
+
+```
+</div>
+
+
+<div class="fold o">
+```{r i1_agg_resample_03,  out.width="100%", results='asis', warning=FALSE, message=FALSE}
+
+# ensure that all rasters have data for the same area
+# create new mask for data areas
+
+rast_mask_proj_data_i1 <- mask(rast_mask_proj_i1, anyNA(c_raster_data_rsmp_i1), maskvalue=TRUE)
+rast_mask_proj_data_i1
+plot(rast_mask_proj_data_i1)
+
+```
+</div>
+
+This mask designates the locations where predictions should be made, and an empty dataframe (tibble) is created with records for all locations.
+
+
+<div class="fold o">   
+```{r i1_mask03,  cache.whatever=params$Agg, warning=FALSE }
+
+# only run the models for the areas in the mask
+
+df_irm_i1 <- geom(terra::as.points(rast_mask_proj_data_i1)) %>% as_tibble()
+
+x <-  pull(df_irm_i1, x)
+y <-  pull(df_irm_i1, y)
+xy_i1 <- cbind(x, y)
+
+#str(df_irm)
+
+if (params$INT == 1)
+  shiny::setProgress(0.15, message = "Convert raw data to criteria values 1st Innovation")  # set progress to 17%
+``` 
+</div>
+
+# Convert raw data to criteria values
+
+Raster data with multiple bands will need to be processed before adding to the df_irm_i1 data frame.
+
+If the criterion has a growth stage name then it is climatic and will need to undergo the climatic processing.
+
+## Processing climatic data
+
+```{r i1_clim_data_temporal, results='asis'}
+
+clim_raster_data_prefix_i1 <- df_raster_data_clim_i1$data_file_prefix
+df_requirements_clim_i1 <- df_requirements_i1[0,]
+
+for (i in clim_raster_data_prefix_i1) { 
+# if any of the clim raster data prefix values are in the priorities 
+df_requirements_clim_i1 <-
+        rbind(df_requirements_clim_i1, subset(df_requirements_i1, grepl(paste0("\\b",i,"\\b"), df_requirements_i1$data_file_prefix)))
+}
+
+
+n_clim_i1 <- nrow(df_requirements_clim_i1)
+cat(paste("\n\nThere are ", n_clim_i1, "Climatic criteria: \n"))
+
+  for (i in 1:n_clim_i1) {
+  cat(paste("\n",df_requirements_clim_i1[i, 4]," - "))
+  rast_clim_mask_i1 <- get(paste0("rast_",df_requirements_clim_i1[i, 12], "_rsmp_i1"))
+  if (paste(df_requirements_clim_i1[i, 25]) == "m") {
+  rast_clim_mask_m_i1 <- rast_clim_mask_i1
+  names(rast_clim_mask_m_i1) <- c(month.name)
+  cat("monthly data\n")
+  } else {
+  rast_clim_mask_d_i1 <- rast_clim_mask_i1
+  names(rast_clim_mask_d_i1) <- c(1:36)
+  cat("dekadal data\n")}
+  }
+
+cat("\n\n")
+
+```
+
+
+<div class="fold o">   
+```{r i1_clim_data_clean,  cache.whatever=params$Agg, out.width="100%", warning=FALSE}
+
+## division by zero rainfall is infinitive, thus edited by Atkilt
+
+if (exists('rast_clim_mask_m_i1')) {
+  values(rast_clim_mask_m_i1)[values(rast_clim_mask_m_i1) >= 0] = 0
+  values(rast_clim_mask_m_i1)[values(rast_clim_mask_m_i1) < 0] = NA
+}
+
+if (exists('rast_clim_mask_d_i1')) {
+  values(rast_clim_mask_d_i1)[values(rast_clim_mask_d_i1) >= 0] = 0
+  values(rast_clim_mask_d_i1)[values(rast_clim_mask_d_i1) < 0] = NA
+}
+
+```
+</div>
+
+
+```{r i1_growth_stages_01, echo=FALSE, results='asis'}
+
+cat("\n\n#### Growth Stages\n
+
+Here we load the table of the growth stages.\n")
+
+```
+
+
+<div class="fold o"> 
+```{r i1_growth_stages_02, results='asis'}
+
+# get the growth stages filename using the innovation parameter
+#growth_stages_filename_i1 <-
+#  as.character(paste("tab_data/input/growth_stages_", params$INN1, ".csv", sep = ""))
+
+growth_stages_filename_i1 <- as.character(paste("E:/repos/raise_fs/shiny/data/",
+    params$INN1,
+    "_gs_s10.csv", sep = ""))
+
+df_growth_stages_i1 <-  read.csv(here(growth_stages_filename_i1))
+
+df_growth_stages_i1 %>% dplyr::filter(gs_name != "sow_date") %>% select(-gs_day)  %>%
+  kable(digits = 3, caption = "Growth Stage Lengths") %>% kable_styling("striped", full_width = T) #%>% print
+
+# create a new table just for where growth stage has requirements
+df_growth_stages_req_i1 <-
+  dplyr::filter(df_growth_stages_i1, (prec_criteria == 1 |
+                                  temp_criteria == 1))
+df_growth_stages_req_prec_i1 <-
+  dplyr::filter(df_growth_stages_i1, prec_criteria == 1)
+df_growth_stages_req_temp_i1 <-
+  dplyr::filter(df_growth_stages_i1, temp_criteria == 1)
+
+```
+</div>
+
+
+<div class="fold o"> 
+```{r i1_sowing_dates_static_01, cache.whatever=params$Agg, out.width="100%", warning=FALSE, results='asis', eval=nonsos_crit_i1}
+
+# see if one of the criteria is for the total growing period, if so then generate distribution
+
+# this uses two functions from the irm package called .growth_period_long (for monthly data) and .growth_period_long_dekad (for dekadal data)
+
+# both functions take three arguments: day_begin, and day_end in day numbers (obtained from the growth_stages_req table) and num_years which is calculated based on whether the growing season is spread across more than one calendar year
+
+
+# for each of the growth stages for which there are requirements create a new raster brick
+if (nonsos_crit_i1) {
+
+cat("\n\n\n")
+cat("#### Spatially Static Growing Seasons\n") # add headings
+cat("\n\n\n")
+
+cat(paste("\n\nSowing Date:", df_growth_stages_i1$gs_day[[1]],"\n\n"))
+
+# get the number of variables in growth_stages (excluding sowing/planting date and total length)
+
+# create a list of the growth stages and determine the start and end days of each growth period
+
+phen_tmp_i1 <- list()
+for (i in seq_len(nrow(df_growth_stages_i1) - 1)) {
+  phen_tmp_i1[[as.character(df_growth_stages_i1[i + 1, 1])]] <-
+    df_growth_stages_i1[i + 1, 3]
+}
+
+phen_stages_beg_i1 <-
+  df_growth_stages_i1$gs_day[1] + c(0, cumsum(phen_tmp_i1)[c(-length(phen_tmp_i1), -(length(phen_tmp_i1)-1))], 0)
+phen_stages_length_i1 <- unlist(phen_tmp_i1)
+phen_stages_end_i1 <- phen_stages_beg_i1 + phen_stages_length_i1
+names(phen_stages_beg_i1) <- names(phen_tmp_i1)
+names(phen_stages_end_i1) <- names(phen_tmp_i1)
+
+rbind(start = phen_stages_beg_i1, end = phen_stages_end_i1) %>%
+  as.data.frame %>%
+  kable(caption = "Growth Stage Days") %>% kable_styling("striped", full_width = T)  %>% print
+
+num_years_i1 <- ceiling(phen_stages_end_i1[["total"]] / 365)
+cat(paste("Growth Stages span", num_years_i1, "calendar years"))
+}
+
+```
+</div>
+
+<div class="fold o"> 
+```{r i1_sowing_dates_static_02,  cache.whatever=params$Agg, out.width="100%", warning=FALSE, eval=nonsos_crit_i1, results='asis'}
+
+if (nonsos_crit_i1) {
+  
+# monthly distribution
+if (exists('rast_clim_mask_m_i1')) {
+  for (i in seq_len(nrow(df_growth_stages_req_i1))) {
+    period_name_i1 <- as.character(df_growth_stages_req_i1[i, 1])
+    cat(paste("\n", period_name_i1," - monthly\n"))
+    v_m_i1 <-
+      .growth_period_long(phen_stages_beg_i1[period_name_i1], phen_stages_end_i1[period_name_i1], num_years_i1)
+    assign(paste0("rast_period_m_", df_growth_stages_req_i1[i, 1], "_i1"),
+           rast_clim_mask_m_i1 %>%
+             app(function(x) {
+               ifelse(is.na(x), NA_real_, v_m_i1)
+             }))
+    
+#    plot_raster <-
+      plot(
+        get(paste0("rast_period_m_", df_growth_stages_req_i1[i, 1], "_i1")),
+        maxnl = 12,
+        breaks = c(0, 0.25, 0.5, 0.75, 1),
+        axes = F,
+        plg = list(cex = 1, title = paste0(df_growth_stages_req_i1[i, 1], "_i1"))
+      )
+#    print(plot_raster)
+  }
+}
+# dekadal distribution
+if (exists('rast_clim_mask_d_i1')) {
+  for (i in seq_len(nrow(df_growth_stages_req_i1))) {
+    period_name_i1 <- as.character(df_growth_stages_req_i1[i, 1])
+    cat(paste("\n", period_name_i1," - dekad\n"))
+    v_d_i1 <-
+      .growth_period_long_dekad(phen_stages_beg_i1[period_name_i1], phen_stages_end_i1[period_name_i1], num_years_i1)
+    assign(paste0("rast_period_d_", df_growth_stages_req_i1[i, 1], "_i1"),
+           rast_clim_mask_d_i1 %>%
+             app(function(x) {
+               ifelse(is.na(x), NA_real_, v_d_i1)
+             }))
+    
+#    plot_raster <-
+      plot(
+        get(paste0("rast_period_d_", df_growth_stages_req_i1[i, 1], "_i1")),
+        maxnl = 36,
+        breaks = c(0, 0.25, 0.5, 0.75, 1),
+        axes = F,
+        plg = list(cex = 1, title = paste0(df_growth_stages_req_i1[i, 1], "_i1"))
+      )
+
+  }
+}
+}
+``` 
+</div>
+
+
+```{r i1_sowing_dates_sos_title, echo=FALSE, results='asis', eval=sos_crit_i1}
+
+cat("\n#### Spatially Dynamic Growing Seasons\n")
+
+```
+
+```{r i1_sowing_dates_sos_intro, echo=FALSE, results='asis',  eval=sos_crit_i1}
+
+cat("For climatic criteria for specific growth stages which use monthly or dekadal data, and which have a spatially variable growth period the phenological stages need to be distributed over those periods and spatially.\n
+\n
+\n
+The maps below give the distribution of each phenological stage over the months.\n
+\n
+I use the same function as Walvoort (here called growth_period_long_tbl and growth_period_long_dekad_tbl), and apply this on a cell-by-cell basis using the start and end days for each cell.\n
+\n
+When the function is applied to the tibble using 'apply' it produces a x *x* 12/36 matrix. I transpose this matrix, append it to the original tibble and create a temporary data frame. I save this as a csv, convert this to a spatvector object and create spatrasters for each month/dekad *x* growing period combination. I join the individual rasters in a SpatRaster brick for each growing period - to be used later.")
+
+```
+
+
+<div class="fold o">   
+```{r i1_sowing_dates_sos_onsetdata_01,  cache.whatever=params$Agg, out.width="100%", warning=FALSE, eval=sos_crit_i1}
+
+if (sos_crit_i1) {
+# get onset for area of interest
+rast_filename_onset_i1 <-
+  as.character(paste("spatial_data/input/rast_onset_",
+                     params$INN1,
+                     ".tif",
+                     sep = ""))
+assign(paste0("rast_onset_i1"), rast(here(rast_filename_onset_i1)))
+names(rast_onset_i1) <- c("onset")
+# rast_onset
+# 
+# g <- base_raster_plot(rast_onset, "onset", 'red', 'blue', "Season onset day number (rast_onset)" )
+# 
+# gsubdivsimple <- add_subdiv_simple_plot(g)
+# gsubdivsimple
+}
+```
+</div>
+
+
+<div class="fold o">   
+```{r i1_sowing_dates_sos_onsetdata_02,  cache.whatever=params$Agg, out.width="100%", warning=FALSE, eval=sos_crit_i1}
+
+if (sos_crit_i1) {
+# project onset
+rast_onset_proj_i1 <- project(rast_onset_i1, rast_mask_proj_i1, method = "near")
+# rast_onset_proj
+# 
+# g <- base_raster_plot(rast_onset_proj, "onset", 'red', 'blue', "Season onset day number (rast_onset_proj)" )
+# 
+# gsubdivsimple <- add_subdiv_simple_plot(g)
+# gsubdivsimple
+}
+```
+</div>
+
+
+<div class="fold o">   
+```{r i1_sowing_dates_sos_onsetdata_03,  cache.whatever=params$Agg,  out.width="100%", warning=FALSE, eval=sos_crit_i1}
+
+if (sos_crit_i1) {
+# do a rough crop to boundaries
+rast_onset_crop_i1 <- crop(rast_onset_proj_i1, rast_mask_proj_i1, mask = T, touches = T, extend = T, snap = 'out')
+# rast_onset_crop
+# 
+# g <- base_raster_plot(rast_onset_crop, "onset", 'red', 'blue', "Season onset day number (rast_onset_crop)" )
+# 
+# gsubdivsimple <- add_subdiv_simple_plot(g)
+# gsubdivsimple
+}
+
+```
+</div>
+
+
+<div class="fold o">   
+```{r i1_sowing_dates_sos_onsetdata_04,  cache.whatever=params$Agg, out.width="100%", warning=FALSE, eval=sos_crit_i1}
+if (sos_crit_i1) {
+rast_onset_crop_rsmp_i1 <- resample(rast_onset_crop_i1, rast_mask_proj_i1,  method="near")
+rast_onset_crop_rsmp_i1
+
+
+g_i1 <- base_raster_plot(rast_onset_crop_rsmp_i1, "onset", 'red', 'blue', "Season onset day number (rast_onset_crop_rsmp_i1)" )
+
+gsubdivsimple_i1 <- add_subdiv_simple_plot(g_i1, vect_subdiv_i1)
+gsubdivsimple_i1
+}
+```
+</div>
+
+<div class="fold o">   
+```{r i1_sowing_dates_sos_onsetdata_05,  cache.whatever=params$Agg, out.width="100%", warning=FALSE, eval=sos_crit_i1}
+
+if (sos_crit_i1) {
+# convert to df
+df_onset_i1 <- as.data.frame(rast_onset_crop_rsmp_i1, xy=TRUE, cells=TRUE, na.rm=NA)
+df_onset_i1 <- mutate(df_onset_i1, onset = as.integer(onset))
+}
+```
+</div>
+
+<div class="fold o">   
+```{r i1_sowing_dates_sos_transpose,  cache.whatever=params$Agg,  out.width="100%", warning=FALSE,  eval=sos_crit_i1}
+
+if (sos_crit_i1) {
+df_growth_stages_lengths_i1 <- df_growth_stages_i1[-1, ]
+#df_growth_stages_lengths
+
+df_growth_stages_lengths1_i1 <- t(select(df_growth_stages_lengths_i1, name, length)) %>% data.frame()
+#df_growth_stages_lengths1
+
+df_growth_stages_lengths2_i1 <- setNames(df_growth_stages_lengths1_i1, df_growth_stages_lengths_i1[,1])
+#df_growth_stages_lengths2
+
+df_growth_stages_lengths3_i1 <- df_growth_stages_lengths2_i1[-1, ] 
+#df_growth_stages_lengths3
+
+df_growth_stages_lengths3_i1[] <- lapply(df_growth_stages_lengths3_i1, as.integer)
+df_growth_stages_lengths3_i1 %>%
+  kable(caption = "Growth Stage Days") %>% kable_styling("striped", full_width = T)  #%>% print
+}
+```
+</div>
+
+<div class="fold o">   
+```{r i1_sowing_dates_sos_onsetdata_06,  cache.whatever=params$Agg,  out.width="100%", warning=FALSE,  eval=sos_crit_i1}
+
+if (sos_crit_i1) {
+# add the growth stage lengths to the df
+for (i in seq_len(nrow(df_growth_stages_lengths_i1))) {
+  period_name_i1 <- as.character(df_growth_stages_lengths_i1[i, 1])
+#  cat(paste(period_name))
+#  cat(eval(parse(text = paste0("df_growth_stages_lengths3$", period_name))))
+  df_onset_i1 <-  mutate(df_onset_i1, !!as.character(paste0(period_name_i1,"_l")) :=  eval(parse(text = paste0("df_growth_stages_lengths3_i1$", period_name_i1))), .keep = c("all"))
+} 
+
+
+# add the start day for the first growth stage (which is the onset)
+
+first_period_name_i1 <- as.character(df_growth_stages_lengths_i1[1, 1])
+#cat(paste(first_period_name))
+df_onset_i1 <-
+  mutate(df_onset_i1,!!as.character(paste0(first_period_name_i1, "_s")) :=  eval(parse(text = paste0(
+    "df_onset_i1$onset"
+  ))),
+  .keep = c("all"))
+
+# add the start days for each of the growth stages (excluding the first which is the onset)
+
+for (i in seq_len(nrow(df_growth_stages_lengths_i1)- 2) ) {
+  
+#  cat(paste(i))
+      
+  previous_period_name_i1 <- as.character(df_growth_stages_lengths_i1[i, 1])
+#  cat(paste("Prev = ", previous_period_name))
+#  cat("\n")
+  period_name_i1 <- as.character(df_growth_stages_lengths_i1[i + 1, 1])
+#  cat(paste("Current = ", period_name))
+#  cat("\n")
+#  cat(paste0("df_growth_stages_lengths3$", period_name))
+#  cat(paste(parse(text =paste0("df_onset$", previous_period_name,"_s"))))
+#  cat("\n")
+#  cat(paste(parse(text =paste0("df_onset$", previous_period_name,"_l"))))
+#  cat("\n\n")
+ 
+eval_expr_1 <- eval(parse(text =paste0("df_onset_i1$", previous_period_name_i1, "_s + df_onset_i1$", previous_period_name_i1,"_l")))
+
+  df_onset_i1 <-
+    mutate(df_onset_i1, !!as.character(paste0(period_name_i1, "_s")) :=  eval_expr_1,
+           .keep = c("all"))
+
+}
+
+# add the end days for each of the growth stages
+
+for (i in seq_len(nrow(df_growth_stages_lengths_i1) - 1) ) {
+  
+#  cat(paste(i))
+      
+#  previous_period_name <- as.character(df_growth_stages_lengths[i, 1])
+#  cat(paste("Prev = ", previous_period_name))
+#  cat("\n")
+  period_name_i1 <- as.character(df_growth_stages_lengths_i1[i, 1])
+#  cat(paste("Current = ", period_name))
+#  cat("\n")
+#  cat(paste0("df_growth_stages_lengths3$", period_name))
+#  cat(paste(parse(text =paste0("df_onset$", period_name,"_s"))))
+#  cat("\n")
+#  cat(paste(parse(text =paste0("df_onset$", period_name,"_l"))))
+#  cat("\n\n")
+ 
+eval_expr_2 <- eval(parse(text =paste0("df_onset_i1$", period_name_i1, "_s + df_onset_i1$", period_name_i1,"_l - 1")))
+
+  df_onset_i1 <-
+    mutate(df_onset_i1, !!as.character(paste0(period_name_i1, "_e")) :=  eval_expr_2,
+           .keep = c("all"))
+
+}  
+  
+onset_max_i1 <- max(select(df_onset_i1, -cell, -x, -y)) # gets the maximum value of the julian day numbers
+num_years_i1 <- max(ceiling(onset_max_i1 / 365))
+
+cat(paste("Growth Stages span", num_years_i1, "calendar years"))
+}
+```
+</div>
+
+<div class="fold o">
+```{r i1_sowing_dates_sos_maps_m,  cache.whatever=params$Agg,  out.width="100%", warning=FALSE, eval=sos_crit_i1}
+
+# to reduce unnecessary processing follow these steps
+# for each growth stage:
+
+# (1) does the monthly and/or dekad raster mask exist on file?
+#   YES - (i) load raster file to env
+#         (ii) plot raster file
+#         (iii) move to next growth stage or next chunk
+#   NO -  (i) go to (2)
+
+# (2) does the monthly and/or dekad raster mask csv exist on file?
+#   YES - (i) load csv file to env as vect
+#         (ii) rasterize vect
+#         (iii) write raster to file
+#         (iv) go to (1)
+#   NO -  (i) go to (3)
+
+# (3) does the monthly and/or dekad raster mask df exist in the env?
+#   YES - (i) write df to file as csv
+#         (ii) go to (2)
+#   NO -  (i) go to (4)
+
+# (4) does the monthly and/or dekad raster mask matrix exist in the env?
+#   YES - (i) join the matrix to the onset df
+#         (ii) write df to file as csv
+#         (iii) go to (3)
+#   NO -  (i) create the matrix using the growth_period_long functions
+#         (ii) join the matrix to the onset df
+#         (iii) go to (4)
+
+if (sos_crit_i1) {
+if (exists('rast_clim_mask_m_i1')) {
+  cat(paste("\n1 Monthly data exist"))
+    
+  # set static vectors of days and months
+  days <- 1:365
+  day_months <- days %>% as.character %>% as.Date("%j") %>% 
+    format("%m") %>% as.integer
+  months <- rep.int(day_months, num_years_i1)
+  
+  
+  for (i in seq_len(nrow(df_growth_stages_lengths_i1))) {
+    period_name_i1 <- as.character(df_growth_stages_lengths_i1[i, 1])
+    cat(paste("\nCurrent growth stage = ", period_name_i1))
+    
+    rast_filename_m_i1 <-
+      as.character(paste0(
+        "spatial_data/output/rast_",
+        period_name_i1,
+        "_m_",
+        params$INN1, "_", params$MASK,
+        ".tif"
+      ))
+    
+    if (!file.exists(here(rast_filename_m_i1))) {
+      cat(paste("\n2 No spatraster"))
+      
+      if (!exists(paste0("vect_", period_name_i1, "_m_i1"))) {
+        cat(paste("\n3 No spatvector"))
+        
+        csv_filename_m_i1 <-
+          as.character(
+            paste(
+              "tab_data/output/df_onset_",
+              period_name_i1,
+              "_m_",
+              params$INN1, "_", params$MASK,
+              ".csv",
+              sep = ""
+            )
+          )
+        
+        if (!file.exists(here(csv_filename_m_i1))) {
+          cat(paste("\n4 No csv data"))
+          
+          if (!exists(paste0("df_onset_", period_name_i1, "_m_i1"))) {
+            cat(paste("\n5 No df"))
+            
+            if (!exists(paste0(period_name_i1, "_matrix_days_m_i1"))) {
+              cat(paste("\n6 No matrix"))
+              
+              if (period_name_i1 == "total") {
+                expr_3_m <- parse(
+                  text = paste0(
+                    "t(apply(df_onset_i1, 1, .growth_period_long_tbl_short, day_begin = \"onset\", day_end = \"",
+                    df_growth_stages_lengths_i1[nrow(df_growth_stages_lengths_i1) - 1, 1],
+                    "_e\", num_years = num_years_i1))"
+                  )
+                )
+              } else {
+                expr_3_m <- parse(
+                  text = paste0(
+                    "t(apply(df_onset_i1, 1, .growth_period_long_tbl_short, day_begin = \"",
+                    period_name_i1,
+                    "_s\",
+        day_end = \"",
+        period_name_i1,
+        "_e\", num_years = num_years_i1))"
+                  )
+                )
+              }
+              
+              assign(paste0(period_name_i1, "_matrix_days_m_i1"),
+                     eval(expr_3_m))
+                            
+                            expr_3_m2 <- parse(
+                  text = paste0(period_name_i1, "_matrix_days_m_i1 * 1000"))
+              
+              assign(paste0(period_name_i1, "_matrix_days_m_i1"), eval(expr_3_m2))
+              
+              eval(parse(text = paste0(
+                "mode(", period_name_i1, "_matrix_days_m_i1) <- \"integer\""
+              )))
+              
+              cat(paste("\n-6"))
+            }
+            
+            
+            assign(paste0("df_onset_", period_name_i1, "_m_i1"),
+                   data.frame(df_onset_i1, get(
+                     paste0(period_name_i1, "_matrix_days_m_i1")
+                   )))
+            
+            cat(paste("\n-5"))
+          }
+          
+          rm(list = paste0(period_name_i1, "_matrix_days_m_i1")) # remove matrix when df created
+          
+          write.csv(get(paste0("df_onset_", period_name_i1, "_m_i1")),
+                    here(csv_filename_m_i1))
+          
+          cat(paste("\n-4"))
+        }
+        rm(list = paste0("df_onset_", period_name_i1, "_m_i1")) # remove df when csv created
+        # assign(paste0("vect_", period_name, "_m"),
+        # vect(
+        #   read_csv(here(csv_filename_m), show_col_types = FALSE, .name_repair = "unique_quiet"),
+        #   geom = c("x", "y"),
+        #   crs = wkt_lam
+        # )) # gives an error due to unused argument (.name_repair = "unique_quiet")
+        assign(paste0("vect_", period_name_i1, "_m_i1"),
+               vect(
+                 read_csv(here(csv_filename_m_i1), show_col_types = FALSE),
+                 geom = c("x", "y"),
+                 crs = wkt_lam
+               )) 
+        cat(paste("\n-3"))
+      }
+      
+      
+      assign(paste0("list_rast_", period_name_i1, "_m_i1"),
+             list())
+      
+      #create an empty raster
+      assign(paste0("rast_", period_name_i1, "_m_i1"), rast())
+      
+      for (j in 1:12) {
+        assign(
+          paste0("rast_", period_name_i1, "_m_i1_", j),
+          rasterize(get(
+            paste0("vect_", period_name_i1, "_m_i1")
+          ), rast_clim_mask_m_i1, field = paste0("X", j))
+        )
+        
+        assign(paste0("list_rast_", period_name_i1, "_m_i1"),
+               append(get(
+                 paste0("list_rast_", period_name_i1, "_m_i1")
+               ), paste0("rast_", period_name_i1, "_m_i1_", j)))
+        expr_5_m <-
+          parse(text = paste0(
+            "add(rast_",
+            period_name_i1,
+            "_m_i1) <- (rast_",
+            period_name_i1,
+            "_m_i1_",
+            j,
+            ")"
+          ))
+        
+        eval(expr_5_m)
+        rm(list = paste0("rast_", period_name_i1, "_m_i1_", j)) # remove month rast when added to brick
+      }
+      
+      rm(list = paste0("vect_", period_name_i1, "_m_i1")) # remove vect when raster created
+      writeRaster(get(paste0("rast_", period_name_i1, "_m_i1")), here(rast_filename_m_i1), overwrite = TRUE)
+      cat(paste("\n-2"))
+    }
+    
+    assign(paste0("rast_", period_name_i1, "_m_i1"), rast(here(rast_filename_m_i1)))
+    cat(paste0("\n", rast_filename_m_i1))
+    
+    expr_6_m <-
+      parse(
+        text = paste0(
+          "names(rast_",
+          period_name_i1,
+          "_m_i1) <- c(\"January\", \"February\", \"March\", \"April\",\"May\",\"June\",\"July\",\"August\",\"September\",\"October\",\"November\",\"December\")"
+        )
+      )
+    
+    eval(expr_6_m)
+    
+#    plot(
+#      get(paste0("rast_", period_name, "_m")),
+#      maxnl = 12,
+#      breaks = c(0, 0.25, 0.5, 0.75, 1),
+#      axes = F,
+#      plg = list(cex = 1, title = paste0(period_name))
+#    )
+    
+  }
+  cat(paste("\n-1"))
+}
+}
+```
+</div>
+
+<div class="fold o">
+```{r i1_sowing_dates_sos_maps_d,  cache.whatever=params$Agg,  out.width="100%", warning=FALSE, eval=sos_crit_i1}
+
+# to reduce unnecessary processing follow these steps
+# for each growth stage:
+
+# (1) does the monthly and/or dekad raster mask exist on file?
+#   YES - (i) load raster file to env
+#         (ii) plot raster file
+#         (iii) move to next growth stage or next chunk
+#   NO -  (i) go to (2)
+
+# (2) does the monthly and/or dekad raster mask csv exist on file?
+#   YES - (i) load csv file to env as vect
+#         (ii) rasterize vect
+#         (iii) write raster to file
+#         (iv) go to (1)
+#   NO -  (i) go to (3)
+
+# (3) does the monthly and/or dekad raster mask df exist in the env?
+#   YES - (i) write df to file as csv
+#         (ii) go to (2)
+#   NO -  (i) go to (4)
+
+# (4) does the monthly and/or dekad raster mask matrix exist in the env?
+#   YES - (i) join the matrix to the onset df
+#         (ii) write df to file as csv
+#         (iii) go to (3)
+#   NO -  (i) create the matrix using the growth_period_long functions
+#         (ii) join the matrix to the onset df
+#         (iii) go to (4)
+
+if (sos_crit_i1) {
+if (exists('rast_clim_mask_d_i1')) {
+  cat(paste("\n1 Dekad data exist"))
+  
+  # set static vectors of days and dekads
+  days <- 1:365
+  day_dekads <- days %>% as.character %>% as.Date("%j") %>%
+    dekad(type = "year") %>% as.integer
+  dekads <- rep.int(day_dekads, num_years_i1)
+  
+  
+  for (i in seq_len(nrow(df_growth_stages_lengths_i1))) {
+    period_name_i1 <- as.character(df_growth_stages_lengths_i1[i, 1])
+    cat(paste("\nCurrent growth stage = ", period_name_i1))
+    
+    
+    rast_filename_d_i1 <-
+      as.character(paste0(
+        "spatial_data/output/rast_",
+        period_name_i1,
+        "_d_",
+        params$INN1, "_", params$MASK, 
+        ".tif"
+      ))
+    
+    if (!file.exists(here(rast_filename_d_i1))) {
+      cat(paste("\n2 No spatraster"))
+      
+      if (!exists(paste0("vect_", period_name_i1, "_d"))) {
+        cat(paste("\n3 No spatvector"))
+        
+        csv_filename_d_i1 <-
+          as.character(
+            paste(
+              "tab_data/output/df_onset_",
+              period_name_i1,
+              "_d_",
+              params$INN1, "_", params$MASK,
+              ".csv",
+              sep = ""
+            )
+          )
+        
+        if (!file.exists(here(csv_filename_d_i1))) {
+          cat(paste("\n4 No csv data"))
+          
+          if (!exists(paste0("df_onset_", period_name_i1, "_d"))) {
+            cat(paste("\n5 No df"))
+            
+            if (!exists(paste0(period_name_i1, "_matrix_days_d"))) {
+              cat(paste("\n6 No matrix"))
+              
+              if (period_name_i1 == "total") {
+                expr_3_d <- parse(
+                  text = paste0(
+                    "t(apply(df_onset_i1, 1, .growth_period_long_dekad_tbl_short, day_begin = \"onset\", day_end = \"",
+                    df_growth_stages_lengths_i1[nrow(df_growth_stages_lengths_i1) - 1, 1],
+                    "_e\", num_years = num_years_i1))"
+                  )
+                )
+              } else {
+                expr_3_d <- parse(
+                  text = paste0(
+                    "t(apply(df_onset_i1, 1, .growth_period_long_dekad_tbl_short, day_begin = \"",
+                    period_name_i1,
+                    "_s\",
+        day_end = \"",
+        period_name_i1,
+        "_e\", num_years = num_years_i1))"
+                  )
+                )
+              }
+              
+              assign(paste0(period_name_i1, "_matrix_days_d_i1"),
+                     eval(expr_3_d))
+              expr_3_d2 <- parse(
+                  text = paste0(period_name_i1, "_matrix_days_d_i1 * 1000"))
+              
+              assign(paste0(period_name_i1, "_matrix_days_d_i1"), eval(expr_3_d2))
+              
+              eval(parse(text = paste0(
+                "mode(", period_name_i1, "_matrix_days_d_i1) <- \"integer\""
+              )))
+              
+              cat(paste("\n-6"))
+            }
+            
+            assign(paste0("df_onset_", period_name_i1, "_d_i1"),
+                   data.frame(df_onset_i1, get(
+                     paste0(period_name_i1, "_matrix_days_d_i1")
+                   )))
+            
+            cat(paste("\n-5"))
+          }
+          rm(list = paste0(period_name_i1, "_matrix_days_d_i1")) # remove matrix when df created
+          write.csv(get(paste0("df_onset_", period_name_i1, "_d_i1")),
+                    here(csv_filename_d_i1))
+          
+          cat(paste("\n-4"))
+        }
+        rm(list = paste0("df_onset_", period_name_i1, "_d_i1")) # remove df when csv created
+        # assign(paste0("vect_", period_name, "_d"),
+        #        vect(
+        #          read_csv(
+        #            here(csv_filename_d),
+        #            show_col_types = FALSE,
+        #            .name_repair = "unique_quiet"
+        #          ),
+        #          geom = c("x", "y"),
+        #          crs = wkt_lam
+        #        ))# gives an error due to unused argument (.name_repair = "unique_quiet")
+        assign(paste0("vect_", period_name_i1, "_d_i1"),
+               vect(
+                 read_csv(
+                   here(csv_filename_d_i1),
+                   show_col_types = FALSE
+                 ),
+                 geom = c("x", "y"),
+                 crs = wkt_lam
+               ))
+        cat(paste("\n-3"))
+      }
+      assign(paste0("list_rast_", period_name_i1, "_d_i1"),
+             list())
+      
+      #create an empty raster
+      assign(paste0("rast_", period_name_i1, "_d_i1"), rast())
+      
+      for (j in 1:36) {
+        assign(
+          paste0("rast_", period_name_i1, "_d_i1_", j),
+          rasterize(get(
+            paste0("vect_", period_name_i1, "_d_i1")
+          ), rast_clim_mask_d_i1, field = paste0("X", j))
+        )
+        
+        assign(paste0("list_rast_", period_name_i1, "_d_i1"),
+               append(get(
+                 paste0("list_rast_", period_name_i1, "_d_i1")
+               ), paste0("rast_", period_name_i1, "_d_i1_", j)))
+        expr_5_d <-
+          parse(text = paste0(
+            "add(rast_",
+            period_name_i1,
+            "_d_i1) <- (rast_",
+            period_name_i1,
+            "_d_i1_",
+            j,
+            ")"
+          ))
+        
+        eval(expr_5_d)
+        rm(list = paste0("rast_", period_name_i1, "_d_i1_", j)) # remove dekad rast when added to brick
+        
+      }
+      
+      rm(list = paste0("vect_", period_name_i1, "_d_i1")) # remove vect when raster created
+      writeRaster(get(paste0("rast_", period_name_i1, "_d_i1")), here(rast_filename_d_i1), overwrite = TRUE)
+      cat(paste("\n-2"))
+    }
+    
+    assign(paste0("rast_", period_name_i1, "_d_i1"), rast(here(rast_filename_d_i1)))
+    cat(paste0("\n", rast_filename_d_i1))
+    
+    expr_6_d <-
+      parse(
+        text = paste0(
+          "names(rast_",
+          period_name_i1,
+          "_d_i1) <- c(\"Ja1\", \"Ja2\", \"Ja3\", \"Fe1\", \"Fe2\", \"Fe3\",\"Mr1\", \"Mr2\", \"Mr3\",\"Ap1\", \"Ap2\", \"Ap3\",\"My1\", \"My2\", \"My3\",\"Jn1\", \"Jn2\", \"Jn3\",\"Jl1\",\"Jl2\", \"Jl3\",\"Ag1\",\"Ag2\", \"Ag3\",\"Sp1\",\"Sp2\", \"Sp3\",\"Oc1\",\"Oc2\", \"Oc3\",\"No1\",\"No2\", \"No3\",\"De1\",\"De2\", \"De3\")"
+        )
+      )
+    
+    eval(expr_6_d)
+    
+#    plot(
+#      get(paste0("rast_", period_name, "_d")),
+#      maxnl = 36,
+#      breaks = c(0, 0.25, 0.5, 0.75, 1),
+#      axes = F,
+#      plg = list(cex = 1, title = paste0(period_name))
+#    )
+    
+  }
+  cat(paste("\n-1"))
+}
+}
+```
+</div>
+
+<div class="fold o">   
+```{r i1_sowing_dates_sos_distribute_m,  cache.whatever=params$Agg,  out.width="100%", warning=FALSE, eval=sos_crit_i1}
+
+##-- monthly distribution --
+if (sos_crit_i1) {
+if (exists('rast_clim_mask_m_i1')) {
+  for (i in seq_len(nrow(df_growth_stages_req_i1))) {
+    period_name_i1 <- as.character(df_growth_stages_req_i1[i, 1])
+    cat("period_name = ", period_name_i1, "\n")
+    
+    
+    # load growth period rasters
+    rast_filename_m_i1 <-
+      as.character(paste0(
+        "spatial_data/output/rast_",
+        period_name_i1,
+        "_m_",
+        params$INN1, "_", params$MASK,
+        ".tif"
+      ))
+    
+    assign(paste0("rast_period_m_", period_name_i1, "_original_i1"),
+           rast(here(rast_filename_m_i1))/1000) # divide by 1000 because the values were multiplied by 1000 when creating the matrix
+    
+    # reproject growth period rasters
+    
+    assign(
+      paste0("rast_period_m_", period_name_i1, "_prj_i1"),
+      terra::project(get(
+        paste0("rast_period_m_", period_name_i1, "_original_i1")
+      ),   rast_mask_proj_i1, "near")
+    )
+    
+    # aggregate if necessary
+    
+    #calc_agg_factor_m <-
+    #    (res(rast_mask_proj) / res(rast_period_m_total_prj))
+    #  cat(paste("calculated aggregate factor m = ", calc_agg_factor_m))
+    
+    calc_agg_factor_m_i1 <-
+      (res(rast_mask_proj_i1) / res(get(
+        paste0("rast_period_m_", period_name_i1, "_prj_i1")
+      )))
+    
+    cat(paste("calculated aggregate factor m = ", calc_agg_factor_m_i1))
+    
+    
+    if (calc_agg_factor_m_i1[1] < 1) {
+      calc_agg_factor_m_i1[1] <- 1
+      
+      # this means that the mask has a higher resolution than the precipitation raster so aggregation is not necessary and the precipitation raster will stay the same resolution
+      
+      cat(paste(
+        "revised calculated aggregate factor m1 = ",
+        calc_agg_factor_m_i1[1]
+      ))
+    }
+    cat("\n")
+    
+    if (calc_agg_factor_m_i1[2] < 1) {
+      calc_agg_factor_m_i1[2] <- 1
+      cat(paste(
+        "revised calculated aggregate factor m2 = ",
+        calc_agg_factor_m_i1[2]
+      ))
+    }
+    
+    # resample
+    
+    cat(paste("aggregate and resample"))
+    
+    #    rast_period_m_total <-
+    #    agg_resample(
+    #      rast_period_m_total_prj,
+    #      calc_agg_factor_m, "modal", "near")
+    
+    assign(
+      paste0("rast_period_m_", period_name_i1, "_i1"),
+      agg_resample(get(
+        paste0("rast_period_m_", period_name_i1, "_prj_i1")
+      ),
+      calc_agg_factor_m_i1, "modal", "near", rast_mask_proj_i1)
+    )
+    
+    # plot
+    
+    expr_7_m <-
+      parse(
+        text = paste0(
+          "names(rast_period_m_",
+          period_name_i1,
+          "_i1) <- c(\"January\", \"February\", \"March\", \"April\",\"May\",\"June\",\"July\",\"August\",\"September\",\"October\",\"November\",\"December\")"
+        )
+      )
+    
+    eval(expr_7_m)
+    plot(
+      get(paste0("rast_period_m_", period_name_i1, "_i1")),
+      maxnl = 12,
+      breaks = c(0, 0.25, 0.5, 0.75, 1),
+      axes = F,
+      plg = list(cex = 1, title = paste0(period_name_i1))
+    )
+    
+  }
+}
+}
+```  
+</div>    
+ 
+<div class="fold o">   
+```{r i1_sowing_dates_sos_distribute_d,  cache.whatever=params$Agg,  out.width="100%", warning=FALSE, eval=sos_crit_i1}
+
+# dekadal growth stages have been pre-modelled for the spatial onset of season
+
+# for each of the growth stages for which there are requirements create a new raster brick
+
+##-- dekadal distribution --
+
+if (sos_crit_i1) {
+if (exists('rast_clim_mask_d_i1')) {
+  for (i in seq_len(nrow(df_growth_stages_req_i1))) {
+    period_name_i1 <- as.character(df_growth_stages_req_i1[i, 1])
+    cat("period_name = ", period_name_i1, "\n")
+    
+    
+    # load growth period rasters
+    rast_filename_d_i1 <-
+      as.character(paste0(
+        "spatial_data/output/rast_",
+        period_name_i1,
+        "_d_",
+        params$INN1, "_", params$MASK,
+        ".tif"
+      ))
+    
+    assign(paste0("rast_period_d_", period_name_i1, "_original_i1"),
+           rast(here(rast_filename_d_i1))/1000) # divide by 1000 because the values were multiplied by 1000 when creating the matrix
+    
+    # reproject growth period rasters
+    
+    assign(
+      paste0("rast_period_d_", period_name_i1, "_prj_i1"),
+      terra::project(get(
+        paste0("rast_period_d_", period_name_i1, "_original_i1")
+      ),   rast_mask_proj_i1, "near")
+    )
+    
+    # aggregate if necessary
+    
+    #calc_agg_factor_d <-
+    #    (res(rast_mask_proj) / res(rast_period_d_total_prj))
+    #  cat(paste("calculated aggregate factor m = ", calc_agg_factor_d))
+    
+    calc_agg_factor_d_i1 <-
+      (res(rast_mask_proj_i1) / res(get(
+        paste0("rast_period_d_", period_name_i1, "_prj_i1")
+      )))
+    
+    cat(paste("calculated aggregate factor d = ", calc_agg_factor_d_i1))
+    
+    
+    if (calc_agg_factor_d_i1[1] < 1) {
+      calc_agg_factor_d_i1[1] <- 1
+      
+      # this means that the mask has a higher resolution than the precipitation raster so aggregation is not necessary and the precipitation raster will stay the same resolution
+      
+      cat(paste(
+        "revised calculated aggregate factor d1 = ",
+        calc_agg_factor_d_i1[1]
+      ))
+    }
+    cat("\n")
+    
+    if (calc_agg_factor_d_i1[2] < 1) {
+      calc_agg_factor_d_i1[2] <- 1
+      cat(paste(
+        "revised calculated aggregate factor d2 = ",
+        calc_agg_factor_d_i1[2]
+      ))
+    }
+    
+    # resample
+    
+    cat(paste("aggregate and resample"))
+    
+    #    rast_period_d_total <-
+    #    agg_resample(
+    #      rast_period_d_total_prj,
+    #      calc_agg_factor_d, "modal", "near")
+    
+    assign(
+      paste0("rast_period_d_", period_name_i1, "_i1"),
+      agg_resample(get(
+        paste0("rast_period_d_", period_name_i1, "_prj_i1")
+      ),
+      calc_agg_factor_d_i1, "modal", "near", rast_mask_proj_i1)
+    )
+    
+    # plot
+    
+    expr_7_d <-
+      parse(
+        text = paste0(
+          "names(rast_period_d_",
+          period_name_i1,
+          "_i1) <- c(\"Ja1\", \"Ja2\", \"Ja3\", \"Fe1\", \"Fe2\", \"Fe3\",\"Mr1\", \"Mr2\", \"Mr3\",\"Ap1\", \"Ap2\", \"Ap3\",\"My1\", \"My2\", \"My3\",\"Jn1\", \"Jn2\", \"Jn3\",\"Jl1\",\"Jl2\", \"Jl3\",\"Ag1\",\"Ag2\", \"Ag3\",\"Sp1\",\"Sp2\", \"Sp3\",\"Oc1\",\"Oc2\", \"Oc3\",\"No1\",\"No2\", \"No3\",\"De1\",\"De2\", \"De3\")"
+        )
+      )
+    
+    eval(expr_7_d)
+    plot(
+      get(paste0("rast_period_d_", period_name_i1, "_i1")),
+      maxnl = 36,
+      breaks = c(0, 0.25, 0.5, 0.75, 1),
+      axes = F,
+      plg = list(cex = 1, title = paste0(period_name_i1))
+    )
+    
+  }
+}
+}
+```     
+</div> 
+
+### Processing precipitation data
+
+<div class="fold o">   
+```{r i1_requirements_prec02,  cache.whatever=params$Agg,  out.width="100%", fig.show="hold", warning=FALSE}
+
+df_requirements_clim_prec_m_i1 <-
+  dplyr::filter(df_requirements_clim_i1, prec_temp == "p" &
+                  temp_resolution == "m") # filter precipitation criteria
+
+for (i in seq_len(nrow(df_growth_stages_req_prec_i1))) {
+  period_name_i1 <- as.character(df_growth_stages_req_prec_i1[i, 1])
+  print(paste("Criterion = ", df_requirements_clim_prec_m_i1[i, 4]))
+  #      print(period_name)
+  
+  for (j in seq_len(nrow(df_requirements_clim_prec_m_i1))) {
+    if (sum(df_requirements_clim_prec_m_i1[j, 'phen_stage'] == period_name_i1, na.rm = TRUE) == 1) {
+      print(paste0("period_name = ", as.character(period_name_i1)))
+      # crit_rownum <-
+      #   which(df_requirements_clim_prec_m$phen_stage == period_name)
+      assign(
+        paste0(
+          "rast_",
+          df_requirements_clim_prec_m_i1[j, 12],
+          "_rsmp_",
+          df_growth_stages_req_prec_i1[i, 1], "_i1"
+        ),
+        sum(get(
+          paste0("rast_", df_requirements_clim_prec_m_i1[j, 12], "_rsmp_i1")
+        ) * get(
+          paste0("rast_period_m_", df_growth_stages_req_prec_i1[i, 1], "_i1") #changed 14/05/2024
+        ))
+      )
+      print(
+        paste0(
+          "rast_",
+          df_requirements_clim_prec_m_i1[j, 12],
+          "_rsmp_",
+          df_growth_stages_req_prec_i1[i, 1], "_i1"
+        )
+      )
+      #        plot_raster <-
+      plot(get(
+        paste0(
+          "rast_",
+          df_requirements_clim_prec_m_i1[j, 12],
+          "_rsmp_",
+          df_growth_stages_req_prec_i1[i, 1], "_i1"
+        )
+      ),
+      main = paste0(
+        "rast_period_m_",
+        as.character(df_growth_stages_req_prec_i1[i, 1]), "_i1" 
+      ))
+      #        print(plot_raster)
+      
+      
+      new_col_i1 <-
+        get(
+          paste0(
+            "rast_",
+            df_requirements_clim_prec_m_i1[j, 12],
+            "_rsmp_",
+            df_growth_stages_req_prec_i1[i , 1], "_i1"
+          )
+        ) %>% terra::extract(xy_i1) # extract the raster values using xy points
+      
+      new_col_i1 <- new_col_i1[[1]]
+      
+      df_irm_i1 <-
+        dplyr::select(df_irm_i1,-any_of(c(as.character(
+          paste0(df_requirements_clim_prec_m_i1[j, 3])
+        )))) # remove column if name already exists
+      
+      df_irm_i1 <-
+        mutate(df_irm_i1,!!as.character(paste0(df_requirements_clim_prec_m_i1[j, 3])) := new_col_i1,
+               .keep = c("all"))   # add the raster values to the df_irm_i1 tibble, this needs to be dynamic so uses the !! and := operators
+      
+      
+    } else {
+      #    print(sum(df_requirements_clim_prec_m[, 'phen_stage'] == period_name, na.rm = TRUE))
+    }
+  }
+}
+
+df_requirements_clim_prec_d_i1 <-
+  dplyr::filter(df_requirements_clim_i1, prec_temp == "p" &
+                  temp_resolution == "d") # filter precipitation criteria
+
+for (i in seq_len(nrow(df_growth_stages_req_prec_i1))) {
+  period_name_i1 <- as.character(df_growth_stages_req_prec_i1[i, 1])
+  print(paste("Criterion = ", df_requirements_clim_prec_d_i1[i, 4]))
+  # print(paste("i =", i))
+  # print(period_name)
+  for (j in seq_len(nrow(df_requirements_clim_prec_d_i1))) {
+      # print(paste("j =", j))
+        if (sum(df_requirements_clim_prec_d_i1[j, 'phen_stage'] == period_name_i1, na.rm = TRUE) == 1) {
+      print(paste0("period_name = ", as.character(period_name_i1)))
+      
+      # crit_rownum <-
+      #   which(df_requirements_clim_prec_d$phen_stage == period_name)
+      assign(
+        paste0(
+          "rast_",
+          df_requirements_clim_prec_d_i1[j, 12],
+          "_rsmp_",
+          df_growth_stages_req_prec_i1[i, 1], "_i1"
+        ),
+        sum(get(
+          paste0("rast_", df_requirements_clim_prec_d_i1[j, 12], "_rsmp_i1")
+        ) * get(
+          paste0("rast_period_d_", df_growth_stages_req_prec_i1[i, 1], "_i1")
+        ))
+      )
+      print(
+        paste0(
+          "rast_",
+          df_requirements_clim_prec_d_i1[j, 12],
+          "_rsmp_",
+          df_growth_stages_req_prec_i1[i, 1], "_i1"
+        )
+      )
+      #        plot_raster <-
+      plot(get(
+        paste0(
+          "rast_",
+          df_requirements_clim_prec_d_i1[j, 12],
+          "_rsmp_",
+          df_growth_stages_req_prec_i1[i, 1], "_i1"
+        )
+      ),
+      main = paste0(
+        "rast_period_d_",
+        as.character(df_growth_stages_req_prec_i1[i, 1]), "_i1" #changed 14/05/2024
+      ))
+      #        print(plot_raster)
+      
+      
+      new_col_i1 <-
+        get(
+          paste0(
+            "rast_",
+            df_requirements_clim_prec_d_i1[j, 12],
+            "_rsmp_",
+            df_growth_stages_req_prec_i1[i , 1], "_i1"
+          )
+        ) %>% terra::extract(xy_i1) # extract the raster values using xy points
+      
+      new_col_i1 <- new_col_i1[[1]]
+      
+      df_irm_i1 <-
+        dplyr::select(df_irm_i1, -any_of(c(as.character(
+          paste0(df_requirements_clim_prec_d_i1[j, 3])
+        )))) # remove column if name already exists
+      
+      df_irm_i1 <-
+        mutate(df_irm_i1,
+               !!as.character(paste0(df_requirements_clim_prec_d_i1[j, 3])) := new_col_i1,
+               .keep = c("all"))   # add the raster values to the df_irm_i1 tibble, this needs to be dynamic so uses the !! and := operators
+      
+      
+    } else {
+      #   print(sum(df_requirements_clim_prec_d[, 'phen_stage'] == period_name, na.rm = TRUE))
+    }
+  }
+}
+
+df_requirements_clim_prec_i1 <-
+  rbind(df_requirements_clim_prec_m_i1, df_requirements_clim_prec_d_i1)
+
+``` 
+</div>
+
+### Processing temperature data
+
+<div class="fold o">   
+```{r i1_requirements_temp02,  cache.whatever=params$Agg,  out.width="100%", fig.show="hold", warning=FALSE}
+
+# A Farrow 01/06/2023 the following assumes that there is only one temperature criterion per growth stage
+# In fact there may be multiple so a different way of looping through the criteria is needed
+
+
+# for monthly temperature data
+
+# logic
+# for each temperature criterion i
+# for each phen stage for which there is a criterion j
+# do the appropriate calculation
+
+
+df_requirements_clim_temp_m_i1 <-
+  dplyr::filter(df_requirements_clim_i1, prec_temp == "t" &
+                  temp_resolution == "m") # filter temperature criteria
+
+if (nrow(df_requirements_clim_temp_m_i1) > 0) {
+  #1
+  for (i in seq_len(nrow(df_requirements_clim_temp_m_i1))) {
+    #2
+    #print(paste("i = ", i))
+    print(paste("Criterion = ", df_requirements_clim_temp_m_i1[i, 4]))
+    for (j in seq_len(nrow(df_growth_stages_req_temp_i1))) {
+      #3
+      #print(paste("j = ", j))
+      period_name_i1 <- as.character(df_growth_stages_req_temp_i1[j, 1])
+      print(paste0("m period_name = ", as.character(period_name_i1)))
+      if (sum(df_requirements_clim_temp_m_i1[i, 'phen_stage'] == period_name_i1, na.rm = TRUE) == 1) {
+        #4
+        if (df_requirements_clim_temp_m_i1[i, 14] == "mean") {
+          #5
+          print("mean")
+          assign(
+            paste0(
+              "rast_",
+              df_requirements_clim_temp_m_i1[i, 12],
+              "_rsmp_",
+              df_growth_stages_req_temp_i1[j, 1], "_i1"
+            ),
+            (sum(get(
+              paste0("rast_", df_requirements_clim_temp_m_i1[i, 12], "_rsmp_i1")
+            ) * get(
+              paste0("rast_period_m_", df_growth_stages_req_temp_i1[j, 1], "_i1")
+            )) / sum(get(
+              paste0("rast_period_m_", df_growth_stages_req_temp_i1[j, 1], "_i1")
+            )))
+          )
+        } else {
+          #-5 5a
+          if (df_requirements_clim_temp_m_i1[i, 14] == "min") {
+            #6
+            print("min")
+            assign(
+              paste0(
+                "rast_",
+                df_requirements_clim_temp_m_i1[i, 12],
+                "_rsmp_",
+                df_growth_stages_req_temp_i1[j, 1], "_i1"
+              ),
+              (min(get(
+                paste0("rast_", df_requirements_clim_temp_m_i1[i, 12], "_rsmp_i1")
+              ) / round(
+                get(
+                  paste0("rast_period_m_", df_growth_stages_req_temp_i1[j, 1], "_i1")
+                )
+              )))
+            )
+            
+          } else {
+            #-6 6a
+            if (df_requirements_clim_temp_m_i1[i, 14] == "max") {
+              #7
+              print("max")
+              assign(
+                paste0(
+                  "rast_",
+                  df_requirements_clim_temp_m_i1[i, 12],
+                  "_rsmp_",
+                  df_growth_stages_req_temp_i1[j, 1], "_i1"
+                ),
+                (max(
+                  get(
+                    paste0("rast_", df_requirements_clim_temp_m_i1[i, 12], "_rsmp_i1")
+                  ) * get(
+                    paste0("rast_period_m_", df_growth_stages_req_temp_i1[j, 1], "_i1")
+                  )
+                ))
+              )
+              
+            } else {
+              #-7 7a
+            } #-7a
+          } #-6a
+        } #-5a
+        plot(get(
+          paste0(
+            "rast_",
+            df_requirements_clim_temp_m_i1[i, 12],
+            "_rsmp_",
+            df_growth_stages_req_temp_i1[j, 1], "_i1"
+          )
+        ),
+        main = paste0(
+          "rast_period_m_",
+          as.character(df_growth_stages_req_temp_i1[j, 1], "_i1")
+        ))
+        
+        new_col_i1 <-
+          get(
+            paste0(
+              "rast_",
+              df_requirements_clim_temp_m_i1[i, 12],
+              "_rsmp_",
+              df_growth_stages_req_temp_i1[j , 1], "_i1"
+            )
+          ) %>% terra::extract(xy_i1) # extract the raster values using xy points
+        
+        new_col_i1 <- new_col_i1[[1]]
+        
+        df_irm_i1 <-
+          dplyr::select(df_irm_i1,-any_of(c(as.character(
+            paste0(df_requirements_clim_temp_m_i1[i, 3])
+          )))) # remove column if name already exists
+        
+        df_irm_i1 <-
+          mutate(df_irm_i1,
+                 !!as.character(paste0(df_requirements_clim_temp_m_i1[i, 3])) := new_col_i1,
+                 .keep = c("all"))   # add the raster values to the df_irm_i1 tibble, this needs to be dynamic so uses the !! and := operators
+      } #-4
+    }
+  }
+}
+
+
+
+
+# for dekadal temperature data
+
+df_requirements_clim_temp_d_i1 <-
+  dplyr::filter(df_requirements_clim_i1, prec_temp == "t" &
+                  temp_resolution == "d") # filter temperature criteria
+
+if (nrow(df_requirements_clim_temp_d_i1) > 0) {
+  #1
+  for (i in seq_len(nrow(df_requirements_clim_temp_d_i1))) {
+    #2
+    #print(paste("i = ", i))
+    print(paste("Criterion = ", df_requirements_clim_temp_d_i1[i, 4]))
+    for (j in seq_len(nrow(df_growth_stages_req_temp_i1))) {
+      #3
+      print(paste("j = ", j))
+      period_name_i1 <- as.character(df_growth_stages_req_temp_i1[j, 1])
+      print(paste0("d period_name = ", as.character(period_name_i1)))
+      if (sum(df_requirements_clim_temp_d_i1[i, 'phen_stage'] == period_name_i1, na.rm = TRUE) == 1) {
+        #4
+        if (df_requirements_clim_temp_d_i1[i, 14] == "mean") {
+          #5
+          print("mean")
+          assign(
+            paste0(
+              "rast_",
+              df_requirements_clim_temp_d_i1[i, 12],
+              "_rsmp_",
+              df_growth_stages_req_temp_i1[j, 1], "_i1"
+            ),
+            (sum(get(
+              paste0("rast_", df_requirements_clim_temp_d_i1[i, 12], "_rsmp")
+            ) * get(
+              paste0("rast_period_d_", df_growth_stages_req_temp_i1[j, 1], "_i1")
+            )) / sum(get(
+              paste0("rast_period_d_", df_growth_stages_req_temp_i1[j, 1], "_i1")
+            )))
+          )
+        } else {
+          #-5 5a
+          if (df_requirements_clim_temp_d_i1[i, 14] == "min") {
+            #6
+            print("min")
+            assign(
+              paste0(
+                "rast_",
+                df_requirements_clim_temp_d_i1[i, 12],
+                "_rsmp_",
+                df_growth_stages_req_temp_i1[j, 1], "_i1"
+              ),
+              (min(get(
+                paste0("rast_", df_requirements_clim_temp_d_i1[i, 12], "_rsmp")
+              ) / round(
+                get(
+                  paste0("rast_period_d_", df_growth_stages_req_temp_i1[j, 1], "_i1")
+                )
+              )))
+            )
+            
+          } else {
+            #-6 6a
+            if (df_requirements_clim_temp_d_i1[i, 14] == "max") {
+              #7
+              print("max")
+              assign(
+                paste0(
+                  "rast_",
+                  df_requirements_clim_temp_d_i1[i, 12],
+                  "_rsmp_",
+                  df_growth_stages_req_temp_i1[j, 1], "_i1"
+                ),
+                (max(
+                  get(
+                    paste0("rast_", df_requirements_clim_temp_d_i1[i, 12], "_rsmp")
+                  ) * get(
+                    paste0("rast_period_d_", df_growth_stages_req_temp_i1[j, 1], "_i1")
+                  )
+                ))
+              )
+              
+            } else {
+              #-7 7a
+            } #-7a
+          } #-6a
+        } #-5a
+        plot(get(
+          paste0(
+            "rast_",
+            df_requirements_clim_temp_d_i1[i, 12],
+            "_rsmp_",
+            df_growth_stages_req_temp_i1[j, 1], "_i1"
+          )
+        ),
+        main = paste0(
+          "rast_period_d_",
+          as.character(df_growth_stages_req_temp_i1[j, 1], "_i1")
+        ))
+        
+        new_col_i1 <-
+          get(
+            paste0(
+              "rast_",
+              df_requirements_clim_temp_d_i1[i, 12],
+              "_rsmp_",
+              df_growth_stages_req_temp_i1[j , 1], "_i1"
+            )
+          ) %>% terra::extract(xy_i1) # extract the raster values using xy points
+        
+        new_col_i1 <- new_col_i1[[1]]
+        
+        df_irm_i1 <-
+          dplyr::select(df_irm_i1,-any_of(c(as.character(
+            paste0(df_requirements_clim_temp_d_i1[i, 3])
+          )))) # remove column if name already exists
+        
+        df_irm_i1 <-
+          mutate(df_irm_i1,
+                 !!as.character(paste0(df_requirements_clim_temp_d_i1[i, 3])) := new_col_i1,
+                 .keep = c("all"))   # add the raster values to the df_irm_i1 tibble, this needs to be dynamic so uses the !! and := operators
+      } #-4
+    }
+  }
+}
+
+df_requirements_clim_temp_i1 <-
+  rbind(df_requirements_clim_temp_m_i1, df_requirements_clim_temp_d_i1)
+
+```
+</div> 
+
+## Processing soil data
+
+### Soil drainage
+
+Soil drainage has different impacts on the suitability for an innovation that changes according to the crop that is being cultivated as well as the texture of the soil.
+
+Sys _et al._ (1993), give suitability values for different textual drainage classes (e.g. imperfect or poor drainage). The suitability values are given for: (i) medium and fine textured soils; and (ii) coarse textured soils (sandy families). 
+
+We record the suitability values for both soil texture types and apply these only for the relevant soil texture.
+
+We reclassify the soil texture into the 2 classes relevant for drainage:
+
+USDA Texture Class| New Texture Class for Drainage
+------------------|---------------
+clay              |	medium and fine             
+silty clay        |	medium and fine           
+sandy  clay       |	medium and fine       
+clay loam         |	medium and fine 
+silty clay loam   |	medium and fine 
+sandy clay loam   |	medium and fine 
+loam              |	medium and fine 
+silty loam        |	medium and fine 
+sandy loam        |	coarse          
+silt              |	medium and fine 
+loamy sand        |	coarse     
+sand              |	coarse
+
+This produces a raster called soil_TEX_4_drainage_eth.tif
+
+We use this dataset to add more classes to the soil drainage dataset, these classes are then linked to the soil drainage requirements table. Only drainage classes in coarse soil areas are reclassified.
+
+Original Class | New Class
+---------------|--------------
+1              | 100
+2              | 200
+3              | 300
+4              | 400
+5              | 500
+6              | 600
+7              | 700
+
+
+soil_drainage_fine_coarse_eth.tif
+
+Example of drainage text file:
+
+AfSIS_Code | IRM_Value
+-----------|------------
+1	         | 0.125
+2	         | 0.4
+3	         | 0.725
+4	         | 0.9
+5	         | 0.975
+6	         | 0.975
+7	         | 0.975
+100	       | 0.125
+200	       | 0.4
+300	       | 0.975
+400	       | 0.9
+500	       | 0.725
+600	       | 0.725
+700	       | 0.725
+
+If soil texture is a criterion then the USDA codes are reclassified quantitatively so that the fuzzy partitions can be applied.
+
+
+```{r i1_reclass_soil_drainage, results='asis'}
+
+soil_drainage_filename_i1 <-
+  as.character(paste(
+    "E:/repos/raise_fs/shiny/data/",
+    params$INN1,
+    "_drainage_s9.csv",
+    sep = ""
+  ))
+
+cat("soil_drainage_filename_i1")
+print(soil_drainage_filename_i1)
+cat("print(file.exists(soil_drainage_filename_i1))")
+print(file.exists(soil_drainage_filename_i1))
+
+
+
+if (file.exists(soil_drainage_filename_i1)) {
+  
+  cat("EXISTS")
+  
+  
+  df_soil_drainage_i1 <- read.csv(soil_drainage_filename_i1)
+  
+
+  
+  df_soil_drainage_i1 %>%
+    kable(digits = 3, caption = "Soil Drainage ") %>% kable_styling("striped", full_width = T) 
+
+}
+
+if (file.exists(soil_drainage_filename_i1)) {
+  
+  # cat("print(file.exists(df_raster_data_soil_i1))")
+  # print(df_raster_data_soil_i1)
+  
+  df_requirements_drainage_i1 <-
+    dplyr::filter(df_raster_data_soil_i1, drainage == 1) # filter temperature criteria
+  # reclass using df_soil_texture table
+  
+  # cat("print(file.exists(df_requirements_texture_i1))")
+  # print(df_requirements_texture_i1)
+  
+  if (nrow(df_requirements_drainage_i1) > 0) {
+    
+    cat("\n\n\n")
+    cat("reclassify the drainage raster")
+    cat("\n\n\n")
+    
+    
+    #reclassify the drainage raster (ensure that it is integer)
+    rast_drn_clas_rsmp_i1 <- get(paste0("rast_", df_requirements_drainage_i1[1, 12], "_rsmp_i1")) %>% as.int() %>% classify(as.matrix(
+      dplyr::select(df_soil_drainage_i1, IRM_Value)
+    ))
+    
+    plot(rast_drn_clas_rsmp_i1)
+    
+    #replace the texture raster in df_raster_data_soil
+    text_rownum_i1 <- which(df_raster_data_soil_i1$drainage == 1)
+    
+    cat("\n\n\n")
+    cat("text_rownum_i1")
+    cat("\n\n\n")
+    
+    df_raster_data_soil_i1[text_rownum_i1, 12] <- "drn_clas"
+    
+    }
+}
+
+knitr::knit_exit
+
+```
+
+
+### Soil texture
+
+If soil texture is a criterion then the USDA codes are reclassified quantitatively so that the fuzzy partitions can be applied.
+
+
+```{r i1_reclass_soil_texture, results='asis'}
+
+#soil_texture_filename_i1 <-
+#  as.character(paste("tab_data/input/usda_texture_", params$INN1, ".csv", sep = ""))
+
+soil_texture_filename_i1 <-
+  as.character(paste(
+    "E:/repos/raise_fs/shiny/data/",
+    params$INN1,
+    "_texture_s9.csv",
+    sep = ""
+  ))
+
+cat("soil_texture_filename_i1")
+print(soil_texture_filename_i1)
+cat("print(file.exists(soil_texture_filename_i1))")
+print(file.exists(soil_texture_filename_i1))
+
+
+
+if (file.exists(soil_texture_filename_i1)) {
+  
+  cat("EXISTS")
+  
+  
+  df_soil_texture_i1 <- read.csv(soil_texture_filename_i1)
+  
+
+  
+  df_soil_texture_i1 %>%
+    kable(digits = 3, caption = "Soil Texture ") %>% kable_styling("striped", full_width = T) 
+
+}
+
+if (file.exists(soil_texture_filename_i1)) {
+  
+  # cat("print(file.exists(df_raster_data_soil_i1))")
+  # print(df_raster_data_soil_i1)
+  
+  df_requirements_texture_i1 <-
+    dplyr::filter(df_raster_data_soil_i1, texture == 1) # filter temperature criteria
+  # reclass using df_soil_texture table
+  
+  # cat("print(file.exists(df_requirements_texture_i1))")
+  # print(df_requirements_texture_i1)
+  
+  if (nrow(df_requirements_texture_i1) > 0) {
+    
+    cat("\n\n\n")
+    cat("reclassify the texture raster")
+    cat("\n\n\n")
+    
+    
+    #reclassify the texture raster (ensure that it is integer)
+    rast_txt_clas_rsmp_i1 <- get(paste0("rast_", df_requirements_texture_i1[1, 12], "_rsmp_i1")) %>% as.int() %>% classify(as.matrix(
+      dplyr::select(df_soil_texture_i1, USDA_Texture_Class, IRM_Value)
+    ))
+    
+    plot(rast_txt_clas_rsmp_i1)
+    
+    #replace the texture raster in df_raster_data_soil
+    text_rownum_i1 <- which(df_raster_data_soil_i1$texture == 1)
+    
+    cat("\n\n\n")
+    cat("text_rownum_i1")
+    cat("\n\n\n")
+    
+    df_raster_data_soil_i1[text_rownum_i1, 12] <- "txt_clas"
+    
+    }
+}
+
+```
+
+
+
+### Processing soil data horizons
+
+If the criterion does not have a growth stage and the dataset has multiple layers/bands we can assume that it is a soil property, and the values will need to be averaged, and weighted by the depth of each horizon, and possibly any other weights (e.g. Maghami Moghim, 2024). The simplest is to assume that each horizon has decreasing importance with depth, instead of applying a weight we assume that the depth of each horizon is the same - so we just calculate a simple average. Typical horizons in ISRIC data are:  
+
+Depth             | Interval I | Interval II | Interval III | Interval IV | Interval V | Interval VI
+------------------|------------|-------------|--------------|-------------|------------|-----------
+Top depth (cm)    |	0          |	5          |	15          |	30          |	60         |	100
+Bottom depth (cm  |	5          |	15         |	30          |	60          | 100        |	200
+
+
+```{r i1_soil_horizon_weights_01, results='asis', warning=FALSE}
+
+# averaging the values in the sifferent horizons
+# there are two methods 1) use the thickness of each layer 2) assume that each layer contributes equally
+
+for (i in seq_len(nrow(df_raster_data_soil_i1))) {
+  cat(paste(df_raster_data_soil_i1[i, 3], "\n", df_raster_data_soil_i1[i, 4], "\n"))
+  
+  # method 1
+  
+  # # standard depths for interpolation
+  # standard_depths <- c(0.025, 0.10, 0.225, 0.45, 0.80, 1.50)
+  # 
+  # # thicknesses of individual layers
+  # bottom_layer <- c(0.05, 0.15, 0.30, 0.60, 1.0)
+  # thickness <- diff(c(0, bottom_layer))
+  # stopifnot(max(abs(
+  #   bottom_layer - 0.5 *  thickness - standard_depths[1:5]
+  # )) < 1.0e-6)
+  # 
+  # # horizon depth weighted
+  # assign(
+  #   paste0("rast_", df_raster_data_soil[i, 12], "_rsmp_1"),
+  #   get(paste0("rast_", df_raster_data_soil[i, 12], "_rsmp")) %>% app(function(x) {
+  #     sum((x * thickness) / sum(thickness))
+  #   })
+  # )
+  # 
+  # plot(get(paste0(
+  #   "rast_", df_raster_data_soil[i, 12], "_rsmp_1"
+  # )),
+  # main = paste0("rast_", df_raster_data_soil[i, 12], "_rsmp_1"))
+  # 
+  # print("method 1")
+  
+  # method 2
+  
+  n_band_i1 <- dim(get(paste0("rast_", df_raster_data_soil_i1[i, 12], "_rsmp_i1")))[[3]]
+  print(n_band_i1)
+  
+  # averaged equally across horizons
+  assign(
+    paste0("rast_", df_raster_data_soil_i1[i, 12], "_rsmp_i1"),
+    get(paste0("rast_", df_raster_data_soil_i1[i, 12], "_rsmp_i1")) %>% app(function(x) {
+      sum((x) / n_band_i1)
+    })
+  )
+  
+  plot(get(paste0(
+    "rast_", df_raster_data_soil_i1[i, 12], "_rsmp_i1"
+  )),
+  main = paste0("rast_", df_raster_data_soil_i1[i, 12], "_rsmp_i1"))
+  
+  print("uses simple method")
+}
+
+
+```
+
+<div class="fold o">   
+```{r i1_soil_horizon_weights_02,  cache.whatever=params$Agg,  out.width="100%", fig.show="hold", warning=FALSE}
+
+for (i in seq_len(nrow(df_raster_data_soil_i1))) {
+  new_col_i1 <-
+    get(paste0("rast_", df_raster_data_soil_i1[i, 12], "_rsmp_i1")) %>% terra::extract(xy_i1) # extract the raster values using xy points
+  
+  new_col_i1 <- new_col_i1[[1]]
+  
+  df_irm_i1 <-
+    mutate(df_irm_i1,!!as.character(paste0(df_raster_data_soil_i1[i, 3])) := new_col_i1, .keep = c("all"))   # add the raster values to the df_irm_i1 tibble, this needs to be dynamic so uses the !! and := operators
+  
+}
+
+#knitr::knit_exit()
+
+```
+</div>
+
+## Extract other data
+
+```{r i1_extract_other_data}
+## Add all other criteria data to the IRM spatial database
+# some criteria use the same raster data so need to get those rows from df_priorities
+
+df_requirements_single_i1 <- inner_join(df_requirements_i1, select(df_raster_data_single_i1, data_file_prefix), by = "data_file_prefix")
+
+for (i in seq_len(nrow(df_requirements_single_i1))) {
+  new_col_i1 <-
+    get(paste0("rast_", df_requirements_single_i1[i, 12], "_rsmp_i1")) %>% terra::extract(xy_i1) # extract the raster values using xy points
+  
+  new_col_i1 <- new_col_i1[[1]]
+  
+  df_irm_i1 <-
+    mutate(df_irm_i1,!!as.character(paste0(df_requirements_single_i1[i, 3])) := new_col_i1, .keep = c("all"))   # add the raster values to the df_irm_i1 tibble, this needs to be dynamic so uses the !! and := operators
+  
+}
+
+print(df_irm_i1)
+
+if (params$INT == 1)
+  shiny::setProgress(0.20, message = "Evaluate lower level rule bases 1st Innovation")  #
+
+```
+
+
+# Evaluate lower level rule bases
+
+```{r i1_get_lower_level_data, results = "asis"}
+
+# join to original table using the criterion name
+
+df_leaves_data_i1 <-
+  left_join(df_leaves_criterion_i1,
+            df_requirements_i1,
+            by = c("crit_code"))
+
+
+
+
+```
+
+
+
+```{r i1_evaluate_lower_level_rules_prop_conc, time_it = TRUE, out.width="100%", results = "asis"}
+# Function to populate a list of proposition and conclusion levels
+
+prop_conc_i1 <- function(df_leaves_row_i1) {
+  if (!is.na(df_leaves_row_i1["prop_level_3"])) {
+    # for those criteria with three proposition values
+    prop_levels_i1 <<-
+      as.character(df_leaves_row_i1[c("prop_level_1", "prop_level_2", "prop_level_3")])
+    conc_levels_i1 <<-
+      df_leaves_row_i1[c("conc_level_1", "conc_level_2", "conc_level_3")]
+  } else {
+    # for those criteria with two proposition values
+    prop_levels_i1 <<-
+      as.character(df_leaves_row_i1[c("prop_level_1", "prop_level_2")])
+    conc_levels_i1 <<- df_leaves_row_i1[c("conc_level_1", "conc_level_2")]
+  }
+  
+  return(list(prop_levels_i1 = prop_levels_i1, conc_levels_i1 = conc_levels_i1))
+}
+
+result_list_i1 <- list()
+
+
+
+```
+
+
+```{r i1_evaluate_lower_level_rules_main function, time_it = TRUE, out.width="100%", results = "asis"}
+cat("\n\n\n")
+cat("## Fuzzy Partitions\n") # add headings
+cat("\n\n\n")
+
+# Main function  
+apply(df_leaves_data_i1, 1, function(df_leaves_row_i1) {
+  
+  
+  ## ADDED 28-07-2025
+      
+       tryCatch({
+    # Debug print
+    cat("\n\n\n ### Processing df_leaves_row_i1:", df_leaves_row_i1, "\n")
+         
+      ## ADDED 28-07-2025 END
+         
+         
+  
+  
+    # Calculate the value list within the main function
+  prop_conc_list_i1 <- prop_conc_i1(df_leaves_row_i1)
+  prop_levels_i1 <- prop_conc_list_i1$prop_levels_i1
+  conc_levels_i1 <- prop_conc_list_i1$conc_levels_i1
+  conc_suffixes_i1 <- lapply(conc_levels_i1, function(x)
+    substr(x, 1, 1))
+  
+  cross_points_i1 <-
+    as.numeric(c(df_leaves_row_i1["threshold_1"], ifelse(!is.na(df_leaves_row_i1["threshold_2"]), df_leaves_row_i1["threshold_2"], NA)))
+  
+  cross_points_i1 <- cross_points_i1[!is.na(cross_points_i1)]
+  
+  trans_width_i1 <-
+    as.numeric(c(as.numeric(df_leaves_row_i1["width_1"]), ifelse(
+      !is.na(as.numeric(df_leaves_row_i1["width_2"])), as.numeric(df_leaves_row_i1["width_2"]), NA
+    )))
+  
+  trans_width_i1 <- trans_width_i1[!is.na(trans_width_i1)]
+  
+  cat("\n\n\n")
+  cat("###", df_leaves_row_i1[["criterion"]], "\n") # add headings
+  cat("\n\n\n")
+      
+  plot_xlim_i1 <-
+    as.numeric(c((as.numeric(df_leaves_row_i1["threshold_1"]) - as.numeric(df_leaves_row_i1["width_1"])), (as.numeric(df_leaves_row_i1["threshold_1"]) + as.numeric(df_leaves_row_i1["width_1"]))))
+  
+  # construct the fuzzy partition
+  # get the type of fuzzy partition - linear or zadeh
+    
+  if(as.character(df_leaves_row_i1["fuzzy_partition"]) == "linear") {
+    
+    # assign three versions one locally another in results and a third globally
+    
+    # assign(
+    #   paste0("fp_", as.character(df_leaves_row_i1["crit_code"])),
+    #   LinearFuzzyPartition(
+    #     level = prop_levels_i1,
+    #     crossoverPoint = cross_points_i1,
+    #     transitionWidth = trans_width_i1
+    #   ), envir = results_env)
+    
+    assign(
+      paste0("fp_", as.character(df_leaves_row_i1["crit_code"])),
+      LinearFuzzyPartition(
+        level = prop_levels_i1,
+        crossoverPoint = cross_points_i1,
+        transitionWidth = trans_width_i1
+      ),
+      .GlobalEnv)
+    
+    
+    # assign(
+    #   paste0("fp_", as.character(df_leaves_row_i1["crit_code"])),
+    #   LinearFuzzyPartition(
+    #     level = prop_levels_i1,
+    #     crossoverPoint = cross_points_i1,
+    #     transitionWidth = trans_width_i1
+    #   )
+    # )
+    
+
+      
+    
+    
+  } else {
+    
+    # assign two versions one locally an another in results
+    # assign(
+    #   paste0("fp_", as.character(df_leaves_row_i1["crit_code"])),
+    #   ZadehFuzzyPartition(
+    #     level = prop_levels_i1,
+    #     crossoverPoint = cross_points_i1,
+    #     transitionWidth = trans_width_i1
+    #   ), envir = results_env)
+    
+
+    assign(
+      paste0("fp_", as.character(df_leaves_row_i1["crit_code"])),
+      ZadehFuzzyPartition(
+        level = prop_levels_i1,
+        crossoverPoint = cross_points_i1,
+        transitionWidth = trans_width_i1
+      ),
+      .GlobalEnv)
+    
+    # assign(
+    #   paste0("fp_", as.character(df_leaves_row_i1["crit_code"])),
+    #   ZadehFuzzyPartition(
+    #     level = prop_levels_i1,
+    #     crossoverPoint = cross_points_i1,
+    #     transitionWidth = trans_width_i1
+    #   )
+    # )
+  }
+  
+  # construct the fuzzy partition plot
+  plot_fp_i1 <- plot(
+    get(paste0("fp_", as.character(df_leaves_row_i1["crit_code"]))),
+    xlim = plot_xlim_i1,
+    xlab = as.character(df_leaves_row_i1["criterion"]),
+    ylab = expression(paste("Membership ( ", mu, " )")),
+    title = "Rule base\nProposition\nFuzzy partition",
+    theme = theme_bw()
+  )
+  
+  # print the fuzzy partition plot
+  print(plot_fp_i1)
+  
+  # construct the rule bases
+  # set the proposition name
+  
+  Prop_name_i1 <-
+    paste0(as.character(df_leaves_row_i1["crit_code"]))
+  
+  # set the conclusion name
+  Conc_name_i1 <-
+    paste0(as.character(df_leaves_row_i1["crit_code"]),
+           "_o")
+  
+  # thanks to https://stackoverflow.com/questions/45741498/add-column-in-tibble-with-variable-column-name for the following dynamic assignment of variable names in a tibble
+  
+  # set the proposition values
+  df_prop_i1 <- tibble(!!Prop_name_i1 := c(prop_levels_i1))
+  # set the conclusion values
+  df_conc_i1 <- tibble(!!Conc_name_i1 := c(conc_levels_i1))
+  
+  # new proposition and conclusion class objects are made here
+  new_prop_i1 <- new("Proposition", table = df_prop_i1)
+  new_conc_i1 <- new("Conclusion", table = df_conc_i1)
+  
+  # assign two versions one locally an another in results
+  
+  # assign(paste0("rb_",
+  #               as.character(df_leaves_row_i1["crit_code"])),
+  #        RuleBase(new_prop_i1, new_conc_i1), envir = results_env)
+
+  assign(paste0("rb_",
+                as.character(df_leaves_row_i1["crit_code"])),
+         RuleBase(new_prop_i1, new_conc_i1), .GlobalEnv)
+    
+  # assign(paste0("rb_",
+  #               as.character(df_leaves_row_i1["crit_code"])),
+  #        RuleBase(new_prop_i1, new_conc_i1))
+  
+  
+  cat("\n\nRule Base = \n")
+  knitr::normal_print(
+  # print(get(paste0("rb_",
+  #                  as.character(df_leaves_row_i1["crit_code"])), envir = results_env)))
+  
+    print(paste0("rb_", as.character(df_leaves_row_i1["crit_code"]))))
+  
+  # apply the fuzzy partitions to the data
+  
+  # first construct the predict function with all arguments as text
+  
+  x <- paste0(
+    "predict(rb_",
+    as.character(df_leaves_row_i1["crit_code"]),
+    ", newdata = df_irm_i1,",
+    as.character(df_leaves_row_i1["crit_code"]),
+    "=",
+    "fp_",
+    as.character(df_leaves_row_i1["crit_code"]),
+    ")"
+  )
+
+  print(x)
+  
+  # assign(paste0("fpm_", as.character(df_leaves_row_i1["crit_code"])), eval(parse(text = x)), envir = results_env)
+  
+  assign(paste0("fpm_", as.character(df_leaves_row_i1["crit_code"])), eval(parse(text = x)))
+   assign(paste0("fpm_", as.character(df_leaves_row_i1["crit_code"])), eval(parse(text = x)), .GlobalEnv)
+   
+  fpm_loop <- eval(parse(text = x))
+  
+  
+  cat("\n\n\n")
+  cat("\n",paste0("fpm_", as.character(df_leaves_row_i1["crit_code"])),"\n")
+  cat("\n\n\n")
+  
+  # print(get(paste0("fpm_", as.character(df_leaves_row_i1["crit_code"])), envir = results_env))
+  print(get(paste0("fpm_", as.character(df_leaves_row_i1["crit_code"]))))
+ 
+  cat("\n\n\n")
+  cat("\n",paste0("str(fpm_", as.character(df_leaves_row_i1["crit_code"])),")\n")
+  cat("\n\n\n")
+  
+  # str((get(paste0("fpm_", as.character(df_leaves_row_i1["crit_code"])), envir = results_env)))
+  str(get(paste0("fpm_", as.character(df_leaves_row_i1["crit_code"]))))
+      
+      
+  # apply the fpm_values to the list of conclusion levels and generate a list of values (result_list)
+  
+  
+  
+fpm_values_i1 <- function(conc_value_i1) {
+    
+  fpm_name_i1 <-
+     paste0("fpm_loop$", conc_value_i1)
+    #print(fpm_name)
+    conc_col_name_i1 <-
+      paste0(df_leaves_row_i1["crit_code"], "_", substr(conc_value_i1, 1, 1))
+    #print(paste0("suffix = _", substr(conc_value, 1, 1)))
+    x <- paste0("getMembership(", fpm_name_i1, ")")
+    
+    cat("\n\n\n")
+    cat("\nprint(x)\n")
+    cat("\n\n\n")
+    
+    print(x)
+    
+    cat("\n\n\n")
+    cat("\nprint(eval(parse(text = x)))\n")
+    cat("\n\n\n")
+    print(eval(parse(text = x)))
+    
+    # this works
+     #result_list <-
+    #   c(result_list, setNames(list(eval(parse(
+    #     text = x
+    #   ))), conc_col_name))
+     
+     # construct the fuzzy partition
+  # assign(paste("result_list_i1"),
+  #    c(get(paste("result_list_i1"), envir = results_env), setNames(list(eval(parse(
+  #        text = x
+  #      ))), conc_col_name_i1)), envir = results_env
+  # )
+  
+    # assign(paste("result_list_i1"), c(
+    #   get(paste("result_list_i1"), envir = results_env),
+    #   setNames(list(eval(parse(
+    #     text = x
+    #   ))), conc_col_name_i1)
+    # ))
+    
+    cat("\n\n\n")
+    cat("\n\n conc_col_name_i1 \n")
+    cat("\n\n\n")
+    cat(conc_col_name_i1)
+    
+    result_list_i1 <<-  c(get(paste("result_list_i1")), setNames(list(eval(parse(
+      text = x
+    ))), conc_col_name_i1))
+    
+    cat("\n\n\n")
+    cat("\nprint(ls(result_list_i1))\n")
+    cat("\n\n\n")
+    print(ls(result_list_i1))
+    
+
+
+    #return(result_list)
+    # cat("\n\n ls(results_env) \n")
+    # print(ls(envir = results_env))
+    
+  }
+  
+  # apply the fpm_values to the list of conclusion levels and generate a list of values (result_list)
+  lapply(unique(conc_levels_i1), fpm_values_i1)
+  #print("done 2")
+  #return(result_list)
+  
+  # cat("\n\n print(result_list_i1, envir = results_env) \n")
+  # print(result_list_i1, envir = results_env)
+  # print(get(paste("result_list_i1"), envir = results_env))
+  
+  cat("\n\n str(result_list_i1) \n")
+  str(result_list_i1)
+
+
+       } , error = function(e) {
+    cat("Error in df_leaves_row_i1:", df_leaves_row_i1, "\n")
+    cat("Message:", conditionMessage(e), "\n")
+    return(NULL)  # or some placeholder
+  })
+  
+ 
+})
+
+
+cat("\n\n\n")
+cat("\nprint(ls(result_list_i1))\n")
+cat("\n\n\n")
+print(ls(result_list_i1))
+
+#knitr::knit_exit()
+
+# result_list_i1 <- get(paste("result_list_i1"), envir = results_env)
+```
+
+
+```{r i1_evaluate_lower_level_rules_write_data, time_it = TRUE, out.width="100%", results = "asis"}
+
+# Convert the result list to a data frame
+result_df_i1 <- data.frame(matrix(unlist(result_list_i1), ncol = length(result_list_i1), byrow = FALSE))
+colnames(result_df_i1) <- names(result_list_i1)
+
+# Bind the result data frame to the original data frame
+df_irm_i1 <- cbind(df_irm_i1, result_df_i1)
+
+print(df_irm_i1)
+
+write.csv(df_irm_i1, "E:/repos/raise_fs/shiny/results/df_irm_i1.csv" )
+
+
+
+```
+
+
+```{r i1_evaluate_lower_level_rules, time_it = TRUE, out.width="100%", results = "asis"}
+# Print the updated data frame
+#print(df_irm_i1)
+cat("\n\n\n")
+cat("## Evaluate Rules\n") # add headings
+cat("\n\n\n")
+
+
+# Plot function for evaluated fuzzy partition using main data frame - rowwise across criteria
+apply(df_leaves_data_i1, 1, function(df_leaves_row_i1) {
+  
+  cat("\n\n\n")
+  cat("###", df_leaves_row_i1[["criterion"]], "\n") # add headings
+  cat("\n\n\n")
+  
+  prop_conc_list_i1 <- prop_conc_i1(df_leaves_row_i1)
+  conc_levels_i1 <- prop_conc_list_i1$conc_levels_i1
+  conc_suffixes_i1 <- lapply(conc_levels_i1, function(x)
+    substr(x, 1, 1))
+  
+  # Function to print each conclusion value - per unique object in list of conclusion values
+  # this only works when nested in print function
+  
+  plot_fpm_i1 <- function(conc_value_i1) {
+    conc_col_name_i1 <-
+      paste0(df_leaves_row_i1["crit_code"], "_", substr(conc_value_i1, 1, 1))
+    fpm_conc_var_i1 <- c(conc_col_name_i1, "x" , "y")
+    fpm_conc_name_i1 <- conc_value_i1
+
+    # spatialise the results
+    sf_fpm_i1 <- df_irm_i1 %>%
+      dplyr::select(unlist(as.character(noquote(fpm_conc_var_i1)))) %>%
+      na.omit() %>%
+      st_as_sf(coords = c("x", "y")) %>% na.omit()
+    
+    # rasterize
+    rast_fpm_i1 <-  rasterize(sf_fpm_i1, rast_mask_proj_i1, fpm_conc_var_i1[[1]]) 
+    
+    # give the rast sensible names
+    names(rast_fpm_i1) <- fpm_conc_name_i1
+    
+    # plot rast using title
+    #plot_conc <-
+    cat(paste(conc_col_name_i1, "\n\n")) 
+    rast_fpm_i1 %>% plot(
+      breaks = c(0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1),
+      axes = F,
+      main = paste(df_leaves_row_i1[["criterion"]], "-", conc_value_i1)
+    )
+    cat("\n\n") 
+  }
+  
+  # apply the plot_fpm to the list of conclusion levels and generate plots
+  lapply(unique(conc_levels_i1), plot_fpm_i1)
+  
+  #print("done 4")
+  #return(plot_fpm)
+
+})
+
+
+
+
+if (params$INT == 1)
+  shiny::setProgress(0.25, message = "Evaluate higher level rule bases 1st Innovation")  #
+
+```
+
+# Objects available?
+
+```{r objects_available_1, out.width="100%", results = 'asis'}
+
+cat("\n\n\n")
+cat("\nvar1\n\n")
+cat("\n\n\n")
+print(var1)
+
+cat("\n\n\n")
+cat("\nprint(ls(result_list_i1))\n\n")
+cat("\n\n\n")
+print(ls(result_list_i1))
+
+cat("\n\n\n")
+cat("\nprint(ls())\n\n")
+cat("\n\n\n")
+print(ls())
+
+```
+
+
+```{r objects_available_2, out.width="100%", results = 'asis'}
+
+cat("\n\n\n")
+cat("\nRule base example\n\n")
+cat("\n\n\n")
+print(get(paste("rb_AEK"), .GlobalEnv))
+      
+cat("\n\n\n")
+cat("\nPartition example\n\n")
+cat("\n\n\n")
+print(fp_AEK)
+
+cat("\n\n\n")
+cat("\nRule base example Local\n\n")
+cat("\n\n\n")
+print(rb_AEK)
+      
+#knitr::knit_exit()
+
+```
+
+
+
+
+# Higher-level rule base evaluation
+
+
+``` {r i1_evaluate_higher_level_rules, out.width="100%", results = 'asis' }
+
+# inverse join df_leaves_data to df_priorities
+
+df_rulebases_i1 <-
+  anti_join(df_requirements_i1,
+            df_leaves_data_i1,
+            by = 'crit_code',
+            copy = FALSE)
+
+  cat("\n\n\n")
+  cat(paste0("df_rulebases_i1\n\n\n"))
+  print(dplyr::select(df_rulebases_i1,'crit_code', "conc_level_1"))
+  
+  df_stack_conc_levels_i1 <- dplyr::select(df_rulebases_i1,'crit_code', "conc_level_1", "conc_level_2", "conc_level_3")
+  
+  print(df_stack_conc_levels_i1)
+    
+  cat("\n\n\n")
+  
+#  join df_rulebases to hierarchies_new
+
+# first split hierarchies_new based on hierarchy level
+
+# get highest level
+
+hierarchy_level_max_i1 <- max(unique(hierarchies_new_i1$level_number))
+cat(paste("Highest hierarchy level = ", hierarchy_level_max_i1, "\n"))
+
+# initialise FAO limits raster list
+list_rast_clas_FAO_cat <<- list()
+
+# initialise FAO limits raster list
+list_rast_limits_max_FAO <<- list()
+
+
+# for loop to run through all hierarchy levels from biggest to smallest
+for (i in hierarchy_level_max_i1:1) {
+  cat(paste0('\nLevel', i, "\n"))
+  
+  # join to the rulebases
+  assign(paste0("df_hierarchy_i1_", i),
+         inner_join(
+           select(df_rulebases_i1, crit_code, conc_level_1, conc_level_2, conc_level_3),
+           dplyr::filter(select(
+             hierarchies_new_i1, level_number, paste0('level', i)
+           ), level_number == i),
+           by = c('crit_code' = paste0('level', i))
+         ))
+  cat("\n\n\n")
+  cat(paste0("df_hierarchy_i1_", i,"\n\n\n"))
+  str(get(paste0("df_hierarchy_i1_", i)))
+  cat("\n\n\n")
+  
+  # if no data move to next
+  if (nrow(get(paste0("df_hierarchy_i1_", i)) != 0)) {
+    cat(paste0("\nLevel", i, " has higher rule bases"))
+    
+    #Custom function to perform one-to-many join for each row and evaluate rule base
+    eval_rule_base_i1 <- function(row) {
+      
+      ## ADDED 28-07-2025
+      
+       tryCatch({
+    # Debug print
+    cat("\n\n\n ### Processing row with crit_code:", row[["crit_code"]], "\n")
+         
+      ## ADDED 28-07-2025 END
+      
+      
+      # conc_options <-
+      #   c(row[["conc_level_1"]], row[["conc_level_2"]], row[["conc_level_3"]])
+      # print(conc_options)
+      # print(paste("conc_options = ", conc_options))
+      
+      df_row_i1 <- data.frame(crit_code = row[["crit_code"]])
+      
+      
+      # get the conc_levels for this higher level rule base
+      
+      df_row_conc_levels_i1 <- left_join(df_row_i1, df_stack_conc_levels_i1, by = c("crit_code"))
+      
+      cat("\n\nconc_level_1\n")
+      conc_levels_i1_1 <- df_row_conc_levels_i1$conc_level_1
+      #assign(paste("conc_levels_i1_1"), df_row_conc_levels_i1$conc_level_1, envir = results_env)
+      assign(paste("conc_levels_i1_1"), df_row_conc_levels_i1$conc_level_1, .GlobalEnv)
+      print(df_row_conc_levels_i1$conc_level_1)
+      cat("\n\nconc_level_2\n")
+      conc_levels_i1_2 <- df_row_conc_levels_i1$conc_level_2
+      #assign(paste("conc_levels_i1_2"), df_row_conc_levels_i1$conc_level_2, envir = results_env)
+      assign(paste("conc_levels_i1_2"), df_row_conc_levels_i1$conc_level_2, .GlobalEnv)
+      
+      print(df_row_conc_levels_i1$conc_level_2)
+      cat("\n\nconc_level_3\n")
+      conc_levels_i1_3 <- df_row_conc_levels_i1$conc_level_3
+      #assign(paste("conc_levels_i1_3"), df_row_conc_levels_i1$conc_level_3, envir = results_env)
+      assign(paste("conc_levels_i1_3"), df_row_conc_levels_i1$conc_level_3, .GlobalEnv)
+      print(df_row_conc_levels_i1$conc_level_3)
+      cat("\n\n\n")
+      
+      
+      
+      df_one_many_i1 <<-
+        left_join(
+          df_row_i1,
+          df_requirements_i1,
+          by = c('crit_code' = 'stack_code'),
+          keep = TRUE
+        )
+      
+      cat("\n\n\n")
+      cat("###", unique(df_one_many_i1[["stack"]]), "\n")
+      cat("\n\n\n")
+      conc_name_i1 <- unique(df_one_many_i1[["stack_code"]])
+      
+      # get the higher rb conclusion levels
+      #join df_one_many_i1 and df_stack_conc_levels_i1
+     
+      df_stack_conc_levels_row_i1 <- inner_join(df_stack_conc_levels_i1,
+                                               df_one_many_i1,
+                                               by = c("crit_code" = "stack_code"))
+     
+      cat("\n\n\ndf_stack_conc_levels_row_i1\n\n")
+      
+      print(df_stack_conc_levels_row_i1)
+      
+      cat("\n\n\n")
+      
+      str(df_row_i1)
+      
+      
+      # cat("\n\nStack = ", df_one_many[["stack_code"]], df_one_many[["stack"]])
+      cat("\n\nCriterion = ", df_one_many_i1[["criterion"]])
+      # cat("\n\nconc_name = ", conc_name)
+      
+      
+      ### GET OR ADD TO THE FUZZY PARTITION LIST ###
+      
+      fp_list_i1 <<- fn_fill_fp_list(df_one_many_i1) # function gets the fp list
+      
+      # assign(paste0("fp_", conc_name_i1, "_list"),
+      #        fp_list_i1,
+      #        .GlobalEnv) # make a globally available named list
+      
+      assign(paste0("fp_", conc_name_i1, "_list"), fp_list_i1, .GlobalEnv) # make a globally available named list
+      
+      ### GET WEIGHTS ###
+      
+      weights_i1 <- df_one_many_i1$weight
+      weights_glob_i1 <<- weights_i1
+      cat(paste0("\n\nWeights = ", weights_i1))
+      
+      ### CONSTRUCT THE NEW RULE BASE ###    
+      
+      rb_prefix <- "rb_"
+      df_one_many_i1$rb <<-
+        paste(rb_prefix, df_one_many_i1$crit_code.y, sep = "")
+
+      lower_rb_i1 <<- df_one_many_i1$rb      # get the rule bases
+      # get and print the lower rule bases to ensure that these are available
+      #cat(paste("lower_rb = ", lower_rb))
+      #str(lower_rb)
+      lower_rb_glob_i1 <<-
+        lower_rb_i1      # save to global env for debugging
+      
+      lower_rb_concs_i1 <<- lapply(lower_rb_i1, fn_get_rb_conc)
+      lower_rb_concs_glob_i1 <<- (lower_rb_concs_i1)      
+      lower_rb_props_i1 <<- lapply(lower_rb_i1, fn_get_rb_prop)
+      lower_rb_props_glob_i1 <<- (lower_rb_props_i1) 
+       
+      # print(paste("str(lower_rb_concs) =", str(lower_rb_concs)))
+      # print(paste("lower_rb_concs =", lower_rb_concs))
+
+      results_rb_i1  <<- fn_create_rb(lower_rb_concs_i1, weights_i1, conc_name_i1)
+      #str(results_rb)
+      result_rb_i1 <<- unlist(results_rb_i1[[1]])
+      cat("\n\nRule Base = \n")
+      #cat(paste(result_rb, "\n"))
+      print(result_rb_i1)
+      result_rb_conc_i1 <<- unlist(results_rb_i1[[2]])
+      #cat("\nresult_rb_conc = \n")
+      #print(result_rb_conc)
+
+                  
+      assign(paste0("rb_", conc_name_i1), result_rb_i1, .GlobalEnv)
+      #assign(paste0("rb_", conc_name_i1), result_rb_i1)
+      
+      ### GET OR ADD TO THE RULE BASE STACK ###
+      
+      rb_list <<- fn_fill_rb_list(df_one_many_i1)
+      rb_list <<-  append(rb_list, paste0("rb_", conc_name_i1))
+      rb_list_glob_i1 <<- rb_list
+      #cat("\nrb_list = \n")
+      #print(rb_list)   
+      
+       assign(paste0("rb_list_", conc_name_i1), rb_list,
+              .GlobalEnv) # convert to rule base list
+      
+      #assign(paste0("rb_list_", conc_name_i1), rb_list) # convert to rule base list
+
+      newList_i1 <<- list(
+        "df" = df_one_many_i1,
+        "fp" = fp_list_i1 ,
+        "rb" = result_rb_i1,
+        rbs = rb_list
+      )
+
+      
+ 
+      
+      # print(get(paste0("rb_list_", conc_name)))
+      # str(get(paste0("rb_list_", conc_name)))
+      
+      # # create the rule base stack from the list
+      x <-
+        paste("stack(", gsub(",$", "", paste0(
+          get(paste0("rb_list_", conc_name_i1)), sep = ",", collapse = ""
+        )), ")")
+      
+      #cat("\nx = \n")
+      #print(x)
+      
+      # assign(paste0("rbs_", conc_name_i1, "_i1"), eval(parse(text = x)),
+      #        .GlobalEnv)
+      
+      assign(paste0("rbs_", conc_name_i1, "_i1"), eval(parse(text = x)))
+            
+      #print(get(paste0("rbs_", conc_name)))
+      
+      # # evaluate the rule base stack
+      
+      w <-
+        paste0("predict(",
+              "rbs_",
+              conc_name_i1,
+              "_i1, newdata = df_irm_i1,",
+              gsub(",$", "", paste0(
+                fp_list_i1, sep = ",", collapse = ""
+              )),
+              ")")
+      
+      #cat("\nw = \n")
+      #print(w)
+      # assign(paste0("fpm_", conc_name_i1, "_i1"), eval(parse(text = w)),
+      #        .GlobalEnv)
+      
+      assign(paste0("fpm_", conc_name_i1, "_i1"), eval(parse(text = w)))
+      
+      # columns defined by conclusions to rule base
+      
+      fpm_colnames_i1 <<- pull(distinct(result_rb_conc_i1@table))
+      
+      #cat("\nfpm_colnames = \n")
+      #print(fpm_colnames)
+      
+      for (j in 1:length(fpm_colnames_i1)) {
+        
+      col_suffix_i1 <-   substr( fpm_colnames_i1[[j]] , start = 1 , stop = 1 )
+      #cat("\ncol_suffix = \n")
+      #print(col_suffix)
+      
+      mem_text_i1 <- paste0("getMembership(","fpm_", conc_name_i1, "_i1$", fpm_colnames_i1[[j]],")")
+      #print(mem_text)
+      membership_i1 <- eval(parse(text = mem_text_i1))
+      
+      df_irm_i1 <<-
+        mutate(df_irm_i1,!!as.character(paste0(conc_name_i1, "_", col_suffix_i1)) := membership_i1, .keep = c("all"))
+        
+      }
+   
+      n_i1 = length(fpm_colnames_i1)
+      fpm_conc_var_i1 <- c()
+      for (j in 1:length(fpm_colnames_i1)) {
+        col_suffix_i1 <-   substr(fpm_colnames_i1[[j]] , start = 1 , stop = 1)
+        fpm_conc_var_i1 <-
+          c(fpm_conc_var_i1, paste0(conc_name_i1, "_", col_suffix_i1))
+      }
+      
+      fpm_conc_var_i1 <-    c(fpm_conc_var_i1, "x" , "y")
+      fpm_conc_name_i1 <- fpm_colnames_i1
+      fpm_plot_title_i1 <-    paste(unique(df_one_many_i1[["stack"]]))
+      
+      plot_fpm_i1 <-
+        rasterize_plot_fpm(
+          n_i1,
+          fpm_conc_var_i1,
+          fpm_conc_name_i1,
+          df_irm_i1,
+          fpm_plot_title_i1,
+          rast_mask_proj_i1
+        )
+      
+      print(plot_fpm_i1)
+ 
+      if (i <= params$FAOCLASS1) {
+        FAO_leaflet_widget_i1 <<-
+          classify_maps_FAO(
+            n_i1,
+            fpm_conc_var_i1,
+            fpm_conc_name_i1,
+            df_irm_i1,
+            fpm_plot_title_i1,
+            df_one_many_i1,
+            rast_mask_proj_i1,
+            list_rast_clas_FAO_cat,
+            vect_subdiv_i1,
+            params$INN1
+          )
+      }
+      
+      if (i <= params$LIMITS1) {
+        FAO_limits_leaflet_widget_i1 <<-
+          classify_maps_limits(
+            n_i1,
+            fpm_conc_var_i1,
+            fpm_conc_name_i1,
+            df_irm_i1,
+            fpm_plot_title_i1,
+            df_one_many_i1,
+            weights_i1,
+            rast_mask_proj_i1,
+            vect_subdiv_i1,
+            list_rast_limits_max_FAO,
+            params$INN1
+          )
+      }
+      
+      if (i <= params$CONCCLASS1) {
+        CONC_leaflet_widget_i1 <<-
+          classify_maps_CONC(
+            n_i1,
+            fpm_conc_var_i1,
+            fpm_conc_name_i1,
+            df_irm_i1,
+            fpm_plot_title_i1,
+            df_one_many_i1,
+            rast_mask_proj_i1,
+            list_rast_clas_FAO_cat,
+            vect_subdiv_i1,
+            params$INN1
+          )
+      }
+      
+      return(newList_i1)
+            
+       } , error = function(e) {
+    cat("Error in row with crit_code:", row[["crit_code"]], "\n")
+    cat("Message:", conditionMessage(e), "\n")
+    return(NULL)  # or some placeholder
+  }) 
+     }
+    
+    # Apply the rule base evaluation function to each row of df1
+    assign(paste0("df_one_many_i1_", i),
+           apply(get(paste0("df_hierarchy_i1_", i)), 1, eval_rule_base_i1), .GlobalEnv)
+    
+  }
+}
+
+#knitr::knit_exit()
+
+```
+
+```{r i1_leaflet_FAO, results = 'asis', out.width="100%"}
+if ( params$FAOCLASS1 > 0){
+  cat(paste("\n\n## Interactive Classified Map - FAO Suitability Classes \n\n"))
+  FAO_leaflet_widget_i1}
+
+```
+
+```{r i1_leaflet_FAOlimits, results = 'asis', out.width="100%"}
+if ( params$LIMITS1 > 0){
+  cat(paste("\n\n## Interactive Classified Map - FAO Limitations Classes \n\n"))
+  FAO_limits_leaflet_widget_i1}
+
+
+```
+# Objects available?
+
+```{r objects_available_3, out.width="100%", results = 'asis'}
+
+# str(get(paste("rast_clas_fao_catFarm Production Feasibility")))
+# plot(get(paste("rast_clas_fao_catFarm Production Feasibility")))
+# str(get(paste("rast_clas_fao_catMarket Access")))
+# plot(get(paste("rast_clas_fao_catMarket Access")))
+# str(get(paste("rast_clas_fao_catClimatic Aptitude")))
+# plot(get(paste("rast_clas_fao_catClimatic Aptitude")))
+# str(get(paste("rast_clas_fao_catLandscape Aptitude")))
+# plot(get(paste("rast_clas_fao_catLandscape Aptitude")))
+# str(get(paste("rast_clas_fao_catSoil Fertility Aptitude")))
+# plot(get(paste("rast_clas_fao_catSoil Fertility Aptitude")))
+# str(get(paste("rast_clas_fao_catSoil Physical Properties Aptitude")))
+# plot(get(paste("rast_clas_fao_catSoil Physical Properties Aptitude")))  
+# str(get(paste("rast_clas_fao_catSocio-Economic Feasibility")))
+# plot(get(paste("rast_clas_fao_catSocio-Economic Feasibility")))
+# str(get(paste("rast_clas_fao_catBiophysical Aptitude")))
+# plot(get(paste("rast_clas_fao_catBiophysical Aptitude")))
+# str(get(paste("rast_clas_fao_catLikelihood of Adoption")))
+# plot(get(paste("rast_clas_fao_catLikelihood of Adoption")))
+
+
+cat("\n\n\n")
+cat("\n\n\n length(list_rast_clas_FAO_cat):\n\n")
+print(length(list_rast_clas_FAO_cat))
+cat("\n\n\n")
+cat("\n\n\n")
+cat("\n\n\n str(list_rast_clas_FAO_cat):\n\n")
+print(str(list_rast_clas_FAO_cat))
+cat("\n\n\n")
+
+
+# for (i in seq_along(list_rast_clas_FAO_cat)) {
+# 
+#   str(list_rast_clas_FAO_cat[[i]])
+#   plot(list_rast_clas_FAO_cat[[i]], main = paste("Raster", i))
+# 
+# }
+
+for (nm in names(list_rast_clas_FAO_cat)) {
+  plot(list_rast_clas_FAO_cat[[nm]], main = nm)
+}
+
+
+# 
+# 
+# knitr::knit_exit()
+
+# 
+# 
+# #raster_list <- mget(paste("list_rast_clas_FAO_cat"), .GlobalEnv)
+# # Step 1: get the character vector of raster names
+# raster_names <- list_rast_clas_FAO_cat  # already a list
+# raster_names <- unlist(raster_names)    # make it a simple character vector
+# 
+# # Step 2: get the actual SpatRaster objects
+# raster_list <- mget(raster_names)
+# 
+# 
+# cat("\n\n\n")
+# cat("\n\n\n length(raster_list):\n\n")
+# print(length(raster_list))
+# 
+# cat("\n\n\n")
+# cat("\n\n\n str(raster_list)\n\n")
+# cat("\n\n\n")
+# str(raster_list)
+# cat("\n\n\n")
+#      
+#      
+# # Now you can plot each raster
+# for (i in seq_along(raster_list)) {
+#   r <- get(raster_list[i])
+#   
+#   print(str(r))
+#   
+#   if (!inherits(r, "SpatRaster") || all(!is.finite(values(r)))) {
+#     message(paste("Raster", i, "is invalid or has no finite values. Skipping."))
+#     next
+#   }
+#   
+#   plot(r, main = raster_list[i])
+# 
+# }
+# 
+# # #plot(get(paste("list_rast_clas_FAO_cat"))[[1]])
+# # 
+# #  for (i in seq_along(list_rast_clas_FAO_cat)) {
+# #    str(names(get(paste("list_rast_clas_FAO_cat"))[[i]]))
+# #    #plot(get(paste("list_rast_clas_FAO_cat"))[[i]], main = paste("Raster", i))
+# # 
+# #  }
+
+
+
+```
+
+# Sub-division statistics
+
+This section gets the statistics for each sub-division, taking into account the dynamically created limitations for adoption, suitability and feasibility.
+
+
+The existing function expects arguments showing:
+
+1) the number of maps to produce - one per class (of whatever output)
+2) a vector of the variables (classes) that need to be mapped (1 and 2 are linked and 1 is not really necessary)
+3) a palette of colours with the same number of colours as classes - these are 
+
+The palettes in the current IRM do not match with the any of the colours used in the classified maps.
+Instead they are just a distinct colour.
+
+The variables and colour palette names are currently hard coded. The names of the palettes are from the ggplot2 package but derive from colorbrewer, all palettes are sequential. There are 18 named sequential palettes, they can be referenced by name or as an index from the list.
+
+The index works as long as the values do not exceed 18, so need to wrap.
+
+## Area
+
+### FAO Classes
+
+```{r i1_subdiv_area_FAO_palettes, results = 'asis', out.width="100%"}
+# create a list of valid names of colorbrewer palettes for sequential data
+palettes_i1 <-
+  c("Blues",
+    "YlGn",
+    "Greys",
+    "Oranges",
+    "YlOrRd"
+  )
+
+
+# loop through the FAO class rasters created above
+
+# cat("\n\n\n")
+# cat("\nprint(ls(list_rast_clas_FAO_cat))\n\n")
+# cat("\n\n\n")
+# print(ls(list_rast_clas_FAO_cat))
+
+cat("\n\n\n length(list_rast_clas_FAO_cat):\n\n")
+print(length(list_rast_clas_FAO_cat))
+
+
+# cat("\n\n\n")
+# cat("\nprint(ls())\n\n")
+# cat("\n\n\n")
+# print(ls())
+# 
+# cat("\n\n\n")
+# cat("\nprint(ls())\n\n")
+# cat("\n\n\n")
+# print(as.list(.GlobalEnv))
+# 
+# knitr::knit_exit()
+
+```
+
+
+```{r i1_subdiv_area_FAO, results = 'asis', out.width="100%"}
+#for (i in 1:length(get(paste("list_rast_clas_FAO_cat"), .GlobalEnv)))   {
+
+# for (i in 1:length(list_rast_clas_FAO_cat))  {
+for (i in names(list_rast_clas_FAO_cat)) {  
+  
+   tryCatch({
+    
+     # cat("\n\n\n")
+     # cat("\n\n\n ### str(get(paste(list_rast_clas_FAO_cat)))\n\n")
+     # cat("\n\n\n")
+     # str(get(paste("list_rast_clas_FAO_cat")))
+     # cat("\n\n\n")
+     #    
+     # # Debug print
+     # cat("\n\n\n ### Processing raster - global:", names(get(paste("list_rast_clas_FAO_cat"), .GlobalEnv)[i]), "\n")
+     # 
+     # # Debug print
+     # cat("\n\n\n ### Processing raster:", names(get(paste("list_rast_clas_FAO_cat"))[i]), "\n\n")
+     # cat("\n\n\n")
+     # 
+     # cat("\n--\n")
+     # 
+     # cat("\n\n\n")
+     # cat("\n\n\n ### Plot raster - global:", names(get(paste(
+     #   "list_rast_clas_FAO_cat"
+     # ))[i]), "\n\n")
+     # cat("\n\n\n")
+     # 
+     # #plot(names(get(paste("list_rast_clas_FAO_cat"), .GlobalEnv ))[i])
+     # plot(get(paste("list_rast_clas_FAO_cat"), .GlobalEnv ))[i]
+     # 
+     # 
+     # cat("\n\n\n")
+     # cat("\n\n\n ### Plot raster:", names(get(paste(
+     #   "list_rast_clas_FAO_cat"
+     # )))[i], "\n\n")
+     # cat("\n\n\n")
+     # 
+     # plot(names(get(paste("list_rast_clas_FAO_cat")))[i])    
+  
+  plot(list_rast_clas_FAO_cat[[i]], main = i)
+     
+  # get the name of the criteria from the raster name - this is used in the plotting
+  subdiv_criteria_name_i1 <- i
+  subdiv_criteria_name_i1 <-
+    sub(paste0(".*", "fao_cat"), "", subdiv_criteria_name_i1)
+  
+  cat("\n\n\n")
+  cat("###", subdiv_criteria_name_i1, "\n") # add headings
+  cat("\n\n\n")
+  
+  # get the raster for which statistics are derived for each limitation
+  #rast_to_plot_i1 <- get(paste0(list_rast_clas_FAO_cat[i]))
+  rast_to_plot_i1 <- list_rast_clas_FAO_cat[[i]]
+  
+  
+  
+  # get the cellsize for each raster
+  rast_to_plot_cellsize_i1 <- cellSize(rast_to_plot_i1, unit = "ha")
+  
+  
+  # extract the raster class to a data frame using the subdivisions
+  df_extr_i1 <-
+    terra::extract(rast_to_plot_i1, vect_subdiv_i1, na.rm = TRUE, ID = T, weights = T)
+  
+    # extract the raster cellsize to a data frame using the subdivisions
+  df_extr_cellsize_i1 <-
+    terra::extract(rast_to_plot_cellsize_i1, vect_subdiv_i1, na.rm = TRUE, ID = T, weights = T)
+  
+  df_extr_i1 <- mutate(df_extr_i1, df_extr_cellsize_i1)
+  
+   # summarise the class for each subdivision raster ID
+  df_extr_summary_i1 <- df_extr_i1 %>%
+    group_by(ID) %>%
+    count(FAO, wt = (area * weight), .drop = FALSE)
+  
+  # get the names of the FAO classes
+  FAO <- as.vector(unique(df_extr_summary_i1$FAO))
+  FAO <- FAO[!is.na(FAO)]
+  
+  df_extr_summary_i1_pivot <- df_extr_summary_i1 %>% pivot_wider(names_from = FAO, values_from = n)
+  
+  # join the summary data frame to the original subdivision data spatvector
+  vect_subdiv_extr_i1 <<-
+    left_join(vect_subdiv_i1, df_extr_summary_i1_pivot, by = 'ID')
+    
+      # save as geojson and csv files
+  output_vect(vect_subdiv_extr_i1, paste0(subdiv_criteria_name_i1, "_FAO_area_", params$INN1)) # save as a geojson file
+  output_csv(as_tibble(vect_subdiv_extr_i1), paste0(subdiv_criteria_name_i1, "_FAO_area_", params$INN1)) # save as a csv file 
+  
+
+  # loop through each existing class type 
+  for (class_type in FAO) {
+    
+    # Get the current iteration number
+    j_i1 <- match(class_type, FAO)
+
+    # get the palette using the iteration number
+    colour_index_i1 <- j_i1
+    colour_index_mod_i1 <- (colour_index_i1 %% 18)
+    colour_index_mod_i1 <-
+      ifelse(colour_index_mod_i1 == 0, 18, colour_index_mod_i1)
+    result_i1 <- palettes_i1[colour_index_mod_i1]
+    
+    # Filter the joined data for the current limitation
+    # Filter the joined data for the current limitation
+    filtered_data_i1 <-
+      vect_subdiv_extr_i1 %>% select(any_of(class_type))
+    #print(filtered_data)
+    
+    if (nrow(filtered_data_i1) == 0) {next} 
+
+  
+    # Create a ggplot for count value per subdivision for the current class type using the palette from above
+    subdiv_plot_i1 <- ggplot() +
+      geom_spatvector(data = filtered_data_i1, aes(group = params$SUBDIVNAMEVAR, fill = eval(parse(text = FAO[j_i1])))) +
+      labs(
+        title = paste(subdiv_criteria_name_i1, "\nClass = ", class_type),
+        fill = "Area (ha)"
+      ) +
+      scale_fill_distiller(
+        type = "seq",
+        palette = result_i1,
+        direction = 1,
+        limits = c(0, max_area_i1),
+        guide = "legend", labels = comma
+      ) 
+    
+    print(subdiv_plot_i1)
+  }
+  
+} , error = function(e) {
+    cat("Error in rast:", names(list_rast_clas_FAO_cat)[i], "\n")
+    cat("Message:", conditionMessage(e), "\n")
+    return(NULL)  # or some placeholder
+})  
+    
+}  
+
+
+```
+
+# Objects available?
+
+```{r objects_available_4, out.width="100%", results = 'asis'}
+
+# str(get(paste("rast_clas_fao_catFarm Production Feasibility")))
+# plot(get(paste("rast_clas_fao_catFarm Production Feasibility")))
+# str(get(paste("rast_clas_fao_catMarket Access")))
+# plot(get(paste("rast_clas_fao_catMarket Access")))
+# str(get(paste("rast_clas_fao_catClimatic Aptitude")))
+# plot(get(paste("rast_clas_fao_catClimatic Aptitude")))
+# str(get(paste("rast_clas_fao_catLandscape Aptitude")))
+# plot(get(paste("rast_clas_fao_catLandscape Aptitude")))
+# str(get(paste("rast_clas_fao_catSoil Fertility Aptitude")))
+# plot(get(paste("rast_clas_fao_catSoil Fertility Aptitude")))
+# str(get(paste("rast_clas_fao_catSoil Physical Properties Aptitude")))
+# plot(get(paste("rast_clas_fao_catSoil Physical Properties Aptitude")))  
+# str(get(paste("rast_clas_fao_catSocio-Economic Feasibility")))
+# plot(get(paste("rast_clas_fao_catSocio-Economic Feasibility")))
+# str(get(paste("rast_clas_fao_catBiophysical Aptitude")))
+# plot(get(paste("rast_clas_fao_catBiophysical Aptitude")))
+# str(get(paste("rast_clas_fao_catLikelihood of Adoption")))
+# plot(get(paste("rast_clas_fao_catLikelihood of Adoption")))
+
+
+cat("\n\n\n")
+cat("\n\n\n length(list_rast_limits_max_FAO):\n\n")
+print(length(list_rast_limits_max_FAO))
+cat("\n\n\n")
+cat("\n\n\n")
+cat("\n\n\n str(list_rast_limits_max_FAO):\n\n")
+print(str(list_rast_limits_max_FAO))
+cat("\n\n\n")
+
+
+# for (i in seq_along(list_rast_clas_FAO_cat)) {
+# 
+#   str(list_rast_clas_FAO_cat[[i]])
+#   plot(list_rast_clas_FAO_cat[[i]], main = paste("Raster", i))
+# 
+# }
+
+for (nm in names(list_rast_limits_max_FAO)) {
+  plot(list_rast_limits_max_FAO[[nm]], main = nm)
+}
+
+
+# 
+# 
+# knitr::knit_exit()
+
+# 
+# 
+# #raster_list <- mget(paste("list_rast_clas_FAO_cat"), .GlobalEnv)
+# # Step 1: get the character vector of raster names
+# raster_names <- list_rast_clas_FAO_cat  # already a list
+# raster_names <- unlist(raster_names)    # make it a simple character vector
+# 
+# # Step 2: get the actual SpatRaster objects
+# raster_list <- mget(raster_names)
+# 
+# 
+# cat("\n\n\n")
+# cat("\n\n\n length(raster_list):\n\n")
+# print(length(raster_list))
+# 
+# cat("\n\n\n")
+# cat("\n\n\n str(raster_list)\n\n")
+# cat("\n\n\n")
+# str(raster_list)
+# cat("\n\n\n")
+#      
+#      
+# # Now you can plot each raster
+# for (i in seq_along(raster_list)) {
+#   r <- get(raster_list[i])
+#   
+#   print(str(r))
+#   
+#   if (!inherits(r, "SpatRaster") || all(!is.finite(values(r)))) {
+#     message(paste("Raster", i, "is invalid or has no finite values. Skipping."))
+#     next
+#   }
+#   
+#   plot(r, main = raster_list[i])
+# 
+# }
+# 
+# # #plot(get(paste("list_rast_clas_FAO_cat"))[[1]])
+# # 
+# #  for (i in seq_along(list_rast_clas_FAO_cat)) {
+# #    str(names(get(paste("list_rast_clas_FAO_cat"))[[i]]))
+# #    #plot(get(paste("list_rast_clas_FAO_cat"))[[i]], main = paste("Raster", i))
+# # 
+# #  }
+
+
+
+```
+
+### FAO Limitations
+
+```{r i1_subdiv_area_FAOlimits, results = 'asis', out.width="100%"}
+
+# create a list of valid names of colorbrewer palettes for sequential data
+palettes_i1 <-
+  c(
+    "Blues",
+    "BuGn",
+    "BuPu",
+    "GnBu",
+    "Greens",
+    "Greys",
+    "Oranges",
+    "OrRd",
+    "PuBu",
+    "PuBuGn",
+    "PuRd",
+    "Purples",
+    "RdPu",
+    "Reds",
+    "YlGn",
+    "YlGnBu",
+    "YlOrBr",
+    "YlOrRd"
+  )
+
+
+# loop through the limitation rasters created above
+
+#for (i in 1:length(list_rast_limits_max_FAO))   {
+  for (i in names(list_rast_limits_max_FAO)) {  
+  
+   tryCatch({
+     
+  # get the name of the criteria from the raster name - this is used in the plotting
+  subdiv_criteria_name_i1 <- i
+  subdiv_criteria_name_i1 <-
+    sub(paste0(".*", "FAO_"), "", subdiv_criteria_name_i1)
+  
+  cat("\n\n\n")
+  cat("###", subdiv_criteria_name_i1, "\n") # add headings
+  cat("\n\n\n")
+  
+  # get the raster for which statistics are derived for each limitation
+  #rast_to_plot_i1 <- get(paste0(list_rast_limits_max_FAO[i]))
+  rast_to_plot_i1 <- list_rast_limits_max_FAO[[i]]
+  
+  # get the cellsize for each raster
+  rast_to_plot_cellsize_i1 <- cellSize(rast_to_plot_i1, unit = "ha")
+  
+  
+  # extract the raster limitations to a data frame using the subdivisions
+  df_extr_i1 <-
+    terra::extract(rast_to_plot_i1, vect_subdiv_i1, na.rm = TRUE, ID = T, weights = T)
+  
+    # extract the raster cellsize to a data frame using the subdivisions
+  df_extr_cellsize_i1 <-
+    terra::extract(rast_to_plot_cellsize_i1, vect_subdiv_i1, na.rm = TRUE, ID = T, weights = T)
+  
+  df_extr_i1 <- mutate(df_extr_i1, df_extr_cellsize_i1)
+  
+   # summarise the limitations for each subdivision raster ID
+  df_extr_summary_i1 <- df_extr_i1 %>%
+    group_by(ID) %>%
+    count(FAO_limit, wt = (area * weight), .drop = FALSE)
+  
+  # get the names of the FAO limitations
+  FAO_limits <- as.vector(unique(df_extr_summary_i1$FAO_limit))
+    FAO_limits <- FAO_limits[!is.na(FAO_limits)]
+    
+  # pivot wider to give a column for each limit
+  df_extr_summary_i1_pivot <- df_extr_summary_i1 %>% pivot_wider(names_from = FAO_limit, values_from = n)
+  
+    # join the summary data frame to the original subdivision data spatvector
+  vect_subdiv_extr_i1 <<-
+    left_join(vect_subdiv_i1, df_extr_summary_i1_pivot, by = 'ID')
+  
+  # join the summary data frame to the subdivision area data frame
+  vect_subdiv_extr_i1 <<-
+    left_join(vect_subdiv_extr_i1, df_subdiv_area_i1, by = 'ID')
+
+      # save as geojson and csv files
+  output_vect(vect_subdiv_extr_i1, paste0(subdiv_criteria_name_i1, "_FAO_limits_area_", params$INN1)) # save as a geojson file
+  output_csv(as_tibble(vect_subdiv_extr_i1), paste0(subdiv_criteria_name_i1, "_FAO_limits_area_", params$INN1)) # save as a csv file 
+  
+
+  # loop through each existing limitation type 
+  for (limitation_type_i1 in FAO_limits) {
+    
+    # Get the current iteration number
+    j_i1 <- match(limitation_type_i1, FAO_limits)
+
+    # get the palette using the iteration number
+    colour_index_i1 <- j_i1
+    colour_index_mod_i1 <- (colour_index_i1 %% 18)
+    colour_index_mod_i1 <-
+      ifelse(colour_index_mod_i1 == 0, 18, colour_index_mod_i1)
+    result_i1 <- palettes_i1[colour_index_mod_i1]
+    
+    # Filter the joined data for the current limitation
+    filtered_data_i1 <-
+      vect_subdiv_extr_i1 %>% select(any_of(limitation_type_i1))
+    #print(filtered_data)
+    if (nrow(filtered_data_i1) == 0) {next} 
+    
+
+    
+    # Create a ggplot for count value per subdivision for the current limitation type using the palette from above
+    subdiv_plot_i1 <- ggplot() +
+      geom_spatvector(data = filtered_data_i1, aes(group = params$SUBDIVNAMEVAR, fill = eval(parse(text = FAO_limits[j_i1])))) +
+      labs(
+        title = paste(subdiv_criteria_name_i1, "\nLimit = ", limitation_type_i1),
+        fill = "Area (ha)"
+      ) +
+      scale_fill_distiller(
+        type = "seq",
+        palette = result_i1,
+        direction = 1,
+        limits = c(0, max_area_i1),
+        guide = "legend", labels = comma
+      ) 
+    
+    print(subdiv_plot_i1)
+  }
+  
+   } ,
+  error = function(e) {
+    cat("Error in rast:", names(list_rast_clas_FAO_cat)[i], "\n")
+    cat("Message:", conditionMessage(e), "\n")
+    return(NULL)  # or some placeholder
+  })
+    
+  }  
+
+
+```
+
+## Percentage
+
+### FAO Classes
+
+```{r i1_subdiv_pc_FAO, results = 'asis', out.width="100%"}
+
+# create a list of valid names of colorbrewer palettes for sequential data
+palettes_i1 <-
+  c("Blues",
+    "YlGn",
+    "Greys",
+    "Oranges",
+    "YlOrRd"
+  )
+
+
+# loop through the FAO class rasters created above
+
+# for (i in 1:length(list_rast_clas_FAO_cat))   {
+  # for (i in 1:length(list_rast_clas_FAO_cat))  {
+for (i in names(list_rast_clas_FAO_cat)) {  
+  
+   tryCatch({
+     
+     
+  # get the name of the criteria from the raster name - this is used in the plotting
+  subdiv_criteria_name_i1 <- i
+  subdiv_criteria_name_i1 <-
+    sub(paste0(".*", "fao_cat"), "", subdiv_criteria_name_i1)
+  
+  cat("\n\n\n")
+  cat("###", subdiv_criteria_name_i1, "\n") # add headings
+  cat("\n\n\n")
+  
+  # get the raster for which statistics are derived for each limitation
+  rast_to_plot_i1 <- list_rast_clas_FAO_cat[[i]]
+  
+  # get the cellsize for each raster
+  rast_to_plot_cellsize_i1 <- cellSize(rast_to_plot_i1, unit = "ha")
+  
+  
+  # extract the raster class to a data frame using the subdivisions
+  df_extr_i1 <-
+    terra::extract(rast_to_plot_i1, vect_subdiv_i1, na.rm = TRUE, ID = T, weights = T)
+  
+    # extract the raster cellsize to a data frame using the subdivisions
+  df_extr_cellsize_i1 <-
+    terra::extract(rast_to_plot_cellsize_i1, vect_subdiv_i1, na.rm = TRUE, ID = T, weights = T)
+  
+  df_extr_i1 <- mutate(df_extr_i1, df_extr_cellsize_i1)
+  
+   # summarise the class for each subdivision raster ID
+  df_extr_summary_i1 <- df_extr_i1 %>%
+    group_by(ID) %>%
+    count(FAO, wt = (area * weight), .drop = FALSE)
+  
+    # get the names of the FAO classes
+  FAO <- as.vector(unique(df_extr_summary_i1$FAO))
+  FAO <- FAO[!is.na(FAO)]
+  
+    df_extr_summary_i1_pivot <- df_extr_summary_i1 %>% pivot_wider(names_from = FAO, values_from = n)
+  
+  # join the summary data frame to the original subdivision data spatvector
+  vect_subdiv_extr_i1 <<-
+    left_join(vect_subdiv_i1, df_extr_summary_i1_pivot, by = 'ID')
+  
+   # join the summary data frame to the subdivision area data frame
+  vect_subdiv_extr_i1 <<-
+    left_join(vect_subdiv_extr_i1, df_subdiv_area_i1, by = 'ID') 
+  
+  # vect_subdiv_extr_i1 <<- vect_subdiv_extr_i1 %>%
+  #    select(ID, ha, any_of(FAO)) %>% mutate(across(any_of(FAO), ~ (.x / ha) * 100)) 
+  
+    vect_subdiv_extr_i1 <<- vect_subdiv_extr_i1 %>% mutate(across(any_of(FAO), ~ (.x / ha) * 100)) #this includes all columns from vect_subdiv_extr_i1 A Farrow 22/05/2024
+      
+      # save as geojson and csv files
+  output_vect(vect_subdiv_extr_i1, paste0(subdiv_criteria_name_i1, "_FAO_pc_", params$INN1)) # save as a geojson file
+  output_csv(as_tibble(vect_subdiv_extr_i1), paste0(subdiv_criteria_name_i1, "_FAO_pc_", params$INN1)) # save as a csv file 
+
+  # loop through each existing class type 
+  for (class_type in FAO) {
+    
+    # Get the current iteration number
+    j_i1 <- match(class_type, FAO)
+
+    # get the palette using the iteration number
+    colour_index_i1 <- j_i1
+    colour_index_mod_i1 <- (colour_index_i1 %% 18)
+    colour_index_mod_i1 <-
+      ifelse(colour_index_mod_i1 == 0, 18, colour_index_mod_i1)
+    result_i1 <- palettes_i1[colour_index_mod_i1]
+    
+    # Filter the joined data for the current limitation
+    filtered_data_i1 <-
+      vect_subdiv_extr_i1 %>% select(any_of(class_type))
+    #print(filtered_data)
+    if (nrow(filtered_data_i1) == 0) {next} 
+
+    # Create a ggplot for count value per subdivision for the current class type using the palette from above
+    
+    filtered_data_global_i1 <<- filtered_data_i1
+      
+    subdiv_plot_i1 <- ggplot() +
+      geom_spatvector(data = filtered_data_i1, aes(group = params$SUBDIVNAMEVAR, fill = eval(parse(text = FAO[j_i1])))) +
+      labs(
+        title = paste(subdiv_criteria_name_i1, "\nClass = ", class_type),
+        fill = "Area (%)"
+      ) +
+      scale_fill_distiller(
+        type = "seq",
+        palette = result_i1,
+        direction = 1,
+        limits = c(0, 101),
+        guide = "legend", labels = comma
+      ) 
+    
+    print(subdiv_plot_i1)
+  }
+    
+} , error = function(e) {
+    cat("Error in rast:", names(list_rast_clas_FAO_cat)[i], "\n")
+    cat("Message:", conditionMessage(e), "\n")
+    return(NULL)  # or some placeholder
+}) 
+  
+}  
+
+
+```
+
+### FAO Limitations
+
+```{r i1_subdiv_pc_FAOlimits, results = 'asis', out.width="100%"}
+
+# create a list of valid names of colorbrewer palettes for sequential data
+palettes_i1 <-
+  c(
+    "Blues",
+    "BuGn",
+    "BuPu",
+    "GnBu",
+    "Greens",
+    "Greys",
+    "Oranges",
+    "OrRd",
+    "PuBu",
+    "PuBuGn",
+    "PuRd",
+    "Purples",
+    "RdPu",
+    "Reds",
+    "YlGn",
+    "YlGnBu",
+    "YlOrBr",
+    "YlOrRd"
+  )
+
+
+# loop through the limitation rasters created above
+
+#for (i in 1:length(list_rast_limits_max_FAO))   {
+
+for (i in names(list_rast_limits_max_FAO)) {
+  tryCatch({
+    
+     
+  # get the name of the criteria from the raster name - this is used in the plotting
+  subdiv_criteria_name_i1 <- i
+  subdiv_criteria_name_i1 <-
+    sub(paste0(".*", "FAO_"), "", subdiv_criteria_name_i1)
+  
+  cat("\n\n\n")
+  cat("###", subdiv_criteria_name_i1, "\n") # add headings
+  cat("\n\n\n")
+  
+  # get the raster for which statistics are derived for each limitation
+  rast_to_plot_i1 <- list_rast_limits_max_FAO[[i]]
+  
+  # get the cellsize for each raster
+  rast_to_plot_cellsize_i1 <- cellSize(rast_to_plot_i1, unit = "ha")
+  
+  # extract the raster limitations to a data frame using the subdivisions
+  df_extr_i1 <-
+    terra::extract(rast_to_plot_i1, vect_subdiv_i1, na.rm = TRUE, ID = T, weights = T)
+  
+    # extract the raster cellsize to a data frame using the subdivisions
+  df_extr_cellsize_i1 <-
+    terra::extract(rast_to_plot_cellsize_i1, vect_subdiv_i1, na.rm = TRUE, ID = T, weights =T)
+  
+  df_extr_i1 <- mutate(df_extr_i1, df_extr_cellsize_i1)
+  
+   # summarise the limitations for each subdivision raster ID
+  df_extr_summary_i1 <- df_extr_i1 %>%
+    group_by(ID) %>%
+    count(FAO_limit, wt = (area * weight), .drop = FALSE)
+  
+  # get the names of the FAO limitations
+  FAO_limits <- as.vector(unique(df_extr_summary_i1$FAO_limit))
+    FAO_limits <- FAO_limits[!is.na(FAO_limits)]
+  
+  # pivot wider to give a column for each limit
+  df_extr_summary_i1_pivot <- df_extr_summary_i1 %>% pivot_wider(names_from = FAO_limit, values_from = n)
+  
+  # join the summary data frame to the original subdivision data spatvector
+  vect_subdiv_extr_i1 <<-
+    left_join(vect_subdiv_i1, df_extr_summary_i1_pivot, by = 'ID')
+  
+  # join the summary data frame to the subdivision area data frame
+  vect_subdiv_extr_i1 <<-
+    left_join(vect_subdiv_extr_i1, df_subdiv_area_i1, by = 'ID')
+  
+  # vect_subdiv_extr_i1 <<- vect_subdiv_extr_i1 %>%
+  #    select(ID, ha, any_of(FAO_limits)) %>% mutate(across(any_of(FAO_limits), ~ (.x / ha) * 100))
+  
+      vect_subdiv_extr_i1 <<- vect_subdiv_extr_i1 %>% mutate(across(any_of(FAO_limits), ~ (.x / ha) * 100)) #this includes all columns from vect_subdiv_extr_i1 A Farrow 22/05/2024
+      
+
+  # save as geojson and csv files
+  output_vect(vect_subdiv_extr_i1, paste0(subdiv_criteria_name_i1, "_FAO_limits_pc_", params$INN1)) # save as a geojson file
+  output_csv(as_tibble(vect_subdiv_extr_i1), paste0(subdiv_criteria_name_i1, "_FAO_limits_pc_", params$INN1)) # save as a csv file 
+
+  # loop through each existing limitation type 
+  for (limitation_type_i1 in FAO_limits) {
+   
+    # Get the current iteration number
+    j_i1 <- match(limitation_type_i1, FAO_limits)
+
+    # get the palette using the iteration number
+    colour_index_i1 <- j_i1
+    colour_index_mod_i1 <- (colour_index_i1 %% 18)
+    colour_index_mod_i1 <-
+      ifelse(colour_index_mod_i1 == 0, 18, colour_index_mod_i1)
+    result_i1 <- palettes_i1[colour_index_mod_i1]
+    
+    # Filter the joined data for the current limitation
+    filtered_data_i1 <-
+      vect_subdiv_extr_i1 %>% select(any_of(limitation_type_i1))
+    #print(filtered_data)
+    if (nrow(filtered_data_i1) == 0) {next} 
+    
+    # Create a ggplot for count value per subdivision for the current limitation type using the palette from above
+    subdiv_plot_i1 <- ggplot() +
+      geom_spatvector(data = filtered_data_i1, aes(group = params$SUBDIVNAMEVAR, fill = eval(parse(text = FAO_limits[j_i1])))) +
+      labs(
+        title = paste(subdiv_criteria_name_i1, "\nLimit = ", limitation_type_i1),
+        fill = "Area (%)"
+      ) +
+      scale_fill_distiller(
+        type = "seq",
+        palette = result_i1,
+        direction = 1,
+        limits = c(0, 101),
+        guide = "legend", labels = comma
+      ) 
+    
+    print(subdiv_plot_i1)
+  }
+    
+   } ,
+  error = function(e) {
+    cat("Error in rast:", names(list_rast_clas_FAO_cat)[i], "\n")
+    cat("Message:", conditionMessage(e), "\n")
+    return(NULL)  # or some placeholder
+  })
+  
+}  
+
+
+```
+
+# Calculate yields and production
+
+## Yield proportion
+
+The IRM script already calculates the optimality of the individual criteria as well as the climatic, landscape, soil fertility and soil physical properties groups of criteria.
+
+The first method of calculating yield will calculate the product of the optimality of selected criteria.
+
+<div class="fold o"> 
+```{r i1_calc_yield_pc, results = 'asis', out.width="100%"}
+
+# get the criteria that contribute to yield
+
+df_yield_rb_1_i1 <- dplyr::select(df_requirements_i1, "crit_code","criterion","yield") %>% dplyr::filter(!is.na(yield))
+
+df_yield_rb_1_i1 %>% kable(digits = 3) %>% kable_styling("striped", full_width = T)  %>%  scroll_box(height = "500px")
+
+# make an expression using the rule base numbers
+
+yield_expr_i1 <- paste("df_irm_i1$yieldpc <- (")
+
+for (i in seq(from = 1,
+              to = nrow(df_yield_rb_1_i1),
+              by = 1)) {
+  yield_expr_i1 <- paste0(yield_expr_i1, "df_irm_i1$" , as.character(df_yield_rb_1_i1[i, 1]), "_o * ")
+  
+}
+yield_expr_i1 <- paste(yield_expr_i1, " 100)")
+yield_expr_i1
+
+cat("\n\n\n")
+cat("\nprint(yield_expr_i1)\n")
+cat("\n\n\n")
+print(yield_expr_i1)
+
+# evaluate the expression
+eval(str2expression(yield_expr_i1))
+
+cat("\n\n\n")
+cat("\nstr(df_irm_i1$yieldpc)\n")
+cat("\n\n\n")
+str(df_irm_i1$yieldpc)
+
+cat("\n\n\n")
+cat("\nsummarise(df_irm_i1, Average = mean(yieldpc, na.rm = T))\n")
+cat("\n\n\n")
+print(summarise(df_irm_i1, Average = mean(yieldpc, na.rm = T)))
+
+write.csv(df_irm_i1, "E:/repos/raise_fs/shiny/results/df_irm_i1.csv" )
+
+
+if (summarise(df_irm_i1, Average = mean(yieldpc, na.rm = T)) > 0) {
+
+  # df_irm_i1 <- dplyr::select(df_irm_i1,-yield)
+  
+  vect_yieldpc_i1 <- select(df_irm_i1, x, y, yieldpc) %>% na.omit %>% vect(geom = c("x", "y"))
+  
+  rast_yieldpc_i1 <- rasterize(vect_yieldpc_i1, rast_mask_proj_i1, field =
+                                 "yieldpc")
+  names(rast_yieldpc_i1) <- c('yieldpc')
+  
+  # get the cellsize for each raster
+  rast_yield_pc_cellsize_i1 <- cellSize(rast_yieldpc_i1, unit = "ha")
+  
+  # export
+  output_geotiff(rast_yieldpc_i1, paste0("yieldpc_", params$INN1))
+  
+  # extract the yield raster to a data frame using the subdivisions
+  df_extr_i1 <-
+    terra::extract(
+      rast_yieldpc_i1,
+      vect_subdiv_i1,
+      na.rm = TRUE,
+      ID = T,
+      weights = T
+    )
+  
+  # extract the raster cellsize to a data frame using the subdivisions
+  df_extr_cellsize_i1 <-
+    terra::extract(
+      rast_yield_pc_cellsize_i1,
+      vect_subdiv_i1,
+      na.rm = TRUE,
+      ID = T,
+      weights = T
+    )
+  
+  df_extr_i1 <- mutate(df_extr_i1, df_extr_cellsize_i1)
+  
+  # summarise the yield for each subdivision raster ID
+  df_extr_summary_i1 <- df_extr_i1 %>%
+    group_by(ID) %>%
+    summarise(yieldpc = weighted.mean(yieldpc, (area * weight), na.rm = TRUE))
+  
+
+  # join the summary data frame to the original subdivision data spatvector
+  vect_subdiv_extr_i1 <<-
+    left_join(vect_subdiv_i1, df_extr_summary_i1, by = 'ID')
+  
+  # join the summary data frame to the subdivision area data frame
+  vect_subdiv_extr_i1 <<-
+    left_join(vect_subdiv_extr_i1, df_subdiv_area_i1, by = 'ID')
+  
+  # save as geojson and csv files
+  output_vect(vect_subdiv_extr_i1, paste0("yieldpc_", params$INN1)) # save as a geojson file
+  output_csv(as_tibble(vect_subdiv_extr_i1),
+             paste0("yieldpc_", params$INN1)) # save as a csv file
+  
+
+#  dy <- rast_yield %>%
+#    as.data.frame(xy = TRUE) %>%
+#    na.omit
+
+  
+  gy_i1 <- ggplot() +
+    geom_spatraster(data = rast_yieldpc_i1, aes(fill = yieldpc)) +
+    scale_fill_stepsn(
+      paste0("Yield % \n", params$INN1),
+      n.breaks = 10,
+      limits = c(0, 100),
+      colours = hcl.colors(palette = "Greens", 10, rev = TRUE),
+      guide = "legend",  na.value = "transparent"
+    ) +
+#    scale_x_continuous(
+#      name = "",
+#      labels = function(x) {
+#        1.0e-3 * x
+#      }
+#    ) +
+#    scale_y_continuous(
+#      name = "",
+#      labels = function(x) {
+#        1.0e-3 * x
+#      }
+#    ) +
+    coord_sf()
+  
+  gy2_i1 <- add_subdiv_proj_simple_plot(gy_i1, vect_subdiv_i1)
+gy2_i1
+
+}
+
+#knitr::knit_exit()
+
+```
+</div>
+
+## Calculate yield
+
+The IRM script converts yield proportion to yield using the yield values for sole crop or intercrop.
+
+<div class="fold o"> 
+```{r i1_calc_yield, results = 'asis', out.width="100%"}
+
+# get the criteria that contribute to yield
+
+filename_yield_i1 <-
+  as.character(paste("E:/repos/raise_fs/shiny/data/", params$INN1, "_yield.csv", sep = ""))
+df_yield_values_i1 <- read.csv(filename_yield_i1, na.strings = c("NA"))
+
+df_yield_values_i1 %>% kable(digits = 3) %>% kable_styling("striped", full_width = T)  %>%  scroll_box(height = "100px")
+
+ if (is.na(params$INN2)) {
+#if (params$INN2 == "NA") {
+  df_irm_i1$yield <- df_irm_i1$yieldpc / 100 * df_yield_values_i1$YW
+  cat("Sole crop yield")
+} else {
+  if (params$SYS == "comparison") {
+    df_irm_i1$yield <- df_irm_i1$yieldpc / 100 * df_yield_values_i1$YW
+    cat("Sole crop 1 yield (comparison)")
+  } else {
+    if (params$SYS == "intercrop") {
+      df_irm_i1$yield <- df_irm_i1$yieldpc / 100 * df_yield_values_i1$YI
+      cat("Intercrop 1 yield")
+    } else {
+      if (params$SYS == "rotation") {
+        df_irm_i1$yield <- df_irm_i1$yieldpc / 100 * df_yield_values_i1$YW
+        cat("Rotation crop 1 yield")
+      }
+    }
+  }
+}
+
+if (summarise(df_irm_i1, Average = mean(yield, na.rm = T)) > 0) {
+  
+  vect_yield_i1 <-
+    select(df_irm_i1, x, y, yield) %>% na.omit %>% vect(geom = c("x", "y"))
+  
+  rast_yield_i1 <- rasterize(vect_yield_i1, rast_mask_proj_i1, field = "yield")
+  names(rast_yield_i1) <-  c('yield')
+  
+  # export
+  output_geotiff(rast_yield_i1, paste0("yield_", params$INN1))
+  
+  # get the cellsize for each raster
+  rast_yield_cellsize_i1 <- cellSize(rast_yield_i1, unit = "ha")
+  
+  # extract the yield raster to a data frame using the subdivisions
+  df_extr_i1 <-
+    terra::extract(
+      rast_yield_i1,
+      vect_subdiv_i1,
+      na.rm = TRUE,
+      ID = T,
+      weights = T
+    )
+  
+  # extract the raster cellsize to a data frame using the subdivisions
+  df_extr_cellsize_i1 <-
+    terra::extract(
+      rast_yield_cellsize_i1,
+      vect_subdiv_i1,
+      na.rm = TRUE,
+      ID = T,
+      weights = T
+    )
+  
+  df_extr_i1 <- mutate(df_extr_i1, df_extr_cellsize_i1)
+  
+  # summarise the yield for each subdivision raster ID
+  df_extr_summary_i1 <- df_extr_i1 %>%
+    group_by(ID) %>%
+    summarise(yield = weighted.mean(yield, (area * weight), na.rm = TRUE))
+  
+  # join the summary data frame to the original subdivision data spatvector
+  vect_subdiv_extr_i1 <<-
+    left_join(vect_subdiv_i1, df_extr_summary_i1, by = 'ID')
+  
+  # join the summary data frame to the subdivision area data frame
+  vect_subdiv_extr_i1 <<-
+    left_join(vect_subdiv_extr_i1, df_subdiv_area_i1, by = 'ID')
+  
+  # save as geojson and csv files
+  output_vect(vect_subdiv_extr_i1, paste0("yield_", params$INN1)) # save as a geojson file
+  output_csv(as_tibble(vect_subdiv_extr_i1),
+             paste0("yield_", params$INN1)) # save as a csv file 
+  
+
+#dyd <- dByd %>%
+#  as.data.frame(xy = TRUE) %>%
+#  na.omit
+
+
+gyd_i1 <- ggplot() +
+  geom_spatraster(data = rast_yield_i1, aes(fill = yield)) +
+  scale_fill_stepsn(
+    paste0("Yield (kg/ha) \n", params$INN1),
+    n.breaks = 10,
+    colours = hcl.colors(palette = "OrRd", 10, rev = TRUE),
+    guide = "legend",
+    labels = comma,  na.value = "transparent"
+  ) +
+#  scale_x_continuous(
+#    name = "",
+#    labels = function(x) {
+#      1.0e-3 * x
+#    }
+#  ) +
+#  scale_y_continuous(
+#    name = "",
+#    labels = function(x) {
+#      1.0e-3 * x
+#    }
+#  ) +
+  coord_sf()
+
+  gyd2_i1 <- add_subdiv_proj_simple_plot(gyd_i1, vect_subdiv_i1)
+gyd2_i1
+}
+```
+</div>
+
+## Calculate production
+
+The IRM script converts yield proportion to production using the yield values for sole crop or intercrop.
+
+<div class="fold o">
+```{r i1_calc_production, results = 'asis', out.width="100%"}
+
+# get the criteria that contribute to yield
+
+#yield_filename <-
+#  as.character(paste("tab_data/input/yield_", params$INN1, ".csv", sep = ""))
+#yield_tab <- read.csv(here(yield_filename), na.strings = c("NA"))
+
+#yield_tab %>% kable(digits = 3) %>% kable_styling("striped", full_width = T)  %>%  scroll_box(height = "150px")
+
+df_irm_i1$production <- df_irm_i1$yield *  Stat_factor_ha_i1
+
+if (summarise(df_irm_i1, Average = mean(production, na.rm = T)) > 0) {
+  vect_production_i1 <-
+    select(df_irm_i1, x, y, production) %>% na.omit %>% vect(geom = c("x", "y"))
+  
+  rast_production_i1 <-
+    rasterize(vect_production_i1, rast_mask_proj_i1, field = "production")
+  names(rast_production_i1) <- c('production')
+  
+  # export
+  output_geotiff(rast_production_i1, paste0("production_", params$INN1))
+  
+  # get the cellsize for each raster
+  rast_production_cellsize_i1 <- cellSize(rast_production_i1, unit = "ha")
+  
+  # extract the production raster to a data frame using the subdivisions
+  df_extr_i1 <-
+    terra::extract(
+      rast_production_i1,
+      vect_subdiv_i1,
+      na.rm = TRUE,
+      ID = T,
+      weights = T
+    )
+  
+  # extract the raster cellsize to a data frame using the subdivisions
+  df_extr_cellsize_i1 <-
+    terra::extract(
+      rast_production_cellsize_i1,
+      vect_subdiv_i1,
+      na.rm = TRUE,
+      ID = T,
+      weights = T
+    )
+  
+  df_extr_i1 <- mutate(df_extr_i1, df_extr_cellsize_i1)
+  
+  # summarise the production for each subdivision raster ID
+  df_extr_summary_i1 <- df_extr_i1 %>%
+    group_by(ID) %>%
+    summarise(production = sum(production * weight, na.rm = TRUE))
+  
+  # join the summary data frame to the original subdivision data spatvector
+  vect_subdiv_extr_i1 <<-
+    left_join(vect_subdiv_i1, df_extr_summary_i1, by = 'ID')
+  
+  # join the summary data frame to the subdivision area data frame
+  vect_subdiv_extr_i1 <<-
+    left_join(vect_subdiv_extr_i1, df_subdiv_area_i1, by = 'ID')
+  
+  # save as geojson and csv files
+  output_vect(vect_subdiv_extr_i1, paste0("production_", params$INN1)) # save as a geojson file
+  output_csv(as_tibble(vect_subdiv_extr_i1),
+             paste0("production_", params$INN1)) # save as a csv file  
+  #  dp <- dBp %>%
+  #    as.data.frame(xy = TRUE) %>%
+  #    na.omit
+  
+  gp_i1 <- ggplot() +
+    geom_spatraster(data = rast_production_i1, aes(fill = production)) +
+    scale_fill_stepsn(
+      paste0("Production (kg) \n", params$INN1),
+      n.breaks = 10,
+      colours = hcl.colors(palette = "BuPu", 10, rev = TRUE),
+      guide = "legend",
+      labels = comma,
+      na.value = "transparent"
+    ) +
+#    scale_x_continuous(
+#      name = "",
+#      labels = function(x) {
+#        1.0e-3 * x
+#      }
+#    ) +
+#    scale_y_continuous(
+#      name = "",
+#      labels = function(x) {
+#        1.0e-3 * x
+#      }
+#    ) +
+    coord_sf()
+  
+  gp2_i1 <- add_subdiv_proj_simple_plot(gp_i1, vect_subdiv_i1)
+  gp2_i1
+}
+```
+</div>
+
+
+```{r innovation_name_i2_check01, echo=FALSE, message=FALSE, warning=FALSE, results='asis'}
+
+if (is.na(params$INN2)) {
+  cat("# Session Information\n\n")
+  
+  print( sessionInfo())
+  
+  cat("\n\n# Acknowledgements\n\n")
+  
+  cat("Javascript code and css style used in this script by Martin Schmelzer
+
+https://stackoverflow.com/questions/37755037/how-to-add-code-folding-to-output-chunks-in-rmarkdown-html-documents
+
+
+Timing for chunks by Yihui Xie
+https://stackoverflow.com/questions/24595280/timing-for-chunks  "
+  )
+  
+  knit_exit()
+  
+}  
+
+```
