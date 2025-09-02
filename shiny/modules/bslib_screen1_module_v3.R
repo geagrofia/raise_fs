@@ -19,6 +19,11 @@ bslib_screen1_module_v3_SidebarUI <- function(id, shared_values) {
     uiOutput(ns("region_ui")),
     uiOutput(ns("zone_ui")),
     uiOutput(ns("woreda_ui")),
+    span(
+    "The depiction and use of boundaries, geographic names and related data
+       shown on maps and included in lists, tables, documents, and databases
+       in this tool are not warranted to be error-free nor do they necessarily
+       imply official endorsement or acceptance", style="color:red; font-style: italic;"),  
     
     # #---new
     # radioButtons(ns("mode"), "Choose mode", choices = c("Option 1" = 1, "Option 2" = 2, "Option 3" = 3, "Option 4" = 4)),
@@ -28,7 +33,9 @@ bslib_screen1_module_v3_SidebarUI <- function(id, shared_values) {
     # 
     # #--- end new
     #actionButton(ns("auto_reload"), "auto_reload"),
-    actionButton(ns("to_screen2"), "Go to Screen 2")
+    actionButton(ns("to_screen2"), "Go to Screen 2"),
+    actionButton(ns("save_progress"), "Save Progress"),
+    actionButton(ns("resume_progress"), "Resume Progress"),
   )
 }
 
@@ -278,6 +285,8 @@ bslib_screen1_module_v3_Server <- function(id, shared_values, switch_screen) {
       if (input$level == "nation") {
         
       shared_values$selected_nation <- "Ethiopia"
+      shared_values$ZONCODEVAR <- "ADM0_CODE"
+      shared_values$ZONCODEVAL <-  "ET"
       shared_values$DIVCODEVAR <- "ADM0_CODE"
       shared_values$DIVCODEVAL <- "ET"
       shared_values$DIVNAMEVAR <- "ADM0_EN"
@@ -287,6 +296,8 @@ bslib_screen1_module_v3_Server <- function(id, shared_values, switch_screen) {
       if (input$level == "region") {
       req(input$region)  
       shared_values$selected_region <- input$region
+      shared_values$ZONCODEVAR <- "ADM0_CODE"
+      shared_values$ZONCODEVAL <-  "ET"
       shared_values$DIVCODEVAR <- "ADM1_CODE"
       shared_values$DIVCODEVAL <- dplyr::filter(df_region, ADM1_EN == input$region) |> pull(ADM1_CODE)
       message("S1. shared_values$DIVCODEVAL")
@@ -298,6 +309,8 @@ bslib_screen1_module_v3_Server <- function(id, shared_values, switch_screen) {
       if (input$level == "zone")   {
       req(input$zone)   
       shared_values$selected_zone <- input$zone
+      shared_values$ZONCODEVAR <- "ADM1_CODE"
+      shared_values$ZONCODEVAL <-  dplyr::filter(df_region, ADM1_EN == input$region) |> pull(ADM1_CODE)
       shared_values$DIVCODEVAR <- "ADM2_CODE"
       shared_values$DIVCODEVAL <- dplyr::filter(df_zone, ADM2_EN == input$zone) |> pull(ADM2_CODE)
       message("S1. shared_values$DIVCODEVAL")
@@ -309,6 +322,8 @@ bslib_screen1_module_v3_Server <- function(id, shared_values, switch_screen) {
       if (input$level == "woreda") {
       req(input$woreda)     
       shared_values$selected_woreda <- input$woreda
+      shared_values$ZONCODEVAR <- "ADM2_CODE"
+      shared_values$ZONCODEVAL <-  dplyr::filter(df_zone, ADM2_EN == input$zone) |> pull(ADM2_CODE)
       shared_values$DIVCODEVAR <- "ADM3_CODE"
       shared_values$DIVCODEVAL <- dplyr::filter(df_woreda, ADM3_EN == input$woreda) |> pull(ADM3_CODE)
       message("S1. shared_values$DIVCODEVAL")
@@ -380,6 +395,17 @@ bslib_screen1_module_v3_Server <- function(id, shared_values, switch_screen) {
       message("S1. 9 input$auto_reload observeEvent")
       map <- leafletProxy(ns("base_map"), session) 
       map |> fitBounds(50, 51, 0, 1)
+    })
+    
+    # Save and load
+    observeEvent(input$save_progress, {
+      save_progress(shared_values, session$token)
+      showNotification("Progress saved!", type = "message")
+    })
+    
+    observeEvent(input$resume_progress, {
+      load_progress(shared_values, session$token)
+      showNotification("Progress resumed!", type = "message")
     })
     
     
