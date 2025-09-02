@@ -1280,6 +1280,234 @@ add_triangulation_plot_no_labels_se <- function(map1, vect_triangulation) {
   
 }
 
+add_triangulation_plot_lim <- function(map1, vect_triangulation, nudge_xvaltri, nudge_yvaltri) {
+  addtriangulation_map_lim <-       map1 +
+    geom_spatvector(
+      data = vect_triangulation,
+      aes(fill = tri_limits),
+      colour = "black",
+      shape = 21,
+      size = 2
+    ) +
+    geom_spatvector_label(
+      data = vect_triangulation,
+      aes(label =.data[[ params$SUBDIVNAMEVAR]]),
+      colour = "black",
+      size = 2,
+      alpha = 0.5,
+      nudge_x = nudge_xvaltri,
+      nudge_y = nudge_yvaltri
+    ) +
+    scale_fill_manual(values = 1:nlevels(vect_triangulation$tri_limits)) +
+    labs(fill = "Limits") +
+    theme(
+      legend.direction = "vertical",
+      legend.box = "horizontal",
+      axis.title.x = element_blank(),
+      axis.title.y = element_blank()
+    ) +
+    guides(fill = guide_legend(order = 1))
+  
+  return(addtriangulation_map_lim)
+  
+}
+
+add_triangulation_plot_lim_1_ba <- function(map1, vect_triangulation, nudge_xvaltri, nudge_yvaltri) {
+  addtriangulation_map_lim_1_ba <-       map1 +
+    geom_spatvector(
+      data = vect_triangulation,
+      aes(fill = LIM_BA_1),
+      colour = "black",
+      shape = 21,
+      size = 2
+    ) +
+    geom_spatvector_label(
+      data = vect_triangulation,
+      aes(label =.data[[ params$SUBDIVNAMEVAR]]),
+      colour = "black",
+      size = 2,
+      alpha = 0.5,
+      nudge_x = nudge_xvaltri,
+      nudge_y = nudge_yvaltri
+    ) +
+    scale_fill_manual(values = c(
+      Ps = rgb(127,201,127, maxColorValue = 255),
+      Ds = rgb(190,174,212, maxColorValue = 255),
+      SF = rgb(253,192,134, maxColorValue = 255),
+      P = rgb(255,255,153, maxColorValue = 255),
+      T = rgb(56,108,176, maxColorValue = 255),
+      Dr = rgb(240,2,127, maxColorValue = 255),
+      Ls = rgb(191,91,23, maxColorValue = 255)
+    ), na.value = "white") +
+    labs(fill = "Limitation") +
+    theme(
+      legend.direction = "vertical",
+      legend.box = "horizontal",
+      axis.title.x = element_blank(),
+      axis.title.y = element_blank()
+    ) +
+    guides(fill = guide_legend(order = 1))
+  
+  return(addtriangulation_map_lim_1_ba)
+  
+}
+
+add_triangulation_plot_lim_1_se <- function(map1, vect_triangulation, nudge_xvaltri, nudge_yvaltri) {
+  addtriangulation_map_lim_1_se <-       map1 +
+    geom_spatvector(
+      data = vect_triangulation,
+      aes(fill = LIM_SE_1),
+      colour = "black",
+      shape = 21,
+      size = 2
+    ) +
+    geom_spatvector_label(
+      data = vect_triangulation,
+      aes(label =.data[[ params$SUBDIVNAMEVAR]]),
+      colour = "black",
+      size = 2,
+      alpha = 0.5,
+      nudge_x = nudge_xvaltri,
+      nudge_y = nudge_yvaltri
+    ) +
+    scale_fill_manual(values = c(
+      Ex = rgb(127,201,127, maxColorValue = 255),
+      F = rgb(190,174,212, maxColorValue = 255),
+      In = rgb(253,192,134, maxColorValue = 255),
+      Lb = rgb(255,255,153, maxColorValue = 255),
+      MA = rgb(56,108,176, maxColorValue = 255),
+      MD = rgb(240,2,127, maxColorValue = 255),
+      Sd = rgb(191,91,23, maxColorValue = 255)
+    ), na.value = "white") +
+    labs(fill = "Limitation") +
+    theme(
+      legend.direction = "vertical",
+      legend.box = "horizontal",
+      axis.title.x = element_blank(),
+      axis.title.y = element_blank()
+    ) +
+    guides(fill = guide_legend(order = 1))
+  
+  return(addtriangulation_map_lim_1_se)
+  
+}
+
+add_triangulation_plot_dec <- function(map1, vect_triangulation, nudge_xvaltri, nudge_yvaltri) {
+  addtriangulation_map_dec <-       map1 +
+    geom_spatvector(
+      data = vect_triangulation,
+      aes(fill = tri_dec),
+      colour = "black",
+      shape = 21,
+      size = 2
+    ) +
+    geom_spatvector_label(
+      data = vect_triangulation,
+      aes(label =.data[[ params$SUBDIVNAMEVAR]]),
+      colour = "black",
+      size = 2,
+      alpha = 0.5,
+      nudge_x = nudge_xvaltri,
+      nudge_y = nudge_yvaltri
+    ) +
+    scale_fill_manual(values = c(
+      farmer_self = rgb(127,201,127, maxColorValue = 255),
+      household = rgb(190,174,212, maxColorValue = 255),
+      cooperative = rgb(253,192,134, maxColorValue = 255),
+      extension_worker = rgb(255,255,153, maxColorValue = 255),
+      market_demand = rgb(56,108,176, maxColorValue = 255),
+      agriculture_office = rgb(240,2,127, maxColorValue = 255),
+      other = rgb(191,91,23, maxColorValue = 255)
+    )) +
+    labs(fill = "Decision to Adopt") +
+    theme(
+      legend.direction = "vertical",
+      legend.box = "horizontal",
+      axis.title.x = element_blank(),
+      axis.title.y = element_blank()
+    ) +
+    guides(fill = guide_legend(order = 1))
+  
+  return(addtriangulation_map_dec)
+  
+}
+
+add_triangulation_plot_suit <- function(map1, vect_triangulation, nudge_xvaltri, nudge_yvaltri) {
+  
+  addtriangulation_map_suit <-       map1 +
+    geom_spatvector(
+      data = vect_triangulation,
+      aes(fill = tri_suit),
+      colour = "black",
+      shape = 21,
+      size = 2
+    ) +
+    geom_spatvector_label(
+      data = vect_triangulation,
+      aes(label =.data[[ params$SUBDIVNAMEVAR]]),
+      colour = "black",
+      size = 2,
+      alpha = 0.5,
+      nudge_x = nudge_xvaltri,
+      nudge_y = nudge_yvaltri
+    ) +
+    scale_fill_manual(values = c(
+      suitable = rgb(51, 160, 44, maxColorValue = 255),
+      partially_suitable = rgb(219, 240, 192, maxColorValue = 255),
+      not_suitable = rgb(255, 255, 153, maxColorValue = 255),
+      dontknow = rgb(200, 200, 200, maxColorValue = 255)
+    )) +
+    labs(fill = "Suitability") +
+    theme(
+      legend.direction = "vertical",
+      legend.box = "horizontal",
+      axis.title.x = element_blank(),
+      axis.title.y = element_blank()
+    ) +
+    guides(fill = guide_legend(order = 1))
+  
+  return(addtriangulation_map_suit)
+  
+}
+
+add_triangulation_plot_pcs <- function(map1, vect_triangulation, nudge_xvaltri, nudge_yvaltri) {
+  addtriangulation_map_pcs <-       map1 +
+    geom_spatvector(
+      data = vect_triangulation,
+      aes(fill = tri_pcs),
+      colour = "black",
+      shape = 21,
+      size = 2
+    ) +
+    geom_spatvector_label(
+      data = vect_triangulation,
+      aes(label =.data[[ params$SUBDIVNAMEVAR]]),
+      colour = "black",
+      size = 2,
+      alpha = 0.5,
+      nudge_x = nudge_xvaltri,
+      nudge_y = nudge_yvaltri
+    ) +
+    scale_fill_distiller(
+      type = "seq",
+      palette = "YlGn",
+      direction = 1,
+      limits = c(0, 100),
+      guide = "legend"
+    ) +
+    labs(fill = "% Area Suitable") +
+    theme(
+      legend.direction = "vertical",
+      legend.box = "horizontal",
+      axis.title.x = element_blank(),
+      axis.title.y = element_blank()
+    ) +
+    guides(fill = guide_legend(order = 1))
+  
+  return(addtriangulation_map_pcs)
+  
+}
+
 base_raster_plot <- function(raster_data, fillvar, low_col, high_col, plot_title) {
   baseraster_map <-       
     ggplot() +
@@ -1821,6 +2049,7 @@ classify_maps_FAO <-
     # assign(paste0("list_rast_clas_FAO_cat"), append(list_rast_clas_FAO_cat,
     #                                                 paste0("rast_clas_fao_cat", fpm_plot_title)), .GlobalEnv)
     
+     
     g <-  ggplot() +
       geom_spatraster(data = rast_clas_fao_cat, na.rm = TRUE, aes(fill = FAO)) +
       scale_fill_manual(
@@ -2242,6 +2471,10 @@ classify_maps_limits <-
     # project to geo for display in leaflet
     vect_limits_max_FAO_geo <- project(vect_limits_max_FAO, "epsg:4326")
     
+    vect_filename <-
+      as.character(paste0("FAO_limits_", stack_code, "_", innovation))
+    output_vect(vect_limits_max_FAO_geo, vect_filename)
+    
     # convert to sf until leaflet properly accepts spatvector
     sf_limits_max_FAO_geo <- st_as_sf(vect_limits_max_FAO_geo)
     
@@ -2327,7 +2560,7 @@ classify_maps_CONC <-
       names(rast_plot_max) <- c("class")
       rast_opt_subopt_brick <- rast(list(rast_plot_opt, rast_plot_subopt, rast_plot_max))
       #names(rast_opt_subopt_brick) <- c('high', 'moderate', 'low', 'class')
-      output_geotiff(rast_opt_subopt_brick, paste0("optsubopt", stack_code, "_", innovation))
+      output_geotiff(rast_opt_subopt_brick, paste0("optsubopt_", stack_code, "_", innovation))
       
       
       # plot the max value
@@ -2468,7 +2701,7 @@ classify_maps_CONC <-
         names(rast_plot_max) <- c("class")
         rast_gmp_brick <- rast(list(rast_plot_good, rast_plot_moderate, rast_plot_poor, rast_plot_max))
         #names(rast_opt_subopt_brick) <- c('good', 'moderate', 'poor', 'class')
-        output_geotiff(rast_gmp_brick, paste0("gmp", stack_code, innovation))
+        output_geotiff(rast_gmp_brick, paste0("gmp_", stack_code, innovation))
         
         # plot the max value
         rast_plot_name <- names(rast_plot_max)
@@ -2514,7 +2747,7 @@ classify_maps_CONC <-
         vect_clas_gmp_cat <-
           as.polygons(rast_plot_max, dissolve = F)
         vect_filename <-
-          as.character(paste0("Good-Moderate-Poor", stack_code, "_", innovation))
+          as.character(paste0("Good-Moderate-Poor_", stack_code, "_", innovation))
         output_vect(vect_clas_gmp_cat, vect_filename)
         
         # project to geo for display in leaflet
