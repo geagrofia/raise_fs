@@ -12,13 +12,13 @@ output:
     toc_depth: 6
     css: js/style.css
 params:
-  INT: 1
+  INT: NULL
   SYS: NULL
   Agg: NULL
   MASK: NULL
   EXT: NULL
   DIVCODEVAR: NULL
-  DIVCODEVAL: NULL
+  DIVCODEVAL: 3NULL
   DIVNAMEVAR: NULL
   SUBDIVNAMEVAR: NULL
   INN1: NULL
@@ -27,18 +27,17 @@ params:
   FAOCLASS1: NULL
   LIMITS1: NULL
   CONCCLASS1: NULL
-  TRIAD1: Adoption
-  TRIBA1: Aptitude
-  TRISE1: Feasible
+  TRIANGULATION: NULL
+  TRILIMITS1: NULL
+  TRIDEC1: NULL
+  TRISUIT1: NULL
+  TRIPCS1: NULL
   INN2: NULL
   RES2: NULL
   SOS2: NULL
   FAOCLASS2: NULL
   LIMITS2: NULL
   CONCCLASS2: NULL
-  TRIAD2: Adoption
-  TRIBA2: Aptitude
-  TRISE2: Feasible
 ---
 
 ```{r}
@@ -219,6 +218,15 @@ cat("\n\n")
 print(params$SYS)
 
 
+#knitr::knit_exit()
+```
+
+
+```{r}
+
+
+
+
  if (is.na(params$INN2)) {
    
    cat("params$INN2 == NA")
@@ -299,7 +307,7 @@ if (params$SOS1 == 1){
 } else {sos_crit_i1 <- FALSE}
 
 if (params$INT == 1)
-  shiny::setProgress(0.02, message = "Get requirements")  # set progress to 17%
+  shiny::setProgress(0.02, message = "Loading requirements")  # set progress to 17%
 ```
 
 
@@ -332,7 +340,7 @@ soil_texture_filename_i1 <-
   as.character(paste(
     "E:/repos/raise_fs/shiny/data/",
     params$INN1,
-    "_texture_s9.csv",
+    "_texture_s10.csv",
     sep = ""
   ))
 
@@ -383,7 +391,7 @@ lower_filename_i1 <-
   as.character(paste(
     "E:/repos/raise_fs/shiny/data/",
     params$INN1,
-    "_requirements_s10.csv",
+    "_requirements_s12.csv",
     sep = ""
   ))
 
@@ -811,7 +819,7 @@ df_leaves_criterion_i1 <- as.data.frame( df_leaves_i1[cbind(seq(nrow(df_leaves_i
 names(df_leaves_criterion_i1) <- c("crit_code")
 
 if (params$INT == 1)
-  shiny::setProgress(0.07, message = "Load Spatial Data - Vector")  # set progress to 17%
+  shiny::setProgress(0.07, message = "Loading spatial data - vector")
 ```
 
 # Load Spatial Data
@@ -901,67 +909,56 @@ gsubdiv_i1
 ```
 </div>
 
+
 <div class="fold o">   
 ```{r i1_spatialdataload_vector_02, cache = FALSE, out.width="100%", include = TRUE, echo=FALSE}
 
-vect_triangulation_i1 <- load_vector_data( paste0("triangulation_", params$DIVCODEVAL,"_", params$INN1))
+# load farmers triangulation
 
-vect_triangulation_i1$ID <- seq.int(nrow(vect_triangulation_i1))# add an id field
-vect_triangulation_i1$id <- formatC(vect_triangulation_i1$ID, width = 2, format = "d", flag = "0") #format the id field
+vect_triangulation_farmers_i1 <- load_vector_data(paste0("triangulation_farmers_", params$DIVCODEVAL,"_", params$INN1))
 
-vect_triangulation_extent_i1 <- ext(vect_triangulation_i1) # get the extent
-nudge_xvaltri_i1 <-
-  ((vect_triangulation_extent_i1[2] - vect_triangulation_extent_i1[1]) /  (nrow(vect_triangulation_i1) * 2.5))
+
+
+vect_triangulation_farmers_i1$ID <- seq.int(nrow(vect_triangulation_farmers_i1))# add an id field
+vect_triangulation_farmers_i1$id <- formatC(vect_triangulation_farmers_i1$ID, width = 2, format = "d", flag = "0") #format the id field
+
+
+vect_triangulation_farmers_extent_i1 <- ext(vect_triangulation_farmers_i1) # get the extent
+nudge_xvaltri_farmers_i1 <-
+  ((vect_triangulation_farmers_extent_i1[2] - vect_triangulation_farmers_extent_i1[1]) /  (nrow(vect_triangulation_farmers_i1) * 2.5))
 #cat("nudge_xvaltri =", nudge_xvaltri)
-nudge_yvaltri_i1 <-
-  ((vect_triangulation_extent_i1[4] - vect_triangulation_extent_i1[3]) /  (nrow(vect_triangulation_i1) * 2.5))
+nudge_yvaltri_farmers_i1 <-
+  ((vect_triangulation_farmers_extent_i1[4] - vect_triangulation_farmers_extent_i1[3]) /  (nrow(vect_triangulation_farmers_i1) * 2.5))
 #cat("nudge_yvaltri =", nudge_yvaltri)
 
 
-if (!is.na(params$TRIAD1)) {
-  expr <- paste0("vect_triangulation_i1$", params$TRIAD1)
-  vect_triangulation_i1$tri_label_ad <-
-    paste(vect_triangulation_i1$id, "=", eval(parse(text = (expr))))
-  vect_triangulation_i1$tri_label_ad <-
-    factor(vect_triangulation_i1$tri_label_ad)
-  g_ad_i1 <- ggplot() +
-      labs(title = paste("\nAdoption Triangulation Points - ", params$INN1))
-  gtriangulation_ad_i1 <- add_triangulation_plot_no_labels_ad(g_ad_i1, vect_triangulation_i1)
-  gtriangulation_ad_i1 <- add_subdiv_simple_plot(gtriangulation_ad_i1, vect_subdiv_i1)
-  gtriangulation_ad_i1
-}
-
-if (!is.na(params$TRIBA1)) {
-  expr <- paste0("vect_triangulation_i1$", params$TRIBA1)
-  vect_triangulation_i1$tri_label_ba <-
-    paste(vect_triangulation_i1$id, "=", eval(parse(text = (expr))))
-  vect_triangulation_i1$tri_label_ba <-
-    factor(vect_triangulation_i1$tri_label_ba)
-  g_ba_i1 <- ggplot() +
-      labs(title = paste("\nBiophysical Aptitude\nTriangulation Points - ", params$INN1))
-  gtriangulation_ba_i1 <- add_triangulation_plot_no_labels_ba(g_ba_i1, vect_triangulation_i1)
-  gtriangulation_ba_i1 <- add_subdiv_simple_plot(gtriangulation_ba_i1, vect_subdiv_i1)
-  gtriangulation_ba_i1
-}
-
-if (!is.na(params$TRISE1)) {
-  expr <- paste0("vect_triangulation_i1$", params$TRISE1)
-  vect_triangulation_i1$tri_label_se <-
-    paste(vect_triangulation_i1$id, "=", eval(parse(text = (expr))))
-  vect_triangulation_i1$tri_label_se <-
-    factor(vect_triangulation_i1$tri_label_se)
-  g_se_i1 <- ggplot() +
-      labs(title = paste("\nSocio-economic Feasibility\nTriangulation Points - ", params$INN1))
-  gtriangulation_se_i1 <- add_triangulation_plot_no_labels_se(g_se_i1, vect_triangulation_i1)
-  gtriangulation_se_i1 <- add_subdiv_simple_plot(gtriangulation_se_i1, vect_subdiv_i1)
-  gtriangulation_se_i1
-}
-
-if (params$INT == 1)
-  shiny::setProgress(0.08, message = "Load Spatial Data - Raster")  # set progress to 17%
-
 ```
 </div>
+
+
+<div class="fold o">   
+```{r i1_spatialdataload_vector_03, cache = FALSE, out.width="100%", include = TRUE, echo=FALSE}
+
+# load agents triangulation
+
+vect_triangulation_agents_i1 <- load_vector_data(paste0("triangulation_agents_", params$DIVCODEVAL,"_", params$INN1))
+
+vect_triangulation_agents_i1$ID <- seq.int(nrow(vect_triangulation_agents_i1))# add an id field
+vect_triangulation_agents_i1$id <- formatC(vect_triangulation_agents_i1$ID, width = 2, format = "d", flag = "0") #format the id field
+
+vect_triangulation_agents_extent_i1 <- ext(vect_triangulation_agents_i1) # get the extent
+nudge_xvaltri_agents_i1 <-
+  ((vect_triangulation_agents_extent_i1[2] - vect_triangulation_agents_extent_i1[1]) /  (nrow(vect_triangulation_agents_i1) * 2.5))
+#cat("nudge_xvaltri =", nudge_xvaltri)
+nudge_yvaltri_agents_i1 <-
+  ((vect_triangulation_agents_extent_i1[4] - vect_triangulation_agents_extent_i1[3]) /  (nrow(vect_triangulation_agents_i1) * 2.5))
+#cat("nudge_yvaltri =", nudge_yvaltri)
+
+if (params$INT == 1)
+  shiny::setProgress(0.08, message = "Loading spatial data - raster")
+```
+</div>
+
 
 ## Raster Data
 
@@ -1108,7 +1105,7 @@ Stat_factor_ha_comma_i1 <- scales::label_comma(accuracy = NULL)(Stat_factor_ha_i
 cat(paste(Stat_factor_ha_comma_i1, "hectares in each cell"))
 
 if (params$INT == 1)
-  shiny::setProgress(0.1, message = "Resampling data 1st Innovation")  # set progress to 10%
+  shiny::setProgress(0.1, message = "Resampling spatial data")  # set progress to 10%
 ```
 
 ## Rough crop, Reproject, Aggregate and Resample
@@ -1365,7 +1362,7 @@ xy_i1 <- cbind(x, y)
 #str(df_irm)
 
 if (params$INT == 1)
-  shiny::setProgress(0.15, message = "Convert raw data to criteria values 1st Innovation")  # set progress to 17%
+  shiny::setProgress(0.15, message = "Converting raw data to criteria values")  # set progress to 17%
 ``` 
 </div>
 
@@ -1447,11 +1444,11 @@ Here we load the table of the growth stages.\n")
 
 growth_stages_filename_i1 <- as.character(paste("E:/repos/raise_fs/shiny/data/",
     params$INN1,
-    "_gs_s10.csv", sep = ""))
+    "_gs_s12.csv", sep = ""))
 
 df_growth_stages_i1 <-  read.csv(here(growth_stages_filename_i1))
 
-df_growth_stages_i1 %>% dplyr::filter(gs_name != "sow_date") %>% select(-gs_day)  %>%
+df_growth_stages_i1 %>% dplyr::filter(gs_name != "sow_date") %>% dplyr::select(-gs_day)  %>%
   kable(digits = 3, caption = "Growth Stage Lengths") %>% kable_styling("striped", full_width = T) #%>% print
 
 # create a new table just for where growth stage has requirements
@@ -1683,7 +1680,7 @@ if (sos_crit_i1) {
 df_growth_stages_lengths_i1 <- df_growth_stages_i1[-1, ]
 #df_growth_stages_lengths
 
-df_growth_stages_lengths1_i1 <- t(select(df_growth_stages_lengths_i1, name, length)) %>% data.frame()
+df_growth_stages_lengths1_i1 <- t(dplyr::select(df_growth_stages_lengths_i1, name, length)) %>% data.frame()
 #df_growth_stages_lengths1
 
 df_growth_stages_lengths2_i1 <- setNames(df_growth_stages_lengths1_i1, df_growth_stages_lengths_i1[,1])
@@ -1774,7 +1771,7 @@ eval_expr_2 <- eval(parse(text =paste0("df_onset_i1$", period_name_i1, "_s + df_
 
 }  
   
-onset_max_i1 <- max(select(df_onset_i1, -cell, -x, -y)) # gets the maximum value of the julian day numbers
+onset_max_i1 <- max(dplyr::select(df_onset_i1, -cell, -x, -y)) # gets the maximum value of the julian day numbers
 num_years_i1 <- max(ceiling(onset_max_i1 / 365))
 
 cat(paste("Growth Stages span", num_years_i1, "calendar years"))
@@ -2962,7 +2959,7 @@ soil_drainage_filename_i1 <-
   as.character(paste(
     "E:/repos/raise_fs/shiny/data/",
     params$INN1,
-    "_drainage_s9.csv",
+    "_drainage_s10.csv",
     sep = ""
   ))
 
@@ -3025,7 +3022,7 @@ if (file.exists(soil_drainage_filename_i1)) {
     }
 }
 
-knitr::knit_exit
+#knitr::knit_exit()
 
 ```
 
@@ -3044,7 +3041,7 @@ soil_texture_filename_i1 <-
   as.character(paste(
     "E:/repos/raise_fs/shiny/data/",
     params$INN1,
-    "_texture_s9.csv",
+    "_texture_s10.csv",
     sep = ""
   ))
 
@@ -3205,7 +3202,7 @@ for (i in seq_len(nrow(df_raster_data_soil_i1))) {
 ## Add all other criteria data to the IRM spatial database
 # some criteria use the same raster data so need to get those rows from df_priorities
 
-df_requirements_single_i1 <- inner_join(df_requirements_i1, select(df_raster_data_single_i1, data_file_prefix), by = "data_file_prefix")
+df_requirements_single_i1 <- inner_join(df_requirements_i1, dplyr::select(df_raster_data_single_i1, data_file_prefix), by = "data_file_prefix")
 
 for (i in seq_len(nrow(df_requirements_single_i1))) {
   new_col_i1 <-
@@ -3221,7 +3218,7 @@ for (i in seq_len(nrow(df_requirements_single_i1))) {
 print(df_irm_i1)
 
 if (params$INT == 1)
-  shiny::setProgress(0.20, message = "Evaluate lower level rule bases 1st Innovation")  #
+  shiny::setProgress(0.20, message = "Evaluating lower level rule bases")  #
 
 ```
 
@@ -3666,7 +3663,7 @@ apply(df_leaves_data_i1, 1, function(df_leaves_row_i1) {
 
 
 if (params$INT == 1)
-  shiny::setProgress(0.25, message = "Evaluate higher level rule bases 1st Innovation")  #
+  shiny::setProgress(0.5, message = "Evaluating higher level rule bases")  #
 
 ```
 
@@ -3762,8 +3759,8 @@ for (i in hierarchy_level_max_i1:1) {
   # join to the rulebases
   assign(paste0("df_hierarchy_i1_", i),
          inner_join(
-           select(df_rulebases_i1, crit_code, conc_level_1, conc_level_2, conc_level_3),
-           dplyr::filter(select(
+           dplyr::select(df_rulebases_i1, crit_code, conc_level_1, conc_level_2, conc_level_3),
+           dplyr::filter(dplyr::select(
              hierarchies_new_i1, level_number, paste0('level', i)
            ), level_number == i),
            by = c('crit_code' = paste0('level', i))
@@ -4079,6 +4076,8 @@ for (i in hierarchy_level_max_i1:1) {
 }
 
 #knitr::knit_exit()
+if (params$INT == 1)
+  shiny::setProgress(0.65, message = "Producing classified maps")
 
 ```
 
@@ -4094,7 +4093,8 @@ if ( params$LIMITS1 > 0){
   cat(paste("\n\n## Interactive Classified Map - FAO Limitations Classes \n\n"))
   FAO_limits_leaflet_widget_i1}
 
-
+if (params$INT == 1)
+  shiny::setProgress(0.75, message = "Calculating sub-division statistics") 
 ```
 # Objects available?
 
@@ -4218,6 +4218,7 @@ The index works as long as the values do not exceed 18, so need to wrap.
 ### FAO Classes
 
 ```{r i1_subdiv_area_FAO_palettes, results = 'asis', out.width="100%"}
+
 # create a list of valid names of colorbrewer palettes for sequential data
 palettes_i1 <-
   c("Blues",
@@ -4362,7 +4363,7 @@ for (i in names(list_rast_clas_FAO_cat)) {
     # Filter the joined data for the current limitation
     # Filter the joined data for the current limitation
     filtered_data_i1 <-
-      vect_subdiv_extr_i1 %>% select(any_of(class_type))
+      vect_subdiv_extr_i1 %>% tidyterra::select(any_of(class_type))
     #print(filtered_data)
     
     if (nrow(filtered_data_i1) == 0) {next} 
@@ -4598,7 +4599,7 @@ palettes_i1 <-
     
     # Filter the joined data for the current limitation
     filtered_data_i1 <-
-      vect_subdiv_extr_i1 %>% select(any_of(limitation_type_i1))
+      vect_subdiv_extr_i1 %>% tidyterra::select(any_of(limitation_type_i1))
     #print(filtered_data)
     if (nrow(filtered_data_i1) == 0) {next} 
     
@@ -4705,7 +4706,7 @@ for (i in names(list_rast_clas_FAO_cat)) {
     left_join(vect_subdiv_extr_i1, df_subdiv_area_i1, by = 'ID') 
   
   # vect_subdiv_extr_i1 <<- vect_subdiv_extr_i1 %>%
-  #    select(ID, ha, any_of(FAO)) %>% mutate(across(any_of(FAO), ~ (.x / ha) * 100)) 
+  #    tidyterra::select(ID, ha, any_of(FAO)) %>% mutate(across(any_of(FAO), ~ (.x / ha) * 100)) 
   
     vect_subdiv_extr_i1 <<- vect_subdiv_extr_i1 %>% mutate(across(any_of(FAO), ~ (.x / ha) * 100)) #this includes all columns from vect_subdiv_extr_i1 A Farrow 22/05/2024
       
@@ -4728,7 +4729,7 @@ for (i in names(list_rast_clas_FAO_cat)) {
     
     # Filter the joined data for the current limitation
     filtered_data_i1 <-
-      vect_subdiv_extr_i1 %>% select(any_of(class_type))
+      vect_subdiv_extr_i1 %>% tidyterra::select(any_of(class_type))
     #print(filtered_data)
     if (nrow(filtered_data_i1) == 0) {next} 
 
@@ -4846,7 +4847,7 @@ for (i in names(list_rast_limits_max_FAO)) {
     left_join(vect_subdiv_extr_i1, df_subdiv_area_i1, by = 'ID')
   
   # vect_subdiv_extr_i1 <<- vect_subdiv_extr_i1 %>%
-  #    select(ID, ha, any_of(FAO_limits)) %>% mutate(across(any_of(FAO_limits), ~ (.x / ha) * 100))
+  #    tidyterra::select(ID, ha, any_of(FAO_limits)) %>% mutate(across(any_of(FAO_limits), ~ (.x / ha) * 100))
   
       vect_subdiv_extr_i1 <<- vect_subdiv_extr_i1 %>% mutate(across(any_of(FAO_limits), ~ (.x / ha) * 100)) #this includes all columns from vect_subdiv_extr_i1 A Farrow 22/05/2024
       
@@ -4870,7 +4871,7 @@ for (i in names(list_rast_limits_max_FAO)) {
     
     # Filter the joined data for the current limitation
     filtered_data_i1 <-
-      vect_subdiv_extr_i1 %>% select(any_of(limitation_type_i1))
+      vect_subdiv_extr_i1 %>% tidyterra::select(any_of(limitation_type_i1))
     #print(filtered_data)
     if (nrow(filtered_data_i1) == 0) {next} 
     
@@ -4901,7 +4902,8 @@ for (i in names(list_rast_limits_max_FAO)) {
   
 }  
 
-
+if (params$INT == 1)
+  shiny::setProgress(0.9, message = "Calculating yield and production")
 ```
 
 # Calculate yields and production
@@ -4959,7 +4961,7 @@ if (summarise(df_irm_i1, Average = mean(yieldpc, na.rm = T)) > 0) {
 
   # df_irm_i1 <- dplyr::select(df_irm_i1,-yield)
   
-  vect_yieldpc_i1 <- select(df_irm_i1, x, y, yieldpc) %>% na.omit %>% vect(geom = c("x", "y"))
+  vect_yieldpc_i1 <- dplyr::select(df_irm_i1, x, y, yieldpc) %>% na.omit %>% vect(geom = c("x", "y"))
   
   rast_yieldpc_i1 <- rasterize(vect_yieldpc_i1, rast_mask_proj_i1, field =
                                  "yieldpc")
@@ -5061,7 +5063,7 @@ The IRM script converts yield proportion to yield using the yield values for sol
 # get the criteria that contribute to yield
 
 filename_yield_i1 <-
-  as.character(paste("E:/repos/raise_fs/shiny/data/", params$INN1, "_yield.csv", sep = ""))
+  as.character(paste("E:/repos/raise_fs/shiny/data/", params$INN1, "_yield_s11.csv", sep = ""))
 df_yield_values_i1 <- read.csv(filename_yield_i1, na.strings = c("NA"))
 
 df_yield_values_i1 %>% kable(digits = 3) %>% kable_styling("striped", full_width = T)  %>%  scroll_box(height = "100px")
@@ -5090,7 +5092,7 @@ df_yield_values_i1 %>% kable(digits = 3) %>% kable_styling("striped", full_width
 if (summarise(df_irm_i1, Average = mean(yield, na.rm = T)) > 0) {
   
   vect_yield_i1 <-
-    select(df_irm_i1, x, y, yield) %>% na.omit %>% vect(geom = c("x", "y"))
+    dplyr::select(df_irm_i1, x, y, yield) %>% na.omit %>% vect(geom = c("x", "y"))
   
   rast_yield_i1 <- rasterize(vect_yield_i1, rast_mask_proj_i1, field = "yield")
   names(rast_yield_i1) <-  c('yield')
@@ -5195,7 +5197,7 @@ df_irm_i1$production <- df_irm_i1$yield *  Stat_factor_ha_i1
 
 if (summarise(df_irm_i1, Average = mean(production, na.rm = T)) > 0) {
   vect_production_i1 <-
-    select(df_irm_i1, x, y, production) %>% na.omit %>% vect(geom = c("x", "y"))
+    dplyr::select(df_irm_i1, x, y, production) %>% na.omit %>% vect(geom = c("x", "y"))
   
   rast_production_i1 <-
     rasterize(vect_production_i1, rast_mask_proj_i1, field = "production")
@@ -5277,6 +5279,957 @@ if (summarise(df_irm_i1, Average = mean(production, na.rm = T)) > 0) {
   gp2_i1 <- add_subdiv_proj_simple_plot(gp_i1, vect_subdiv_i1)
   gp2_i1
 }
+
+if (params$INT == 1)
+  shiny::setProgress(0.95, message = "Triangulation")
+
+```
+</div>
+
+
+```{r i1_export_df_irm, results = 'asis', out.width="100%"}
+
+output_csv(df_irm_i1, paste0("df_irm_i1_", params$INN1)) # save as a csv file
+
+# project to geo for export as geojson
+vect_irm_i1 <-  df_irm_i1 %>% na.omit %>% vect(geom = c("x", "y"), crs = wkt_lam)
+
+vect_irm_i1_geo <- project(vect_irm_i1, "epsg:4326")
+
+output_vect(vect_irm_i1_geo, paste0("vect_irm_i1", params$INN1)) # save as a geojson file  
+  
+```
+
+
+# Triangulation
+
+The objective of triangulation is to evaluate the recommendation domain maps. 
+
+Direct validation of the maps is not possible because we refer to the potential conditions that are not directly observable. Instead, the focus is on gathering perceptions among local experts - farmers and extension agents - regarding the suitability of the innovation and the limits to adoption. We can then compare the local assessment of suitability with the results of the model.
+
+Three perceptions are captured: 
+
+1) the general suitability of each sub-division 
+2) the limits to production and therefore adoption
+3) who makes the decison to adopt the innovation
+
+## Suitability Perceptions
+
+Local experts are asked to provide both a qualitative and quantitative measure of their perception of the suitability of a specific sub-division for the innovation that is being modelled.
+
+### Qualitative Perception
+
+There are three levels of suitability that the local expert can assign:
+
+(i) not suitable
+(ii) partially suitable
+(iii) suitable
+
+<div class="fold o">
+```{r i1_triangulation_suit_qual, results = 'asis', out.width="100%"}
+#  TRISUIT1: "SUITABILITY"
+
+if (params$TRIANGULATION ==1) {
+  expr <- paste0("vect_triangulation_farmers_i1$", params$TRISUIT1)
+  # vect_triangulation_farmers_i1$tri_label_suit <-
+  #   paste(vect_triangulation_farmers_i1$id, "=", eval(parse(text = (expr))))
+  # vect_triangulation_farmers_i1$tri_label_suit <-
+  #   factor(vect_triangulation_farmers_i1$tri_label_suit)
+  
+  vect_triangulation_farmers_i1$tri_suit <-   eval(parse(text = (expr)))
+  vect_triangulation_farmers_i1$tri_suit <-   factor(vect_triangulation_farmers_i1$tri_suit)
+  
+  g_suit_farmers_i1 <- ggplot() +
+    labs(title = paste0("Suitability\nFarmers Perception\n", params$INN1))
+  #gtriangulation_suit_i1 <- add_triangulation_plot_no_labels_suit(g_suit_i1, vect_triangulation_farmers_i1)
+  gtriangulation_suit_farmers_i1 <- add_triangulation_plot_suit(
+    g_suit_farmers_i1,
+    vect_triangulation_farmers_i1,
+    nudge_xvaltri_farmers_i1,
+    nudge_yvaltri_farmers_i1
+  )
+  gtriangulation_suit_farmers_i1 <- add_subdiv_simple_plot(gtriangulation_suit_farmers_i1, vect_subdiv_i1)
+  gtriangulation_suit_farmers_i1
+}
+
+if (params$TRIANGULATION ==1) {
+  expr <- paste0("vect_triangulation_agents_i1$", params$TRISUIT1)
+  # vect_triangulation_agents_i1$tri_label_suit <-
+  #   paste(vect_triangulation_agents_i1$id, "=", eval(parse(text = (expr))))
+  # vect_triangulation_agents_i1$tri_label_suit <-
+  #   factor(vect_triangulation_agents_i1$tri_label_suit)
+  
+  vect_triangulation_agents_i1$tri_suit <-   eval(parse(text = (expr)))
+  vect_triangulation_agents_i1$tri_suit <-   factor(vect_triangulation_agents_i1$tri_suit)
+  
+  g_suit_agents_i1 <- ggplot() +
+    labs(title = paste0("Suitability\nAgents Perception\n", params$INN1))
+  #gtriangulation_suit_i1 <- add_triangulation_plot_no_labels_suit(g_suit_i1, vect_triangulation_agents_i1)
+  gtriangulation_suit_agents_i1 <- add_triangulation_plot_suit(
+    g_suit_agents_i1,
+    vect_triangulation_agents_i1,
+    nudge_xvaltri_agents_i1,
+    nudge_yvaltri_agents_i1
+  )
+  gtriangulation_suit_agents_i1 <- add_subdiv_simple_plot(gtriangulation_suit_agents_i1, vect_subdiv_i1)
+  gtriangulation_suit_agents_i1
+}
+
+```
+</div>
+
+### Quantitative Perception
+
+The local expert is also asked to assign a percentage to the area within the sub-division which is suitable.
+
+<div class="fold o">
+```{r i1_triangulation_suit_quan, results = 'asis', out.width="100%"}
+#  TRIPCS1: "PC_SUIT"
+
+if (params$TRIANGULATION ==1) {
+  expr <- paste0("vect_triangulation_farmers_i1$", params$TRIPCS1)
+  # vect_triangulation_farmers_i1$tri_label_pcs <-
+  #   paste(vect_triangulation_farmers_i1$id, "=", eval(parse(text = (expr))))
+  # vect_triangulation_farmers_i1$tri_label_pcs <-
+  #   factor(vect_triangulation_farmers_i1$tri_label_pcs)
+  
+  vect_triangulation_farmers_i1$tri_pcs <-   eval(parse(text = (expr)))
+  
+  g_pcs_farmers_i1 <- ggplot() +
+      labs(title = paste0("% Area Suitable\nFarmers Perception\n", params$INN1))
+  #gtriangulation_pcs_i1 <- add_triangulation_plot_no_labels_pcs(g_pcs_i1, vect_triangulation_farmers_i1)
+  gtriangulation_pcs_farmers_i1 <- add_triangulation_plot_pcs(g_pcs_farmers_i1, vect_triangulation_farmers_i1,
+                                                    nudge_xvaltri_farmers_i1,
+                                                    nudge_yvaltri_farmers_i1)
+  gtriangulation_pcs_farmers_i1 <- add_subdiv_simple_plot(gtriangulation_pcs_farmers_i1, vect_subdiv_i1)
+  gtriangulation_pcs_farmers_i1
+}
+
+if (params$TRIANGULATION ==1) {
+  expr <- paste0("vect_triangulation_agents_i1$", params$TRIPCS1)
+  # vect_triangulation_agents_i1$tri_label_pcs <-
+  #   paste(vect_triangulation_agents_i1$id, "=", eval(parse(text = (expr))))
+  # vect_triangulation_agents_i1$tri_label_pcs <-
+  #   factor(vect_triangulation_agents_i1$tri_label_pcs)
+  
+  vect_triangulation_agents_i1$tri_pcs <-   eval(parse(text = (expr)))
+  
+  g_pcs_agents_i1 <- ggplot() +
+      labs(title = paste0("% Area Suitable\nAgents Perception\n", params$INN1))
+  #gtriangulation_pcs_i1 <- add_triangulation_plot_no_labels_pcs(g_pcs_i1, vect_triangulation_agents_i1)
+  gtriangulation_pcs_agents_i1 <- add_triangulation_plot_pcs(g_pcs_agents_i1, vect_triangulation_agents_i1,
+                                                    nudge_xvaltri_agents_i1,
+                                                    nudge_yvaltri_agents_i1)
+  gtriangulation_pcs_agents_i1 <- add_subdiv_simple_plot(gtriangulation_pcs_agents_i1, vect_subdiv_i1)
+  gtriangulation_pcs_agents_i1
+}
+
+```
+</div>
+
+## Limits to production and adoption
+
+The expert is asked to rank key factors that limit adoption. These factors are split into factors that affect the biophysical aptitude of the kebele, and those factors that affect the socio-economic feasibility of the kebele.
+
+The user chooses the most important factor, then the second-most important factor etc. until all factors have been assigned. If the expert doesn't know then they can leave the rankings blank and choose a checkbox input. Likewise they can also choose a different type of factor that is not in the list.
+
+The factors are the following (the codes are used for mapping and match as closely as possible the codes used in the IRM model):
+
+Bio-physical aptitude
+
+* Pests (Ps)
+* Diseases (Ds)
+* Low soil fertility (SF)
+* Rainfall (P)
+* Temperature (T)
+* Drainage and Flooding (Dr)
+* Slope and Terrain (Ls)
+* I don't know (true or false)
+* Other (free text)
+
+Socio-economic feasibility
+
+* Lack of quality seeds (Sd)
+* Lack of fertilizers/pesticides (In)
+* Limited market access (MA)
+* No demand from the market (MD)
+* Financial constraints (F)
+* Labour shortage (Lb)
+* Lack of knowledge of the innovation (Ex)
+* I don't know (true or false)
+* Other (free text)
+
+
+### Farmers Perceptions
+
+#### Biophysical Aptitude
+
+##### Dominant Limitation
+
+<div class="fold o">
+```{r i1_triangulation_limits_farmers_dominant_ba, results = 'asis', out.width="100%"}
+
+#  TRILIMITS1: "LIMITS"
+
+if (params$TRIANGULATION ==1) {
+  vect_triangulation_farmers_i1$LIM_BA_1 <-   factor(vect_triangulation_farmers_i1$LIM_BA_1)
+  
+  g_lim_farmers_i1 <- ggplot() +
+    labs(title = paste0("Most Important Biophysical Limitation\nFarmers Perception\n", params$INN1))
+  
+  gtriangulation_lim_1_farmers_i1 <- add_triangulation_plot_lim_1_ba(
+    g_lim_farmers_i1,
+    vect_triangulation_farmers_i1,
+    nudge_xvaltri_farmers_i1,
+    nudge_yvaltri_farmers_i1
+  )
+  gtriangulation_lim_1_farmers_i1 <- add_subdiv_simple_plot(gtriangulation_lim_1_farmers_i1, vect_subdiv_i1)
+  gtriangulation_lim_1_farmers_i1
+}
+
+```
+</div>
+
+##### Other Limitation
+
+<div class="fold o">
+```{r i1_triangulation_limits_farmers_other_ba, results = 'asis', out.width="100%"}
+
+#  TRILIMITS1: "LIMITS"
+
+if (params$TRIANGULATION ==1) {
+
+  vect_triangulation_farmers_i1$LIM_BA_OTH <-   factor(vect_triangulation_farmers_i1$LIM_BA_OTH) 
+  
+  g_lim_farmers_i1_ba_oth <- ggplot(vect_triangulation_farmers_i1) +
+    geom_spatvector(
+      aes(fill = LIM_BA_OTH),
+      colour = "black",
+      shape = 21,
+      size = 2,
+      show.legend = TRUE
+    )+
+    geom_spatvector_label(
+      #aes(label = params$SUBDIVNAMEVAR),
+      aes(label =.data[[ params$SUBDIVNAMEVAR]]),
+      colour = "black",
+      size = 2,
+      alpha = 0.5,
+      nudge_x = nudge_xvaltri_farmers_i1,
+      nudge_y = nudge_yvaltri_farmers_i1
+    ) +
+    scale_fill_discrete(na.value = "white") +
+    #theme_minimal() +
+    labs(title = paste0("Other Biophysical Limitation\nFarmers Perception\n", params$INN1),
+         fill = "Limitation")
+   
+  
+
+  g_lim_farmers_i1_ba_oth <- add_subdiv_simple_plot(g_lim_farmers_i1_ba_oth, vect_subdiv_i1)
+  g_lim_farmers_i1_ba_oth
+}
+
+```
+</div>
+
+##### Importance of individual limitation
+
+<div class="fold o">
+```{r i1_triangulation_limits_farmers_byfactor_ba, results = 'asis', out.width="100%"}
+if (params$TRIANGULATION ==1) {
+# List of rank variables
+limitation_ba_vars <- paste0("LIM_BA_", 1:7)
+
+# Extract attributes
+df_triangulation_farmers_i1 <- as.data.frame(vect_triangulation_farmers_i1)
+
+# Map ranks to scores (7 → 1)
+rank_ba_scores <- setNames(7:1, limitation_ba_vars)
+
+# Long format with scores
+df_triangulation_farmers_i1_long_ba <- df_triangulation_farmers_i1 %>%
+  pivot_longer(cols = all_of(limitation_ba_vars),
+               names_to = "rank_ba",
+               values_to = "limitation_ba") %>%
+  mutate(ba_score = rank_ba_scores[rank_ba])
+
+# Wide format: one column per limitation code, values = score
+df_triangulation_farmers_i1_wide_ba <- df_triangulation_farmers_i1_long_ba %>%
+  select(params$SUBDIVNAMEVAR, limitation_ba, ba_score) %>%
+  tidyterra::filter(!is.na(limitation_ba)) %>%   # drop empty entries
+  pivot_wider(names_from = limitation_ba,
+              values_from = ba_score,
+              values_fn = max,     # keep highest if duplicate
+              values_fill = NA)
+
+# Convert all score columns to factors with descriptive labels
+importance_labels <- c("Most important",
+                       "Very high",
+                       "High",
+                       "Medium",
+                       "Low",
+                       "Very low",
+                       "Least important")
+
+limitation_codes <- setdiff(names(df_triangulation_farmers_i1_wide_ba), params$SUBDIVNAMEVAR)
+
+for (code in limitation_codes) {
+  df_triangulation_farmers_i1_wide_ba[[paste0(code, "_fac")]] <- factor(df_triangulation_farmers_i1_wide_ba[[code]],
+                                               levels = 7:1,
+                                               labels = importance_labels)
+}
+
+geo_scores <- merge(vect_triangulation_farmers_i1, df_triangulation_farmers_i1_wide_ba, by = params$SUBDIVNAMEVAR, all.x = TRUE)
+
+for (code in limitation_codes) {
+  
+  if (code == "Dr") {plot_label = "Drainage"}
+  if (code == "Ds") {plot_label = "Diseases"}
+  if (code == "P") {plot_label = "Rainfall"}
+  if (code == "Ps") {plot_label = "Pests"}
+  if (code == "SF") {plot_label = "Soil Fertility"}
+  if (code == "Ls") {plot_label = "Slope/Terrain"}
+  if (code == "T") {plot_label = "Temperature"}
+  
+  fac_col <- paste0(code, "_fac")
+  
+  gtriangulation_lim_ba_farmers_i1 <- ggplot(geo_scores) +
+    geom_spatvector(aes_string(fill = fac_col),
+                    colour = "black", shape = 21, size = 2, show.legend=TRUE) +
+    geom_spatvector_label(
+      aes(label =.data[[ params$SUBDIVNAMEVAR]]),
+      colour = "black",
+      size = 2,
+      alpha = 0.5,
+      nudge_x = nudge_xvaltri_farmers_i1,
+      nudge_y = nudge_yvaltri_farmers_i1
+    ) +
+    
+    scale_fill_viridis_d(na.value = "white",
+                         option = "E",
+                         drop=FALSE) +  # discrete scale for factors
+    #theme_minimal() +
+    labs(title = paste0("Importance of Limitation: ", plot_label, "\nFarmers Perception\n", params$INN1),
+         fill = "Importance")
+  
+  gtriangulation_lim_ba_farmers_i1 <- add_subdiv_simple_plot(gtriangulation_lim_ba_farmers_i1, vect_subdiv_i1)
+  
+  print(gtriangulation_lim_ba_farmers_i1)
+  
+}
+}
+```
+</div>
+
+#### Socio-Economic Feasibility
+
+##### Dominant Limitation
+
+<div class="fold o">
+```{r i1_triangulation_limits_farmers_dominant_se, results = 'asis', out.width="100%"}
+
+#  TRILIMITS1: "LIMITS"
+
+if (params$TRIANGULATION ==1) {
+  vect_triangulation_farmers_i1$LIM_SE_1 <-   factor(vect_triangulation_farmers_i1$LIM_SE_1)
+  
+  g_lim_farmers_i1 <- ggplot() +
+    labs(title = paste0("Most Important Socio-Economic Limitation\nFarmers Perception\n", params$INN1))
+  
+  gtriangulation_lim_1_farmers_i1 <- add_triangulation_plot_lim_1_se(
+    g_lim_farmers_i1,
+    vect_triangulation_farmers_i1,
+    nudge_xvaltri_farmers_i1,
+    nudge_yvaltri_farmers_i1
+  )
+  gtriangulation_lim_1_farmers_i1 <- add_subdiv_simple_plot(gtriangulation_lim_1_farmers_i1, vect_subdiv_i1)
+  gtriangulation_lim_1_farmers_i1
+}
+
+
+```
+</div>
+
+##### Other Limitation
+
+
+<div class="fold o">
+```{r i1_triangulation_limits_farmers_other_se, results = 'asis', out.width="100%"}
+
+#  TRILIMITS1: "LIMITS"
+
+if (params$TRIANGULATION ==1) {
+
+  
+vect_triangulation_farmers_i1$LIM_SE_OTH <-   factor(vect_triangulation_farmers_i1$LIM_SE_OTH)  
+  
+  g_lim_farmers_i1_se_oth <- ggplot(vect_triangulation_farmers_i1) +
+    geom_spatvector(
+      aes(fill = LIM_SE_OTH),
+      colour = "black",
+      shape = 21,
+      size = 2,
+      show.legend = TRUE
+    )+
+    geom_spatvector_label(
+      aes(label =.data[[ params$SUBDIVNAMEVAR]]),
+      colour = "black",
+      size = 2,
+      alpha = 0.5,
+      nudge_x = nudge_xvaltri_farmers_i1,
+      nudge_y = nudge_yvaltri_farmers_i1
+    ) +
+    scale_fill_discrete(na.value = "white")+
+    #theme_minimal() +
+    labs(title = paste0("Other Socio-Economic Limitation\nFarmers Perception\n", params$INN1),
+         fill = "Limitation")
+   
+  
+
+  g_lim_farmers_i1_se_oth <- add_subdiv_simple_plot(g_lim_farmers_i1_se_oth, vect_subdiv_i1)
+  g_lim_farmers_i1_se_oth
+}
+
+```
+</div>
+
+##### Importance of individual limitation
+
+<div class="fold o">
+```{r i1_triangulation_limits_farmers_byfactor_se, results = 'asis', out.width="100%"}
+
+if (params$TRIANGULATION ==1) {
+  
+# List of rank variables
+limitation_se_vars <- paste0("LIM_SE_", 1:7)
+
+# Extract attributes
+df_triangulation_farmers_i1 <- as.data.frame(vect_triangulation_farmers_i1)
+
+# Map ranks to scores (7 → 1)
+rank_se_scores <- setNames(7:1, limitation_se_vars)
+
+# Long format with scores
+df_triangulation_farmers_i1_long_se <- df_triangulation_farmers_i1 %>%
+  pivot_longer(cols = all_of(limitation_se_vars),
+               names_to = "rank_se",
+               values_to = "limitation_se") %>%
+  mutate(se_score = rank_se_scores[rank_se])
+
+# Wide format: one column per limitation code, values = score
+df_triangulation_farmers_i1_wide_se <- df_triangulation_farmers_i1_long_se %>%
+  select(params$SUBDIVNAMEVAR, limitation_se, se_score) %>%
+  tidyterra::filter(!is.na(limitation_se)) %>%   # drop empty entries
+  pivot_wider(names_from = limitation_se,
+              values_from = se_score,
+              values_fn = max,     # keep highest if duplicate
+              values_fill = NA)
+
+# Convert all score columns to factors with descriptive labels
+importance_labels <- c("Most important",
+                       "Very high",
+                       "High",
+                       "Medium",
+                       "Low",
+                       "Very low",
+                       "Least important")
+
+limitation_codes <- setdiff(names(df_triangulation_farmers_i1_wide_se), params$SUBDIVNAMEVAR)
+
+for (code in limitation_codes) {
+  df_triangulation_farmers_i1_wide_se[[paste0(code, "_fac")]] <- factor(df_triangulation_farmers_i1_wide_se[[code]],
+                                               levels = 7:1,
+                                               labels = importance_labels)
+}
+
+geo_scores <- merge(vect_triangulation_farmers_i1, df_triangulation_farmers_i1_wide_se, by = params$SUBDIVNAMEVAR, all.x = TRUE)
+
+for (code in limitation_codes) {
+  
+  if (code == "Ex") {plot_label = "Extension/Knowledge"}
+  if (code == "F") {plot_label = "Financial Constraints"}
+  if (code == "In") {plot_label = "Fertilisers/Pesticides"}
+  if (code == "Lb") {plot_label = "Labour"}
+  if (code == "MA") {plot_label = "Market Access"}
+  if (code == "MD") {plot_label = "Market Demand"}
+  if (code == "Sd") {plot_label = "Access to Seeds"}
+  
+  fac_col <- paste0(code, "_fac")
+  
+  gtriangulation_lim_se_farmers_i1 <- ggplot(geo_scores) +
+    geom_spatvector(aes_string(fill = fac_col),
+                    colour = "black", shape = 21, size = 2, show.legend=TRUE) +
+    geom_spatvector_label(
+      aes(label =.data[[ params$SUBDIVNAMEVAR]]),
+      colour = "black",
+      size = 2,
+      alpha = 0.5,
+      nudge_x = nudge_xvaltri_farmers_i1,
+      nudge_y = nudge_yvaltri_farmers_i1
+    ) +
+    
+    scale_fill_viridis_d(na.value = "white",
+                         option = "G",
+                         drop=FALSE) +  # discrete scale for factors
+    #theme_minimal() +
+    labs(title = paste0("Importance of Limitation: ", plot_label, "\nFarmers Perception\n", params$INN1),
+         fill = "Importance")
+  
+  gtriangulation_lim_se_farmers_i1 <- add_subdiv_simple_plot(gtriangulation_lim_se_farmers_i1, vect_subdiv_i1)
+  
+  print(gtriangulation_lim_se_farmers_i1)
+  
+}
+}
+
+```
+</div>
+
+### Extension Agents Perceptions
+
+#### Biophysical Aptitude
+
+##### Dominant Limitation
+
+<div class="fold o">
+```{r i1_triangulation_limits_agents_dominant_ba, results = 'asis', out.width="100%"}
+
+#  TRILIMITS1: "LIMITS"
+
+if (params$TRIANGULATION ==1) {
+  vect_triangulation_agents_i1$LIM_BA_1 <-   factor(vect_triangulation_agents_i1$LIM_BA_1)
+  
+  g_lim_agents_i1 <- ggplot() +
+    labs(title = paste0("Most Important Biophysical Limitation\nAgents Perception\n", params$INN1))
+  
+  gtriangulation_lim_1_agents_i1 <- add_triangulation_plot_lim_1_ba(
+    g_lim_agents_i1,
+    vect_triangulation_agents_i1,
+    nudge_xvaltri_agents_i1,
+    nudge_yvaltri_agents_i1
+  )
+  gtriangulation_lim_1_agents_i1 <- add_subdiv_simple_plot(gtriangulation_lim_1_agents_i1, vect_subdiv_i1)
+  gtriangulation_lim_1_agents_i1
+}
+
+```
+</div>
+
+##### Other Limitation
+
+<div class="fold o">
+```{r i1_triangulation_limits_agents_other_ba, results = 'asis', out.width="100%"}
+
+#  TRILIMITS1: "LIMITS"
+
+if (params$TRIANGULATION ==1) {
+
+  vect_triangulation_agents_i1$LIM_BA_OTH <-   factor(vect_triangulation_agents_i1$LIM_BA_OTH) 
+  
+  g_lim_agents_i1_ba_oth <- ggplot(vect_triangulation_agents_i1) +
+    geom_spatvector(
+      aes(fill = LIM_BA_OTH),
+      colour = "black",
+      shape = 21,
+      size = 2,
+      show.legend = TRUE
+    )+
+    geom_spatvector_label(
+      aes(label =.data[[ params$SUBDIVNAMEVAR]]),
+      colour = "black",
+      size = 2,
+      alpha = 0.5,
+      nudge_x = nudge_xvaltri_agents_i1,
+      nudge_y = nudge_yvaltri_agents_i1
+    ) +
+    scale_fill_discrete(na.value = "white") +
+    #theme_minimal() +
+    labs(title = paste0("Other Biophysical Limitation\nAgents Perception\n", params$INN1),
+         fill = "Limitation")
+   
+  
+
+  g_lim_agents_i1_ba_oth <- add_subdiv_simple_plot(g_lim_agents_i1_ba_oth, vect_subdiv_i1)
+  g_lim_agents_i1_ba_oth
+}
+
+```
+</div>
+
+##### Importance of individual limitation
+
+<div class="fold o">
+```{r i1_triangulation_limits_agents_byfactor_ba, results = 'asis', out.width="100%"}
+
+if (params$TRIANGULATION ==1) {
+  
+# List of rank variables
+limitation_ba_vars <- paste0("LIM_BA_", 1:7)
+
+# Extract attributes
+df_triangulation_agents_i1 <- as.data.frame(vect_triangulation_agents_i1)
+
+# Map ranks to scores (7 → 1)
+rank_ba_scores <- setNames(7:1, limitation_ba_vars)
+
+# Long format with scores
+df_triangulation_agents_i1_long_ba <- df_triangulation_agents_i1 %>%
+  pivot_longer(cols = all_of(limitation_ba_vars),
+               names_to = "rank_ba",
+               values_to = "limitation_ba") %>%
+  mutate(ba_score = rank_ba_scores[rank_ba])
+
+# Wide format: one column per limitation code, values = score
+df_triangulation_agents_i1_wide_ba <- df_triangulation_agents_i1_long_ba %>%
+  select(params$SUBDIVNAMEVAR, limitation_ba, ba_score) %>%
+  tidyterra::filter(!is.na(limitation_ba)) %>%   # drop empty entries
+  pivot_wider(names_from = limitation_ba,
+              values_from = ba_score,
+              values_fn = max,     # keep highest if duplicate
+              values_fill = NA)
+
+# Convert all score columns to factors with descriptive labels
+importance_labels <- c("Most important",
+                       "Very high",
+                       "High",
+                       "Medium",
+                       "Low",
+                       "Very low",
+                       "Least important")
+
+limitation_codes <- setdiff(names(df_triangulation_agents_i1_wide_ba), params$SUBDIVNAMEVAR)
+
+for (code in limitation_codes) {
+  df_triangulation_agents_i1_wide_ba[[paste0(code, "_fac")]] <- factor(df_triangulation_agents_i1_wide_ba[[code]],
+                                               levels = 7:1,
+                                               labels = importance_labels)
+}
+
+geo_scores <- merge(vect_triangulation_agents_i1, df_triangulation_agents_i1_wide_ba, by = params$SUBDIVNAMEVAR, all.x = TRUE)
+
+for (code in limitation_codes) {
+  
+  if (code == "Dr") {plot_label = "Drainage"}
+  if (code == "Ds") {plot_label = "Diseases"}
+  if (code == "P") {plot_label = "Rainfall"}
+  if (code == "Ps") {plot_label = "Pests"}
+  if (code == "SF") {plot_label = "Soil Fertility"}
+  if (code == "Ls") {plot_label = "Slope/Terrain"}
+  if (code == "T") {plot_label = "Temperature"}
+  
+  fac_col <- paste0(code, "_fac")
+  
+  gtriangulation_lim_ba_agents_i1 <- ggplot(geo_scores) +
+    geom_spatvector(aes_string(fill = fac_col),
+                    colour = "black", shape = 21, size = 2, show.legend=TRUE) +
+    geom_spatvector_label(
+      aes(label =.data[[ params$SUBDIVNAMEVAR]]),
+      colour = "black",
+      size = 2,
+      alpha = 0.5,
+      nudge_x = nudge_xvaltri_agents_i1,
+      nudge_y = nudge_yvaltri_agents_i1
+    ) +
+    
+    scale_fill_viridis_d(na.value = "white",
+                         option = "E",
+                         drop=FALSE) +  # discrete scale for factors
+    #theme_minimal() +
+    labs(title = paste0("Importance of Limitation: ", plot_label,"\nAgents Perception\n", params$INN1),
+         fill = "Importance")
+  
+  gtriangulation_lim_ba_agents_i1 <- add_subdiv_simple_plot(gtriangulation_lim_ba_agents_i1, vect_subdiv_i1)
+  
+  print(gtriangulation_lim_ba_agents_i1)
+  
+}
+
+}
+```
+</div>
+
+
+
+#### Socio-Economic Feasibility
+
+##### Dominant Limitation
+
+<div class="fold o">
+```{r i1_triangulation_limits_agents_dominant_se, results = 'asis', out.width="100%"}
+
+#  TRILIMITS1: "LIMITS"
+
+if (params$TRIANGULATION ==1) {
+  vect_triangulation_agents_i1$LIM_SE_1 <-   factor(vect_triangulation_agents_i1$LIM_SE_1)
+  
+  g_lim_agents_i1 <- ggplot() +
+    labs(title = paste0("Most Important Socio-Economic Limitation\nAgents Perception\n", params$INN1))
+  
+  gtriangulation_lim_1_agents_i1 <- add_triangulation_plot_lim_1_se(
+    g_lim_agents_i1,
+    vect_triangulation_agents_i1,
+    nudge_xvaltri_agents_i1,
+    nudge_yvaltri_agents_i1
+  )
+  gtriangulation_lim_1_agents_i1 <- add_subdiv_simple_plot(gtriangulation_lim_1_agents_i1, vect_subdiv_i1)
+  gtriangulation_lim_1_agents_i1
+}
+
+
+```
+</div>
+
+##### Other Limitation
+
+
+<div class="fold o">
+```{r i1_triangulation_limits_agents_other_se, results = 'asis', out.width="100%"}
+
+#  TRILIMITS1: "LIMITS"
+
+if (params$TRIANGULATION ==1) {
+
+  
+vect_triangulation_agents_i1$LIM_SE_OTH <-   factor(vect_triangulation_agents_i1$LIM_SE_OTH)  
+  
+  g_lim_agents_i1_se_oth <- ggplot(vect_triangulation_agents_i1) +
+    geom_spatvector(
+      aes(fill = LIM_SE_OTH),
+      colour = "black",
+      shape = 21,
+      size = 2,
+      show.legend = TRUE
+    )+
+    geom_spatvector_label(
+      aes(label =.data[[ params$SUBDIVNAMEVAR]]),
+      colour = "black",
+      size = 2,
+      alpha = 0.5,
+      nudge_x = nudge_xvaltri_agents_i1,
+      nudge_y = nudge_yvaltri_agents_i1
+    ) +
+    scale_fill_discrete(na.value = "white")+
+    #theme_minimal() +
+    labs(title = paste0("Other Socio-Economic Limitation\nAgents Perception\n", params$INN1),
+         fill = "Limitation")
+   
+  
+
+  g_lim_agents_i1_se_oth <- add_subdiv_simple_plot(g_lim_agents_i1_se_oth, vect_subdiv_i1)
+  g_lim_agents_i1_se_oth
+}
+
+```
+</div>
+
+##### Importance of individual limitation
+
+<div class="fold o">
+```{r i1_triangulation_limits_agents_byfactor_se, results = 'asis', out.width="100%"}
+
+if (params$TRIANGULATION ==1) {
+  
+# List of rank variables
+limitation_se_vars <- paste0("LIM_SE_", 1:7)
+
+# Extract attributes
+df_triangulation_agents_i1 <- as.data.frame(vect_triangulation_agents_i1)
+
+# Map ranks to scores (7 → 1)
+rank_se_scores <- setNames(7:1, limitation_se_vars)
+
+# Long format with scores
+df_triangulation_agents_i1_long_se <- df_triangulation_agents_i1 %>%
+  pivot_longer(cols = all_of(limitation_se_vars),
+               names_to = "rank_se",
+               values_to = "limitation_se") %>%
+  mutate(se_score = rank_se_scores[rank_se])
+
+# Wide format: one column per limitation code, values = score
+df_triangulation_agents_i1_wide_se <- df_triangulation_agents_i1_long_se %>%
+  select(params$SUBDIVNAMEVAR, limitation_se, se_score) %>%
+  tidyterra::filter(!is.na(limitation_se)) %>%   # drop empty entries
+  pivot_wider(names_from = limitation_se,
+              values_from = se_score,
+              values_fn = max,     # keep highest if duplicate
+              values_fill = NA)
+
+# Convert all score columns to factors with descriptive labels
+importance_labels <- c("Most important",
+                       "Very high",
+                       "High",
+                       "Medium",
+                       "Low",
+                       "Very low",
+                       "Least important")
+
+limitation_codes <- setdiff(names(df_triangulation_agents_i1_wide_se), params$SUBDIVNAMEVAR)
+
+for (code in limitation_codes) {
+  df_triangulation_agents_i1_wide_se[[paste0(code, "_fac")]] <- factor(df_triangulation_agents_i1_wide_se[[code]],
+                                               levels = 7:1,
+                                               labels = importance_labels)
+}
+
+geo_scores <- merge(vect_triangulation_agents_i1, df_triangulation_agents_i1_wide_se, by = params$SUBDIVNAMEVAR, all.x = TRUE)
+
+for (code in limitation_codes) {
+  
+  if (code == "Ex") {plot_label = "Extension/Knowledge"}
+  if (code == "F") {plot_label = "Financial Constraints"}
+  if (code == "In") {plot_label = "Fertilisers/Pesticides"}
+  if (code == "Lb") {plot_label = "Labour"}
+  if (code == "MA") {plot_label = "Market Access"}
+  if (code == "MD") {plot_label = "Market Demand"}
+  if (code == "Sd") {plot_label = "Access to Seeds"}
+  
+  fac_col <- paste0(code, "_fac")
+  
+  gtriangulation_lim_se_agents_i1 <- ggplot(geo_scores) +
+    geom_spatvector(aes_string(fill = fac_col),
+                    colour = "black", shape = 21, size = 2, show.legend=TRUE) +
+    geom_spatvector_label(
+      aes(label =.data[[ params$SUBDIVNAMEVAR]]),
+      colour = "black",
+      size = 2,
+      alpha = 0.5,
+      nudge_x = nudge_xvaltri_agents_i1,
+      nudge_y = nudge_yvaltri_agents_i1
+    ) +
+    
+    scale_fill_viridis_d(na.value = "white",
+                         option = "G",
+                         drop=FALSE) +  # discrete scale for factors
+    #theme_minimal() +
+    labs(title = paste0("Importance of Limitation: ", plot_label, "\nAgents Perception\n", params$INN1),
+         fill = "Importance")
+  
+  gtriangulation_lim_se_agents_i1 <- add_subdiv_simple_plot(gtriangulation_lim_se_agents_i1, vect_subdiv_i1)
+  
+  print(gtriangulation_lim_se_agents_i1)
+  
+}
+}
+```
+</div>
+
+
+<div class="fold o">
+```{r i1_triangulation_limits, results = 'asis', out.width="100%"}
+
+# #  TRILIMITS1: "LIMITS"
+# 
+# if (!is.na(params$TRILIMITS1)) {
+#   expr <- paste0("vect_triangulation_farmers_i1$", params$TRILIMITS1)
+#   #print(expr)
+#   #eval(parse(text = (expr)))
+#   # vect_triangulation_farmers_i1$tri_label_lim <-
+#   #   paste(vect_triangulation_farmers_i1$id, "=", eval(parse(text = (expr))))
+#   # vect_triangulation_farmers_i1$tri_label_lim <-
+#   #   factor(vect_triangulation_farmers_i1$tri_label_lim)
+#   
+#   vect_triangulation_farmers_i1$tri_limits <-   eval(parse(text = (expr)))
+#   vect_triangulation_farmers_i1$tri_limits <-   factor(vect_triangulation_farmers_i1$tri_limits)
+#   
+#   g_lim_farmers_i1 <- ggplot() +
+#       labs(title = paste0("\nFarmers Triangulation - Limits\n", params$INN1))
+#   #gtriangulation_lim_i1 <- add_triangulation_plot_no_labels_lim(g_lim_i1, vect_triangulation_farmers_i1)
+#   gtriangulation_lim_farmers_i1 <- add_triangulation_plot_lim(g_lim_farmers_i1,
+#                                                     vect_triangulation_farmers_i1,
+#                                                     nudge_xvaltri_farmers_i1,
+#                                                     nudge_yvaltri_farmers_i1)
+#   gtriangulation_lim_farmers_i1 <- add_subdiv_simple_plot(gtriangulation_lim_farmers_i1, vect_subdiv_i1)
+#   gtriangulation_lim_farmers_i1
+# }
+# 
+# 
+# if (!is.na(params$TRILIMITS1)) {
+#   expr <- paste0("vect_triangulation_agents_i1$", params$TRILIMITS1)
+#   #print(expr)
+#   #eval(parse(text = (expr)))
+#   # vect_triangulation_agents_i1$tri_label_lim <-
+#   #   paste(vect_triangulation_agents_i1$id, "=", eval(parse(text = (expr))))
+#   # vect_triangulation_agents_i1$tri_label_lim <-
+#   #   factor(vect_triangulation_agents_i1$tri_label_lim)
+#   
+#     
+#   vect_triangulation_agents_i1$tri_limits <-   eval(parse(text = (expr)))
+#   vect_triangulation_agents_i1$tri_limits <-   factor(vect_triangulation_agents_i1$tri_limits)
+#   
+#   g_lim_agents_i1 <- ggplot() +
+#       labs(title = paste0("\nAgents Triangulation - Limits\n", params$INN1))
+#   #gtriangulation_lim_i1 <- add_triangulation_plot_no_labels_lim(g_lim_i1, vect_triangulation_agents_i1)
+#   gtriangulation_lim_agents_i1 <- add_triangulation_plot_lim(g_lim_agents_i1,
+#                                                     vect_triangulation_agents_i1,
+#                                                     nudge_xvaltri_agents_i1,
+#                                                     nudge_yvaltri_agents_i1)
+#   gtriangulation_lim_agents_i1 <- add_subdiv_simple_plot(gtriangulation_lim_agents_i1, vect_subdiv_i1)
+#   gtriangulation_lim_agents_i1
+# }
+
+```
+</div>
+
+## Decision to adopt
+
+For each sub-division the local experts chooses who in general makes the decision to adopt the innovation. Options include:
+
+* Farmer (self)
+* Household decision
+* Cooperative or group
+* Advice from extension worker
+* Driven by market demand
+* From Agriculture office
+* Other
+
+<div class="fold o">
+```{r i1_triangulation_adoptdecision, results = 'asis', out.width="100%"}
+
+#  TRIDEC1: "DECISION"
+
+if (params$TRIANGULATION ==1) {
+  expr <- paste0("vect_triangulation_farmers_i1$", params$TRIDEC1)
+  # vect_triangulation_farmers_i1$tri_label_dec <-
+  #   paste(vect_triangulation_farmers_i1$id, "=", eval(parse(text = (expr))))
+  # vect_triangulation_farmers_i1$tri_label_dec <-
+  #   factor(vect_triangulation_farmers_i1$tri_label_dec)
+    
+  vect_triangulation_farmers_i1$tri_dec <-   eval(parse(text = (expr)))
+  vect_triangulation_farmers_i1$tri_dec <-   factor(vect_triangulation_farmers_i1$tri_dec)
+  
+  
+  g_dec_farmers_i1 <- ggplot() +
+      labs(title = paste0("Decision to Adopt\nFarmers Perception\n", params$INN1))
+  #gtriangulation_dec_i1 <- add_triangulation_plot_no_labels_dec(g_dec_i1, vect_triangulation_farmers_i1)
+  gtriangulation_dec_farmers_i1 <- add_triangulation_plot_dec(g_dec_farmers_i1, vect_triangulation_farmers_i1,
+                                                    nudge_xvaltri_farmers_i1,
+                                                    nudge_yvaltri_farmers_i1)
+  gtriangulation_dec_farmers_i1 <- add_subdiv_simple_plot(gtriangulation_dec_farmers_i1, vect_subdiv_i1)
+  gtriangulation_dec_farmers_i1
+}
+
+if (!is.na(params$TRIDEC1)) {
+  expr <- paste0("vect_triangulation_agents_i1$", params$TRIDEC1)
+  # vect_triangulation_agents_i1$tri_label_dec <-
+  #   paste(vect_triangulation_agents_i1$id, "=", eval(parse(text = (expr))))
+  # vect_triangulation_agents_i1$tri_label_dec <-
+  #   factor(vect_triangulation_agents_i1$tri_label_dec)
+      
+  vect_triangulation_agents_i1$tri_dec <-   eval(parse(text = (expr)))
+  vect_triangulation_agents_i1$tri_dec <-   factor(vect_triangulation_agents_i1$tri_dec)
+  
+  g_dec_agents_i1 <- ggplot() +
+      labs(title = paste0("Decision to Adopt\nAgents Perception\n", params$INN1))
+  #gtriangulation_dec_i1 <- add_triangulation_plot_no_labels_dec(g_dec_i1, vect_triangulation_agents_i1)
+  gtriangulation_dec_agents_i1 <- add_triangulation_plot_dec(g_dec_agents_i1, vect_triangulation_agents_i1,
+                                                    nudge_xvaltri_agents_i1,
+                                                    nudge_yvaltri_agents_i1)
+  gtriangulation_dec_agents_i1 <- add_subdiv_simple_plot(gtriangulation_dec_agents_i1, vect_subdiv_i1)
+  gtriangulation_dec_agents_i1
+}
+
+if (params$INT == 1)
+  shiny::setProgress(1, message = "Finished!")
 ```
 </div>
 
