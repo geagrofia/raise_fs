@@ -3,16 +3,53 @@
 library(DT)
 
 
-bslib_screen9_module_v3_SidebarUI <- function(id, shared_values) {
+bslib_screen9_module_v3_SidebarUI <- function(id, shared_values, shared_parameters) {
   ns <- NS(id)
   
   tagList(
-    h3("Crop Growth Stages:"),
-    checkboxInput(ns("sos1"), "Spatially Dynamic Growing Season Map", value = FALSE),
-    numericInput(ns("sowdate1"), "Sowing Day Number (1-365)", value = 190),
-    # UI actionButtons screen navigation ----
-    actionButton(ns("back_to_screen8"), "Back to Screen 8"),
-    actionButton(ns("to_screen10"), "Go to Screen 10")
+    wellPanel(
+      style = "padding: 10px; margin-bottom: 5px;",
+      actionButton(
+        ns("back_to_screen8"),
+        label = tagList(
+          icon("circle-left"),
+          # icon first
+          "Back to Screen 8"
+          # text second
+        ),
+        class = "btn-primary"
+      ),
+      actionButton(
+        ns("to_screen10"),
+        label = tagList(
+          "Go to Screen 10",
+          # text first
+          icon("circle-right")  # icon second)
+        ),
+        class = "btn-primary"
+      )
+    ), 
+    # wellPanel(
+    #   style = "padding: 10px; margin-bottom: 5px;",
+    # h4("Screen 9: Crop Growth Stages"),
+    # checkboxInput(ns("sos1"), "Spatially Dynamic Growing Season Map", ifelse(shared_parameters$sos1 == 0, FALSE, TRUE)),
+    # numericInput(ns("sowdate1"), "Sowing Day Number (1-365)", value = shared_parameters$sowdate1)
+    # )
+    wellPanel(
+      style = "padding: 10px; margin-bottom: 5px;",
+      h4("Step 3: Crop Growth Stages"),
+      
+      # First set of radio buttons----
+      radioButtons(
+        ns("sos1"),
+        "Sowing Date:",
+        choices = list("Fixed" = "fixed", "Dynamic" = "dynamic"),
+        selected = ifelse(shared_parameters$sos1 == 1, "dynamic", "fixed")
+      ),
+      
+      # Second radio button (conditionally shown)----
+      uiOutput(ns("sowdate1_ui"))
+    )
   )
 }
 
@@ -30,6 +67,7 @@ bslib_screen9_module_v3_MainUI <- function(id) {
     textOutput(ns("ideotype_1_display")),
     textOutput(ns("scenario_1_display")),
     textOutput(ns("inn_type_1_display")),
+    textOutput(ns("sowdate_1_display")),
     
     # growth stages table
     h4("Growth Stages Table"),
@@ -42,31 +80,37 @@ bslib_screen9_module_v3_MainUI <- function(id) {
   )
 }
 
-bslib_screen9_module_v3_Server <- function(id, shared_values, switch_screen) {
+bslib_screen9_module_v3_Server <- function(id, shared_values, shared_parameters, switch_screen) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
+    
+    output$sowdate1_ui <- renderUI({
+      if (input$sos1 == "fixed") {
+        numericInput(ns("sowdate1"), "Sowing Day Number (1-365)", value = shared_parameters$sowdate1)
+      } 
+    })
     
     # Load the initial growth stages data ----
     initial_growth_stages_data <- reactive({
       if (file.exists(
         paste0(
           "E:/repos/raise_fs/shiny/data/",
-          shared_values$crop_name_1,
+          shared_parameters$crop_name_1,
           "_",
-          shared_values$ideotype_1,
+          shared_parameters$ideotype_1,
           "_",
-          shared_values$scenario_1,
+          shared_parameters$scenario_1,
           "_gs.csv"
         )
       )) {
         df_gs <- read.csv(
           paste0(
             "E:/repos/raise_fs/shiny/data/",
-            shared_values$crop_name_1,
+            shared_parameters$crop_name_1,
             "_",
-            shared_values$ideotype_1,
+            shared_parameters$ideotype_1,
             "_",
-            shared_values$scenario_1,
+            shared_parameters$scenario_1,
             "_gs.csv"
           )
         )
@@ -138,27 +182,50 @@ bslib_screen9_module_v3_Server <- function(id, shared_values, switch_screen) {
     
     # _----
     
-    # observe parameters ----
+    # # observe sos1 ----
+    # observe({
+    #   req(input$sos1)
+    #   message("S9. observe parameters")
+    #   shared_parameters$sos1 <- ifelse(input$sos1, 1, 0)
+    #   message("S9. shared_parameters$sos1")
+    #   print(shared_parameters$sos1)
+    # })
+    # 
+    # 
+    # # observe sowdate1 ----
+    # observe({
+    #   message("S9. observe parameters")
+    #   req(input$sowdate1)
+    #   shared_parameters$sowdate1 <- input$sowdate1
+    #   message("S9. shared_parameters$sowdate1")
+    #   print(shared_parameters$sowdate1)
+    # })
+    
+    #1 observe sos1 ----
     observe({
-      message("S9. observe parameters")
-      shared_values$sos1 <- ifelse(input$sos1, 1, 0)
+      req(input$sos1)
+      message(paste("S3. 1 observe: radio buttons", shared_parameters$innovation_system))
+      shared_parameters$sos1 <- ifelse(input$sos1 == "fixed", 0, 1)
+      #shared_parameters$sowdate1 <- input$sowdate1
       
-      # shared_values$limitsclass1 <- input$limitsclass1
-      # shared_values$concclass1 <- input$concclass1
-      
-      message("S9. observe parameters")
-      print(shared_values$sos1)
-      
-      # print(shared_values$limitsclass1)
-      # print(shared_values$concclass1)
     })
     
-    observeEvent(input$sos1, {
-      message("S9. observeEvent parameters")
-      shared_values$sowdate1 <- ifelse(input$sos1, NA, input$sowdate1)
-      message("S9. observeEvent parameters")
-      print(shared_values$sowdate1)
+    #1 observeevent radio button 2 ----
+    observeEvent(ns(input$sowdate1), {
+      req(input$sowdate1)
+      message(paste("S3. 2 observeevent: radio button 2", shared_parameters$innovation_system))
+      #shared_parameters$sos1 <- ifelse(input$sos1 == "fixed", 0, 1)
+      shared_parameters$sowdate1 <- input$sowdate1
+      
     })
+    
+    
+    # observeEvent(input$sos1, {
+    #   message("S9. observeEvent parameters")
+    #   shared_parameters$sowdate1 <- ifelse(input$sos1, NA, input$sowdate1)
+    #   message("S9. observeEvent parameters")
+    #   print(shared_parameters$sowdate1)
+    # })
     
     # _----
     
@@ -342,7 +409,7 @@ bslib_screen9_module_v3_Server <- function(id, shared_values, switch_screen) {
         
         # add sow date to the top row
         dt_gs <- mutate(dt_gs, gs_day = NA)
-        dt_sow_date <- data.table(gs_name = c("sow_date"), gs_day = c(ifelse(shared_values$sos1==1, 0, input$sowdate1)), gs_length = NA, gs_source = c("User"))
+        dt_sow_date <- data.table(gs_name = c("sow_date"), gs_day = c(ifelse(shared_parameters$sos1==1, 0, input$sowdate1)), gs_length = NA, gs_source = c("User"))
         dt_gs <- rbind(dt_sow_date, dt_gs)
         
         # overwrite and produce a new version of the gs table
@@ -351,11 +418,11 @@ bslib_screen9_module_v3_Server <- function(id, shared_values, switch_screen) {
           dt_gs,
           file = paste0(
             "E:/repos/raise_fs/shiny/data/",
-            shared_values$crop_name_1,
+            shared_parameters$crop_name_1,
             "_",
-            shared_values$ideotype_1,
+            shared_parameters$ideotype_1,
             "_",
-            shared_values$scenario_1,
+            shared_parameters$scenario_1,
             "_gs_s9.csv"
           )
         )
@@ -384,87 +451,93 @@ bslib_screen9_module_v3_Server <- function(id, shared_values, switch_screen) {
     # outputs from previous screens----
     
     output$num_innovations_display <- renderText({
-      paste("Number of innovations:", shared_values$num_innovations)
+      paste("Step 3. Number of innovations =", shared_parameters$num_innovations)
     })
     
     output$innovation_system_display <- renderText({
-      if (shared_values$num_innovations == "two_inn") {
-        paste("Innovation System:",
-              shared_values$innovation_system)
-      }
-    })
+      paste("Step 3. Innovation System =", shared_parameters$innovation_system)
+    })  
     
     output$spatres_display <- renderText({
-      paste("Your spatial resolution is:", shared_values$resolution)
+      paste("Step 2. Spatial resolution =", shared_parameters$resolution)
     })
     
-    
     output$aggregation_display <- renderText({
-      paste("Your aggregation level is:", shared_values$aggregation)
+      paste("Step 2. Aggregation level =", shared_parameters$aggregation)
     })
     
     output$level_display <- renderText({
-      req(shared_values$level)
-      paste("You selected level on Screen 1:", shared_values$level)
+      req(shared_parameters$level)
+      paste("Step 1. Spatial level =", shared_parameters$level)
     })
     
     output$selection_display <- renderText({
-      req(shared_values$level)
+      req(shared_parameters$level)
       
-      if (shared_values$level == "woreda") {
+      if (shared_parameters$level == "woreda") {
         paste(
-          "You selected geography:",
-          shared_values$selected_region,
-          shared_values$selected_zone,
-          shared_values$selected_woreda
+          "Step 1. Geography =",
+          shared_parameters$selected_region,
+          "-",
+          shared_parameters$selected_zone,
+          "-",
+          shared_parameters$selected_woreda
         )
       } else {
-        if (shared_values$level == "zone") {
+        if (shared_parameters$level == "zone") {
           paste(
-            "You selected geography:",
-            shared_values$selected_region,
-            shared_values$selected_zone
+            "Step 1. Geography =",
+            shared_parameters$selected_region,
+            "-",
+            shared_parameters$selected_zone
           )
         } else {
-          if (shared_values$level == "region") {
-            paste("You selected geography:",
-                  shared_values$selected_region)
+          if (shared_parameters$level == "region") {
+            paste("Step 1. Geography =",
+                  shared_parameters$selected_region)
           } else {
-            paste("You selected geography: Ethiopia")
+            paste("Step 1. Geography = Ethiopia")
           }
         }
       }
     })
     
     output$crop_1_display <- renderText({
-      message(paste("S9. crop details:", shared_values$crop_name_1))
-      req(shared_values$crop_name_1)
-      paste("S9. You selected crop on Screen 4:",
-            shared_values$crop_name_1)
+      req(shared_parameters$crop_name_1)
+      paste("Step 4. Crop =", shared_parameters$crop_name_1)
     })
     
     
     output$ideotype_1_display <- renderText({
-      message(paste("S9. ideotype details:", shared_values$ideotype_1))
-      req(shared_values$ideotype_1)
-      paste("S9. You selected ideotype on Screen 4:",
-            shared_values$ideotype_1)
+      req(shared_parameters$ideotype_1)
+      paste("Step 4. Ideotype =", shared_parameters$ideotype_1)
     })
     
     
     output$scenario_1_display <- renderText({
-      message(paste("S9. scenario details:", shared_values$scenario_1))
-      req(shared_values$scenario_1)
-      paste("S9. You selected scenario on Screen 4:",
-            shared_values$scenario_1)
+      req(shared_parameters$scenario_1)
+      paste("Step 4. Scenario =", shared_parameters$scenario_1)
     })
     
     
     output$inn_type_1_display <- renderText({
-      message(paste("S9. Innovation type:", shared_values$inn_type_1))
       req(shared_values$inn_type_1)
-      paste("S9. You selected Innovation type on Screen 4:",
-            shared_values$inn_type_1)
+      paste("Step 4. Innovation type =", shared_values$inn_type_1)
+    })
+    
+    output$sowdate_1_display <- renderText({
+      #req(shared_parameters$sowdate1)
+      if (shared_parameters$sos1 == 1) {
+        paste("Step 9. Sowing Date = Spatially Dynamic")
+      } else {
+        paste("Step 9. Sowing Date =", shared_parameters$sowdate1)
+      }
+    })
+    
+    
+    output$inn_type_1_display <- renderText({
+      req(shared_values$inn_type_1)
+      paste("Step 4. Innovation type =", shared_values$inn_type_1)
     })
     
     # _ navigation----
@@ -476,6 +549,8 @@ bslib_screen9_module_v3_Server <- function(id, shared_values, switch_screen) {
     
     # observeEvent to_screen10 ----
     observeEvent(input$to_screen10, {
+      save_progress(shared_values, shared_parameters)
+      showNotification("Progress saved!", type = "message")
       switch_screen("screen10")
       
     })

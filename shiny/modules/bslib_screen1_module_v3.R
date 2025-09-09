@@ -4,7 +4,7 @@ library(terra)
 library(leaflet)
 
 
-bslib_screen1_module_v3_SidebarUI <- function(id, shared_values) {
+bslib_screen1_module_v3_SidebarUI <- function(id, shared_values, shared_parameters) {
   ns <- NS(id)
   tagList(
     # selectInput(ns("my_dropdown"), "Choose a value", choices = c("A", "B", "C"),
@@ -15,7 +15,7 @@ bslib_screen1_module_v3_SidebarUI <- function(id, shared_values) {
                              "Region" = "region",
                              "Zone" = "zone",
                              "Woreda" = "woreda"),
-                 selected = shared_values$level ),
+                 selected = shared_parameters$level ),
     uiOutput(ns("region_ui")),
     uiOutput(ns("zone_ui")),
     uiOutput(ns("woreda_ui")),
@@ -49,7 +49,7 @@ bslib_screen1_module_v3_MainUI <- function(id) {
   )
 }
 
-bslib_screen1_module_v3_Server <- function(id, shared_values, switch_screen) {
+bslib_screen1_module_v3_Server <- function(id, shared_values, shared_parameters, switch_screen) {
   moduleServer(id, function(input, output, session) {
     
     ns <- session$ns
@@ -89,7 +89,7 @@ bslib_screen1_module_v3_Server <- function(id, shared_values, switch_screen) {
         selectInput(ns("region"), "Region:",
                     choices = unique(df_region$ADM1_EN), 
                     #selected = isolate(input$region))
-                    selected = shared_values$selected_region)
+                    selected = shared_parameters$selected_region)
       }
     })
 
@@ -102,7 +102,7 @@ bslib_screen1_module_v3_Server <- function(id, shared_values, switch_screen) {
       selectInput(ns("zone"), "Zone:",
         choices = filtered_zones,
         #selected = isolate(input$zone))
-        selected = shared_values$selected_zone)
+        selected = shared_parameters$selected_zone)
     })
     
     #0 ----Update woreda dropdown UI----
@@ -114,7 +114,7 @@ bslib_screen1_module_v3_Server <- function(id, shared_values, switch_screen) {
       selectInput(ns("woreda"), "Woreda:",
                   choices = filtered_woredas,
                   #selected = isolate(input$woreda))
-      selected = shared_values$selected_woreda)
+      selected = shared_parameters$selected_woreda)
     })
     
     #0 Update test text in main UI----
@@ -125,32 +125,32 @@ bslib_screen1_module_v3_Server <- function(id, shared_values, switch_screen) {
     
     #0 Update geo level text in main UI----
     output$main_level_output <- renderText({
-      req(shared_values$level)
-      paste("S1. You selected level:", shared_values$level)
+      req(shared_parameters$level)
+      paste("S1. You selected level:", shared_parameters$level)
     })
     
     #0 Update geography text in main UI----
     output$main_geography_output <- renderText({
-      req(shared_values$level)
+      req(shared_parameters$level)
       
-      if (shared_values$level == "woreda") {
+      if (shared_parameters$level == "woreda") {
         paste(
           "S1. You selected geography:",
-          shared_values$selected_region,
-          shared_values$selected_zone,
-          shared_values$selected_woreda
+          shared_parameters$selected_region,
+          shared_parameters$selected_zone,
+          shared_parameters$selected_woreda
         )
       } else {
-        if (shared_values$level == "zone") {
+        if (shared_parameters$level == "zone") {
           paste(
             "S1. You selected geography:",
-            shared_values$selected_region,
-            shared_values$selected_zone
+            shared_parameters$selected_region,
+            shared_parameters$selected_zone
           )
         } else {
-          if (shared_values$level == "region") {
+          if (shared_parameters$level == "region") {
             paste("S1. You selected geography:",
-                  shared_values$selected_region)
+                  shared_parameters$selected_region)
           } else {
             paste("S1. You selected geography: Ethiopia")
           }
@@ -247,12 +247,14 @@ bslib_screen1_module_v3_Server <- function(id, shared_values, switch_screen) {
     #3 observeEvent input$level ----
     observeEvent(input$level, {
       message("S1. 3 input$level observeEvent")
-      shared_values$level <- input$level
+      shared_parameters$level <- input$level
     })
 
     #4 observeEvent input$to_screen2 ----
     observeEvent(input$to_screen2, {
       message("S1. 4 input$to_screen2 observeEvent")
+      save_progress(shared_values, shared_parameters)
+      showNotification("Progress saved!", type = "message")
       switch_screen("screen2")
     })
     
@@ -268,11 +270,11 @@ bslib_screen1_module_v3_Server <- function(id, shared_values, switch_screen) {
     
     #5 observe levels and geography ----
     observe({
-      shared_values$level <- input$level
-      shared_values$selected_nation <- "Ethiopia"
-      shared_values$selected_region <- input$region
-      shared_values$selected_zone <- input$zone
-      shared_values$selected_woreda <- input$woreda
+      shared_parameters$level <- input$level
+      shared_parameters$selected_nation <- "Ethiopia"
+      shared_parameters$selected_region <- input$region
+      shared_parameters$selected_zone <- input$zone
+      shared_parameters$selected_woreda <- input$woreda
       
       message("S1. 5 observe level and selected geography name from input")
       
@@ -284,52 +286,52 @@ bslib_screen1_module_v3_Server <- function(id, shared_values, switch_screen) {
       req(input$level)
       if (input$level == "nation") {
         
-      shared_values$selected_nation <- "Ethiopia"
-      shared_values$ZONCODEVAR <- "ADM0_CODE"
-      shared_values$ZONCODEVAL <-  "ET"
-      shared_values$DIVCODEVAR <- "ADM0_CODE"
-      shared_values$DIVCODEVAL <- "ET"
-      shared_values$DIVNAMEVAR <- "ADM0_EN"
-      shared_values$SUBDIVNAMEVAR <- "ADM1_EN"
+      shared_parameters$selected_nation <- "Ethiopia"
+      shared_parameters$ZONCODEVAR <- "ADM0_CODE"
+      shared_parameters$ZONCODEVAL <-  "ET"
+      shared_parameters$DIVCODEVAR <- "ADM0_CODE"
+      shared_parameters$DIVCODEVAL <- "ET"
+      shared_parameters$DIVNAMEVAR <- "ADM0_EN"
+      shared_parameters$SUBDIVNAMEVAR <- "ADM1_EN"
       }
       
       if (input$level == "region") {
       req(input$region)  
-      shared_values$selected_region <- input$region
-      shared_values$ZONCODEVAR <- "ADM0_CODE"
-      shared_values$ZONCODEVAL <-  "ET"
-      shared_values$DIVCODEVAR <- "ADM1_CODE"
-      shared_values$DIVCODEVAL <- dplyr::filter(df_region, ADM1_EN == input$region) |> pull(ADM1_CODE)
-      message("S1. shared_values$DIVCODEVAL")
-      print(shared_values$DIVCODEVAL)
-      shared_values$DIVNAMEVAR <- "ADM1_EN"
-      shared_values$SUBDIVNAMEVAR <- "ADM2_EN"
+      shared_parameters$selected_region <- input$region
+      shared_parameters$ZONCODEVAR <- "ADM0_CODE"
+      shared_parameters$ZONCODEVAL <-  "ET"
+      shared_parameters$DIVCODEVAR <- "ADM1_CODE"
+      shared_parameters$DIVCODEVAL <- dplyr::filter(df_region, ADM1_EN == input$region) |> pull(ADM1_CODE)
+      message("S1. shared_parameters$DIVCODEVAL")
+      print(shared_parameters$DIVCODEVAL)
+      shared_parameters$DIVNAMEVAR <- "ADM1_EN"
+      shared_parameters$SUBDIVNAMEVAR <- "ADM2_EN"
       }
       
       if (input$level == "zone")   {
       req(input$zone)   
-      shared_values$selected_zone <- input$zone
-      shared_values$ZONCODEVAR <- "ADM1_CODE"
-      shared_values$ZONCODEVAL <-  dplyr::filter(df_region, ADM1_EN == input$region) |> pull(ADM1_CODE)
-      shared_values$DIVCODEVAR <- "ADM2_CODE"
-      shared_values$DIVCODEVAL <- dplyr::filter(df_zone, ADM2_EN == input$zone) |> pull(ADM2_CODE)
-      message("S1. shared_values$DIVCODEVAL")
-      print(shared_values$DIVCODEVAL)
-      shared_values$DIVNAMEVAR <- "ADM2_EN"
-      shared_values$SUBDIVNAMEVAR <- "ADM3_EN"
+      shared_parameters$selected_zone <- input$zone
+      shared_parameters$ZONCODEVAR <- "ADM1_CODE"
+      shared_parameters$ZONCODEVAL <-  dplyr::filter(df_region, ADM1_EN == input$region) |> pull(ADM1_CODE)
+      shared_parameters$DIVCODEVAR <- "ADM2_CODE"
+      shared_parameters$DIVCODEVAL <- dplyr::filter(df_zone, ADM2_EN == input$zone) |> pull(ADM2_CODE)
+      message("S1. shared_parameters$DIVCODEVAL")
+      print(shared_parameters$DIVCODEVAL)
+      shared_parameters$DIVNAMEVAR <- "ADM2_EN"
+      shared_parameters$SUBDIVNAMEVAR <- "ADM3_EN"
       }
       
       if (input$level == "woreda") {
       req(input$woreda)     
-      shared_values$selected_woreda <- input$woreda
-      shared_values$ZONCODEVAR <- "ADM2_CODE"
-      shared_values$ZONCODEVAL <-  dplyr::filter(df_zone, ADM2_EN == input$zone) |> pull(ADM2_CODE)
-      shared_values$DIVCODEVAR <- "ADM3_CODE"
-      shared_values$DIVCODEVAL <- dplyr::filter(df_woreda, ADM3_EN == input$woreda) |> pull(ADM3_CODE)
-      message("S1. shared_values$DIVCODEVAL")
-      print(shared_values$DIVCODEVAL)
-      shared_values$DIVNAMEVAR <- "ADM3_EN"
-      shared_values$SUBDIVNAMEVAR <- "ADM4_EN"
+      shared_parameters$selected_woreda <- input$woreda
+      shared_parameters$ZONCODEVAR <- "ADM2_CODE"
+      shared_parameters$ZONCODEVAL <-  dplyr::filter(df_zone, ADM2_EN == input$zone) |> pull(ADM2_CODE)
+      shared_parameters$DIVCODEVAR <- "ADM3_CODE"
+      shared_parameters$DIVCODEVAL <- dplyr::filter(df_woreda, ADM3_EN == input$woreda) |> pull(ADM3_CODE)
+      message("S1. shared_parameters$DIVCODEVAL")
+      print(shared_parameters$DIVCODEVAL)
+      shared_parameters$DIVNAMEVAR <- "ADM3_EN"
+      shared_parameters$SUBDIVNAMEVAR <- "ADM4_EN"
       }
       
       message("S1. 6 observe level")
@@ -345,7 +347,7 @@ bslib_screen1_module_v3_Server <- function(id, shared_values, switch_screen) {
       map |> clearShapes()
       
       #if (input$level == "nation") {
-      if (shared_values$level == "nation") {
+      if (shared_parameters$level == "nation") {
         message("S1. 7 Leaflet update observeEvent level = nation, screen changed to: ", switch_screen())
         nation_ext <- unlist(unname(as.vector(ext(vect_nation)))) # Extent of nation as unnamed vector
         map |>
@@ -399,12 +401,13 @@ bslib_screen1_module_v3_Server <- function(id, shared_values, switch_screen) {
     
     # Save and load
     observeEvent(input$save_progress, {
-      save_progress(shared_values, session$token)
+      #save_progress(shared_values, session$token)
+      save_progress(shared_values, shared_parameters)
       showNotification("Progress saved!", type = "message")
     })
     
     observeEvent(input$resume_progress, {
-      load_progress(shared_values, session$token)
+      load_progress(shared_values, shared_parameters, session$token)
       showNotification("Progress resumed!", type = "message")
     })
     
