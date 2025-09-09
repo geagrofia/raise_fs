@@ -10,20 +10,33 @@ bslib_screen1_module_v3_SidebarUI <- function(id, shared_values, shared_paramete
     # selectInput(ns("my_dropdown"), "Choose a value", choices = c("A", "B", "C"),
     #             selected = shared_values$dropdown  # <-- Persist selected value
     # ),
-    radioButtons(ns("level"), "Select level:",
-                 choices = c("Nation" = "nation",
-                             "Region" = "region",
-                             "Zone" = "zone",
-                             "Woreda" = "woreda"),
-                 selected = shared_parameters$level ),
-    uiOutput(ns("region_ui")),
-    uiOutput(ns("zone_ui")),
-    uiOutput(ns("woreda_ui")),
-    span(
-    "The depiction and use of boundaries, geographic names and related data
+    
+    wellPanel(
+      style = "padding: 10px; margin-bottom: 5px;",
+      h4("Step 1: Select Geography"),
+      radioButtons(
+        ns("level"),
+        "Select level:",
+        choices = c(
+          "Nation" = "nation",
+          "Region" = "region",
+          "Zone" = "zone",
+          "Woreda" = "woreda"
+        ),
+        selected = shared_parameters$level
+      ),
+      uiOutput(ns("region_ui")),
+      uiOutput(ns("zone_ui")),
+      uiOutput(ns("woreda_ui")),
+      span(
+        "The depiction and use of boundaries, geographic names and related data
        shown on maps and included in lists, tables, documents, and databases
        in this tool are not warranted to be error-free nor do they necessarily
-       imply official endorsement or acceptance", style="color:red; font-style: italic;"),  
+       imply official endorsement or acceptance",
+        style = "color:red; font-style: italic;"
+      )
+    )
+    #,  
     
     # #---new
     # radioButtons(ns("mode"), "Choose mode", choices = c("Option 1" = 1, "Option 2" = 2, "Option 3" = 3, "Option 4" = 4)),
@@ -33,19 +46,56 @@ bslib_screen1_module_v3_SidebarUI <- function(id, shared_values, shared_paramete
     # 
     # #--- end new
     #actionButton(ns("auto_reload"), "auto_reload"),
-    actionButton(ns("to_screen2"), "Go to Screen 2"),
-    actionButton(ns("save_progress"), "Save Progress"),
-    actionButton(ns("resume_progress"), "Resume Progress"),
+
   )
 }
 
 bslib_screen1_module_v3_MainUI <- function(id) {
   ns <- NS(id)
   tagList(
-    textOutput(ns("main_output")), 
-    textOutput(ns("main_level_output")),
-    textOutput(ns("main_geography_output")),
-    leafletOutput(ns("base_map"), height = "500px")
+    wellPanel(
+      h4("Navigate", style = "color: var(--bs-secondary);"),
+      style = "padding: 10px; margin-bottom: 5px;",
+      actionButton(ns("to_screen0"), 
+        title = "Go back to Introduction",
+        label = tagList(
+          icon("circle-left"),  # icon first 
+          #"Go to Introduction"
+          "Back"
+          # text second
+          ),
+        class = "btn-primary"),
+      
+      tags$span(
+        tagList("Step 1", icon("location-crosshairs")),  # text + icon
+        class = "btn btn-info disabled"
+      ),
+      # <button type="button" class="btn btn-secondary" data-bs-toggle="tooltip" data-bs-placement="left" data-bs-original-title="Tooltip on left">Left</button>
+      actionButton(ns("to_screen2"), 
+                   title = "Go to Step 2",
+                   label = tagList(
+        #"Go to Screen 2",
+        "Next",
+        # text first
+        icon("circle-right")  # icon second)
+      ),
+      class = "btn-primary")
+      #,
+      #actionButton(ns("save_progress"), "Save Progress"),
+      #actionButton(ns("resume_progress"), "Resume Progress")
+    ),
+    wellPanel(
+      style = "padding: 10px; margin-bottom: 5px; background: rgba(23, 162, 184, 0.5);",
+      h4("Summary of IRM setup"),
+      textOutput(ns("main_output")), 
+      textOutput(ns("main_level_output")),
+      textOutput(ns("main_geography_output"))
+    ),
+    wellPanel(
+      style = "padding: 10px; margin-bottom: 5px;",
+      h4("Selected Geography"), 
+      leafletOutput(ns("base_map"), height = "500px")
+    )
   )
 }
 
@@ -53,6 +103,9 @@ bslib_screen1_module_v3_Server <- function(id, shared_values, shared_parameters,
   moduleServer(id, function(input, output, session) {
     
     ns <- session$ns
+    
+    # Initially disable select_row and duplicate_row, and next_screen ----
+    disable("home")
     
     # load geojson files and convert to df
     vect_nation <- terra::vect("E:/repos/raise_fs/shiny/data/eth_nation.geojson")
@@ -120,13 +173,13 @@ bslib_screen1_module_v3_Server <- function(id, shared_values, shared_parameters,
     #0 Update test text in main UI----
     output$main_output <- renderText({
       req(shared_values$dropdown)
-      paste("S1. You selected:", shared_values$dropdown)
+      paste("Step 1. You selected:", shared_values$dropdown)
     })
     
     #0 Update geo level text in main UI----
     output$main_level_output <- renderText({
       req(shared_parameters$level)
-      paste("S1. You selected level:", shared_parameters$level)
+      paste("Step 1. Spatial level =", shared_parameters$level)
     })
     
     #0 Update geography text in main UI----
@@ -135,24 +188,27 @@ bslib_screen1_module_v3_Server <- function(id, shared_values, shared_parameters,
       
       if (shared_parameters$level == "woreda") {
         paste(
-          "S1. You selected geography:",
+          "Step 1. Geography =",
           shared_parameters$selected_region,
+          "-",
           shared_parameters$selected_zone,
+          "-",
           shared_parameters$selected_woreda
         )
       } else {
         if (shared_parameters$level == "zone") {
           paste(
-            "S1. You selected geography:",
+            "Step 1. Geography =",
             shared_parameters$selected_region,
+            "-",
             shared_parameters$selected_zone
           )
         } else {
           if (shared_parameters$level == "region") {
-            paste("S1. You selected geography:",
+            paste("Step 1. Geography =",
                   shared_parameters$selected_region)
           } else {
-            paste("S1. You selected geography: Ethiopia")
+            paste("Step 1. Geography = Ethiopia")
           }
         }
       }
@@ -249,14 +305,23 @@ bslib_screen1_module_v3_Server <- function(id, shared_values, shared_parameters,
       message("S1. 3 input$level observeEvent")
       shared_parameters$level <- input$level
     })
-
+    
+    #4 observeEvent input$to_screen0 ----
+    observeEvent(input$to_screen0, {
+      message("S1. 4 input$to_screen0 observeEvent")
+      #save_progress(shared_values, shared_parameters)
+      #showNotification("Progress saved!", type = "message")
+      switch_screen("screen0")
+    })
+    
     #4 observeEvent input$to_screen2 ----
     observeEvent(input$to_screen2, {
       message("S1. 4 input$to_screen2 observeEvent")
-      save_progress(shared_values, shared_parameters)
-      showNotification("Progress saved!", type = "message")
+      #save_progress(shared_values, shared_parameters)
+      #showNotification("Progress saved!", type = "message")
       switch_screen("screen2")
     })
+
     
     # # Update input to reflect shared value if returning
     # observe({
@@ -270,6 +335,7 @@ bslib_screen1_module_v3_Server <- function(id, shared_values, shared_parameters,
     
     #5 observe levels and geography ----
     observe({
+      req(input$level)
       shared_parameters$level <- input$level
       shared_parameters$selected_nation <- "Ethiopia"
       shared_parameters$selected_region <- input$region
@@ -357,7 +423,7 @@ bslib_screen1_module_v3_Server <- function(id, shared_values, shared_parameters,
       
       if (input$level == "region" && !is.null(input$region)) {
         message("S1. 7 Leaflet update observeEvent level = region, screen changed to: ", switch_screen())
-        region_id <- df_region |> filter(ADM1_EN == input$region) |> pull(ADM1_EN)
+        region_id <- df_region |> dplyr::filter(ADM1_EN == input$region) |> pull(ADM1_EN)
         region_data <- vect_region |> subset(vect_region$ADM1_EN == region_id)
         region_ext <- unlist(unname(as.vector(ext(region_data)))) # Extent of selected region as unnamed vector
         map |>
@@ -367,7 +433,7 @@ bslib_screen1_module_v3_Server <- function(id, shared_values, shared_parameters,
       
       if (input$level == "zone" && !is.null(input$zone)) {
         message("S1. 7 Leaflet update observeEvent level = zone, screen changed to: ", switch_screen())
-        zone_id <- df_zone %>% filter(ADM2_EN == input$zone) %>% pull(ADM2_EN)
+        zone_id <- df_zone %>% dplyr::filter(ADM2_EN == input$zone) %>% pull(ADM2_EN)
         zone_data <- vect_zone %>% subset(vect_zone$ADM2_EN == zone_id)
         zone_ext <- unlist(unname(as.vector(ext(zone_data)))) # Extent of selected zone as unnamed vector
         map %>%
@@ -377,7 +443,7 @@ bslib_screen1_module_v3_Server <- function(id, shared_values, shared_parameters,
       
       if (input$level == "woreda" && !is.null(input$woreda)) {
         message("S1. 7 Leaflet update observeEvent level = woreda, screen changed to: ", switch_screen())
-        woreda_id <- df_woreda %>% filter(ADM3_EN == input$woreda) %>% pull(ADM3_EN)
+        woreda_id <- df_woreda %>% dplyr::filter(ADM3_EN == input$woreda) %>% pull(ADM3_EN)
         woreda_data <- vect_woreda %>% subset(vect_woreda$ADM3_EN == woreda_id)
         woreda_ext <- unlist(unname(as.vector(ext(woreda_data)))) # Extent of selected woreda as unnamed vector
         map %>%
@@ -387,10 +453,10 @@ bslib_screen1_module_v3_Server <- function(id, shared_values, shared_parameters,
       
       })
     
-    #8 observeEvent switch_screen() message----
-    observeEvent(switch_screen(), {
-      message("S1. 8 switch_screen() observeEvent.Screen changed to: ", switch_screen())
-    })
+    # #8 observeEvent switch_screen() message----
+    # observeEvent(switch_screen(), {
+    #   message("S1. 8 switch_screen() observeEvent.Screen changed to: ", switch_screen())
+    # })
     
     #9 observeEvent auto_reload ----
     observeEvent(input$auto_reload, {

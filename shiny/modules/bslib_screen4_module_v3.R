@@ -3,46 +3,105 @@
 library(DT)
 
 
-bslib_screen4_module_v3_SidebarUI <- function(id, shared_values) {
+bslib_screen4_module_v3_SidebarUI <- function(id, shared_values, shared_parameters) {
   
   ns <- NS(id)
   
   tagList(
-    h3("Existing Innovations:"),
-    
-    # UI datatable ----
-    DTOutput(ns("data_table")),
-    
-    # UI actionbuttons row selections----
-    actionButton(ns("select_row"), "Select an Existing Innovation"),
-    actionButton(ns("duplicate_row"), "Add New Innovation based on selection"),
-    actionButton(ns("add_row"), "Add New Innovation"),
-    
-    # UI actionButtons screen navigation ----
-    actionButton(ns("back_to_screen3"), "Back to Screen 3"),
-    actionButton(ns("to_screen5"), "Go to Screen 5")
+    # wellPanel(
+    #   style = "padding: 10px; margin-bottom: 5px;",
+    #   actionButton(
+    #     ns("back_to_screen3"),
+    #     label = tagList(
+    #       icon("circle-left"),
+    #       # icon first
+    #       "Back to Screen 3"
+    #       # text second
+    #     ),
+    #     class = "btn-primary"
+    #   ),
+    #   actionButton(
+    #     ns("to_screen5"),
+    #     label = tagList(
+    #       "Go to Screen 5",
+    #       # text first
+    #       icon("circle-right")  # icon second)
+    #     ),
+    #     class = "btn-primary"
+    #   )
+    # ), 
+    wellPanel(
+      style = "padding: 10px; margin-bottom: 5px;",
+      h4("Screen 4: Select Innovation"),
+      
+      # UI datatable ----
+      DTOutput(ns("data_table")),
+      
+      # UI actionbuttons row selections----
+      actionButton(ns("select_row"), "Select an Existing Innovation", class = "btn-primary"),
+      actionButton(ns("duplicate_row"), "Add New Innovation based on selection", class = "btn-primary"),
+      actionButton(ns("add_row"), "Add New Innovation", class = "btn-primary")
+    ),
+    wellPanel(
+      style = "padding: 10px; margin-bottom: 5px;",
+      # h4("Screen 4: Select Innovation"),
+      # UI row details (view) or edit controls (edit)----
+      uiOutput(ns("edit_controls")),
+      uiOutput(ns("validate_butons"))
+    )
   )
 }
 
 bslib_screen4_module_v3_MainUI <- function(id) {
   ns <- NS(id)
   tagList(
-    textOutput(ns("value_display")),
-    textOutput(ns("level_display")),
-    textOutput(ns("selection_display")),
-    textOutput(ns("spatres_display")),
-    textOutput(ns("aggregation_display")),
-    textOutput(ns("num_innovations_display")),
-    textOutput(ns("innovation_system_display")),
-    
-    # UI row details (view) or edit controls (edit)----
-    uiOutput(ns("row_details")),
-    uiOutput(ns("edit_controls")),
-    uiOutput(ns("validate_butons"))
+    wellPanel(
+      h4("Navigate", style = "color: var(--bs-secondary);"),
+      style = "padding: 10px; margin-bottom: 5px;",
+      actionButton(ns("back_to_screen3"), 
+                   title = "Go back to Step 3",
+                   label = tagList(
+                     icon("circle-left"),  # icon first 
+                     #"Go to Introduction"
+                     "Back"
+                     # text second
+                   ),
+                   class = "btn-primary"),
+      
+      tags$span(
+        tagList("Step 4", icon("location-crosshairs")),  # text + icon
+        class = "btn btn-info disabled"
+      ),
+      # <button type="button" class="btn btn-secondary" data-bs-toggle="tooltip" data-bs-placement="left" data-bs-original-title="Tooltip on left">Left</button>
+      actionButton(ns("to_screen5"), 
+                   title = "Go to Step 5",
+                   label = tagList(
+                     #"Go to Screen 2",
+                     "Next",
+                     # text first
+                     icon("circle-right")  # icon second)
+                   ),
+                   class = "btn-primary")
+      #,
+      #actionButton(ns("save_progress"), "Save Progress"),
+      #actionButton(ns("resume_progress"), "Resume Progress")
+    ),
+    wellPanel(
+      style = "padding: 10px; margin-bottom: 5px; background: rgba(23, 162, 184, 0.5);",
+      h4("Summary of IRM setup"),
+      textOutput(ns("value_display")),
+      textOutput(ns("level_display")),
+      textOutput(ns("selection_display")),
+      textOutput(ns("spatres_display")),
+      textOutput(ns("aggregation_display")),
+      textOutput(ns("num_innovations_display")),
+      textOutput(ns("innovation_system_display")),
+      uiOutput(ns("row_details"))
+    )
   )
 }
 
-bslib_screen4_module_v3_Server <- function(id, shared_values, switch_screen) {
+bslib_screen4_module_v3_Server <- function(id, shared_values, shared_parameters, switch_screen) {
   moduleServer(id, function(input, output, session) {
     
     ns <- session$ns
@@ -69,17 +128,21 @@ bslib_screen4_module_v3_Server <- function(id, shared_values, switch_screen) {
       message(paste("S4. Initiation. editing_mode:", editing_mode()))
       message(paste("S4. Initiation. shared_values$inn_type_1:", shared_values$inn_type_1))
       message(paste("S4. Initiation. forget:", shared_values$forget))
-      message(paste("S4. Initiation. num_innovations", shared_values$num_innovations))
-      message(paste("S4. Initiation. inn details1:", shared_values$crop_name_1,"-", shared_values$ideotype_1,"-", shared_values$scenario_1))
+      message(paste("S4. Initiation. num_innovations", shared_parameters$num_innovations))
+      message(paste("S4. Initiation. inn details1:", shared_parameters$crop_name_1,"-", shared_parameters$ideotype_1,"-", shared_parameters$scenario_1))
      
       
       datatable(
+        caption = htmltools::tags$caption(
+          style = 'caption-side: top; text-align: center;',
+          "Existing Innovations:"),
         df_inn(),
         rownames = F,
         filter = "bottom",
         selection = list(mode = "single", selected = selected_row()),
         editable = FALSE,
         options = list(
+          dom = '<t><"bottom"lip>',
           columnDefs = list(list(
             visible = FALSE, targets = c(0) # hide the inn_ID
           )),
@@ -93,16 +156,9 @@ bslib_screen4_module_v3_Server <- function(id, shared_values, switch_screen) {
     # Initially disable select_row and duplicate_row, and next_screen ----
     disable("select_row")
     disable("duplicate_row")
-    
-    # observe the editing_mode to determine next_screen visibility----
-    observe({
-      if (editing_mode() == "edit") {
-        disable("next_screen")
-      } else {
-        enable("next_screen")
-      }
-    })
-    
+    disable("to_screen5")
+
+
     # observe the selected row----
     observe({
       selected_row <- input$data_table_rows_selected
@@ -110,9 +166,13 @@ bslib_screen4_module_v3_Server <- function(id, shared_values, switch_screen) {
       if (length(selected_row) > 0) {
         enable("select_row")
         enable("duplicate_row")
+        enable("to_screen5")
+        cat("\n\ndisable r\n\n")
       } else {
         disable("select_row")
         disable("duplicate_row")
+        disable("to_screen5")
+        cat("\n\ndisable r\n\n")
       }
     })
     
@@ -121,9 +181,9 @@ bslib_screen4_module_v3_Server <- function(id, shared_values, switch_screen) {
     observeEvent(input$select_row, {
       req(input$data_table_rows_selected)
       selected_row(df_inn()[input$data_table_rows_selected, ])
-      shared_values$crop_name_1 <-  selected_row()$crop_name
-      shared_values$ideotype_1 <- selected_row()$ideotype
-      shared_values$scenario_1 <- selected_row()$scenario
+      shared_parameters$crop_name_1 <-  selected_row()$crop_name
+      shared_parameters$ideotype_1 <- selected_row()$ideotype
+      shared_parameters$scenario_1 <- selected_row()$scenario
       
       # ensure that duplicated innovation is NULL
       shared_values$crop_name_0  <- NULL
@@ -175,7 +235,7 @@ bslib_screen4_module_v3_Server <- function(id, shared_values, switch_screen) {
       req(selected_row())
       if (editing_mode() == "view") {
         tagList(
-          h4("Selected Row Values"),
+          p("Step 4. Your innovation is:"),
           verbatimTextOutput(ns("selected_values"))
         )
       }
@@ -184,7 +244,7 @@ bslib_screen4_module_v3_Server <- function(id, shared_values, switch_screen) {
     # output Display selected row's values (read-only)----
     output$selected_values <- renderPrint({
       req(selected_row())
-      selected_row()
+      selected_row()[2:4]
     })
     
     
@@ -278,7 +338,7 @@ bslib_screen4_module_v3_Server <- function(id, shared_values, switch_screen) {
    observeEvent(ns(input$save_row_btn), {
      message(paste("S4. 2a observeEvent: save_row_btn Edit mode:", editing_mode()))
      message(paste("S4. 2a observeEvent: save_row_btn forget:", shared_values$forget))
-     message(paste("S4. 2a observeEvent: save_row_btn inn details:", shared_values$crop_name_1,"-", shared_values$ideotype_1,"-", shared_values$scenario_1))
+     message(paste("S4. 2a observeEvent: save_row_btn inn details:", shared_parameters$crop_name_1,"-", shared_parameters$ideotype_1,"-", shared_parameters$scenario_1))
      
      if (shared_values$forget > 0 ) {
        
@@ -331,9 +391,9 @@ bslib_screen4_module_v3_Server <- function(id, shared_values, switch_screen) {
 
         } else {
           # Save the row
-          shared_values$crop_name_1 <- edited_row$crop_name
-          shared_values$ideotype_1 <- edited_row$ideotype
-          shared_values$scenario_1 <- edited_row$scenario
+          shared_parameters$crop_name_1 <- edited_row$crop_name
+          shared_parameters$ideotype_1 <- edited_row$ideotype
+          shared_parameters$scenario_1 <- edited_row$scenario
             
           all_df_inn <- all_df_inn[all_df_inn$inn_ID != edited_row$inn_ID, ]
           all_df_inn <- rbind(all_df_inn, edited_row)
@@ -355,7 +415,7 @@ bslib_screen4_module_v3_Server <- function(id, shared_values, switch_screen) {
       
       message(paste("S4. 3a observeEvent: cancel_btn. Edit mode:", editing_mode()))
       message(paste("S4. 3a observeEvent: cancel_btn. forget:", shared_values$forget))
-      message(paste("S4. 3a observeEvent: cancel_btn. inn details:", shared_values$crop_name_1,"-", shared_values$ideotype_1,"-", shared_values$scenario_1))
+      message(paste("S4. 3a observeEvent: cancel_btn. inn details:", shared_parameters$crop_name_1,"-", shared_parameters$ideotype_1,"-", shared_parameters$scenario_1))
       
       
       if (shared_values$forget > 1 ) { 
@@ -383,8 +443,20 @@ bslib_screen4_module_v3_Server <- function(id, shared_values, switch_screen) {
         row <- selected_row()
         tagList(
           h4("Validate"),
-          actionButton(ns("save_row_btn"), "Save"),
-          actionButton(ns("cancel_btn"), "Cancel")
+          actionButton(ns("save_row_btn"), 
+                       label = tagList(
+                         "Save Innovation",
+                         # text first
+                         icon("floppy-disk")  # icon second)
+                       ),
+                       class = "btn-primary"),
+          actionButton(ns("cancel_btn"), 
+                       label = tagList(
+                         "Cancel",
+                         # text first
+                         icon("rectangle-xmark")  # icon second)
+                       ),
+                       class = "btn-primary")
         )
       }
     })
@@ -394,57 +466,52 @@ bslib_screen4_module_v3_Server <- function(id, shared_values, switch_screen) {
     # outputs from previous screens----
     
     output$num_innovations_display <- renderText({
-      paste("S4. Number of innovations:", shared_values$num_innovations)
+      paste("Step 3. Number of innovations =", shared_parameters$num_innovations)
     })
     
     output$innovation_system_display <- renderText({
-      if (shared_values$num_innovations == "two_inn") {
-        paste("S4. Innovation System:", shared_values$innovation_system)
-      }
-    })    
+      paste("Step 3. Innovation System =", shared_parameters$innovation_system)
+    })   
     
     output$spatres_display <- renderText({
-      paste("S4. Your spatial resolution is:", shared_values$resolution)
+      paste("Step 2. Spatial resolution =", shared_parameters$resolution)
     })
-
     
     output$aggregation_display <- renderText({
-      paste("S4. Your aggregation level is:", shared_values$aggregation)
+      paste("Step 2. Aggregation level =", shared_parameters$aggregation)
     })
-    #     
-    # output$value_display <- renderText({
-    #   req(shared_values$dropdown)
-    #   paste("You selected on Screen 1:", shared_values$dropdown)
-    # })
     
     output$level_display <- renderText({
-      req(shared_values$level)
-      paste("S4. You selected level on Screen 1:", shared_values$level)
+      req(shared_parameters$level)
+      paste("Step 1. Spatial level =", shared_parameters$level)
     })
     
     output$selection_display <- renderText({
-      req(shared_values$level)
+      req(shared_parameters$level)
       
-      if (shared_values$level == "woreda") {
+      if (shared_parameters$level == "woreda") {
         paste(
-          "S4. You selected geography:",
-          shared_values$selected_region,
-          shared_values$selected_zone,
-          shared_values$selected_woreda
+          "Step 1. Geography =",
+          shared_parameters$selected_region,
+          "-",
+          shared_parameters$selected_zone,
+          "-",
+          shared_parameters$selected_woreda
         )
       } else {
-        if (shared_values$level == "zone") {
+        if (shared_parameters$level == "zone") {
           paste(
-            "S4. You selected geography:",
-            shared_values$selected_region,
-            shared_values$selected_zone
+            "Step 1. Geography =",
+            shared_parameters$selected_region,
+            "-",
+            shared_parameters$selected_zone
           )
         } else {
-          if (shared_values$level == "region") {
-            paste("S4. You selected geography:",
-                  shared_values$selected_region)
+          if (shared_parameters$level == "region") {
+            paste("Step 1. Geography =",
+                  shared_parameters$selected_region)
           } else {
-            paste("S4. You selected geography: Ethiopia")
+            paste("Step 1. Geography = Ethiopia")
           }
         }
       }
@@ -460,11 +527,14 @@ bslib_screen4_module_v3_Server <- function(id, shared_values, switch_screen) {
     observeEvent(input$to_screen5, {
       req(selected_row())
       
+      save_progress(shared_values, shared_parameters)
+      showNotification("Progress saved!", type = "message")
+      
       # if existing innovation selected then edit mode is view
       # do nothing - load using values for shared_values$crop_name_1 etc.
       if (shared_values$inn_type_1 == "existing")  {
         message(paste("S4. ZZ1 observeEvent newscreen: existing inn", shared_values$crop_name_0,"-", shared_values$ideotype_0,"-", shared_values$scenario_0))
-        message(paste("S4. ZZ1 observeEvent newscreen: new inn", shared_values$crop_name_1,"-", shared_values$ideotype_1,"-", shared_values$scenario_1))
+        message(paste("S4. ZZ1 observeEvent newscreen: new inn", shared_parameters$crop_name_1,"-", shared_parameters$ideotype_1,"-", shared_parameters$scenario_1))
         message(paste("S4. ZZ1 observeEvent newscreen: shared_values$current_tree", shared_values$current_tree))
         
         switch_screen("screen5")
@@ -475,7 +545,7 @@ bslib_screen4_module_v3_Server <- function(id, shared_values, switch_screen) {
       
       if (shared_values$inn_type_1 == "duplicate" && !is.null(shared_values$crop_name_0))  {
         message(paste("S4. ZZ2 observeEvent newscreen: existing inn", shared_values$crop_name_0,"-", shared_values$ideotype_0,"-", shared_values$scenario_0))
-        message(paste("S4. ZZ2 observeEvent newscreen: new inn", shared_values$crop_name_1,"-", shared_values$ideotype_1,"-", shared_values$scenario_1))
+        message(paste("S4. ZZ2 observeEvent newscreen: new inn", shared_parameters$crop_name_1,"-", shared_parameters$ideotype_1,"-", shared_parameters$scenario_1))
         
         file.copy(
           # existing innovation requirements to be duplicated----
@@ -488,11 +558,11 @@ bslib_screen4_module_v3_Server <- function(id, shared_values, switch_screen) {
                          "_requirements.csv"),
           # new innovation
                   paste0("E:/repos/raise_fs/shiny/data/", 
-                         shared_values$crop_name_1,
+                         shared_parameters$crop_name_1,
                          "_",
-                         shared_values$ideotype_1,
+                         shared_parameters$ideotype_1,
                          "_", 
-                         shared_values$scenario_1,
+                         shared_parameters$scenario_1,
                          "_requirements.csv"),
                   overwrite = TRUE)
 
@@ -507,11 +577,11 @@ bslib_screen4_module_v3_Server <- function(id, shared_values, switch_screen) {
                  "_links.csv"),
           # new innovation
           paste0("E:/repos/raise_fs/shiny/data/", 
-                 shared_values$crop_name_1,
+                 shared_parameters$crop_name_1,
                  "_",
-                 shared_values$ideotype_1,
+                 shared_parameters$ideotype_1,
                  "_", 
-                 shared_values$scenario_1,
+                 shared_parameters$scenario_1,
                  "_links.csv"),
           overwrite = TRUE)
         
@@ -526,11 +596,11 @@ bslib_screen4_module_v3_Server <- function(id, shared_values, switch_screen) {
                  "_gs.csv"),
           # new innovation
           paste0("E:/repos/raise_fs/shiny/data/", 
-                 shared_values$crop_name_1,
+                 shared_parameters$crop_name_1,
                  "_",
-                 shared_values$ideotype_1,
+                 shared_parameters$ideotype_1,
                  "_", 
-                 shared_values$scenario_1,
+                 shared_parameters$scenario_1,
                  "_gs.csv"),
           overwrite = TRUE)
         
@@ -545,11 +615,11 @@ bslib_screen4_module_v3_Server <- function(id, shared_values, switch_screen) {
                  "_texture.csv"),
           # new innovation
           paste0("E:/repos/raise_fs/shiny/data/", 
-                 shared_values$crop_name_1,
+                 shared_parameters$crop_name_1,
                  "_",
-                 shared_values$ideotype_1,
+                 shared_parameters$ideotype_1,
                  "_", 
-                 shared_values$scenario_1,
+                 shared_parameters$scenario_1,
                  "_texture.csv"),
           overwrite = TRUE)
         
@@ -564,11 +634,11 @@ bslib_screen4_module_v3_Server <- function(id, shared_values, switch_screen) {
                  "_drainage.csv"),
           # new innovation
           paste0("E:/repos/raise_fs/shiny/data/", 
-                 shared_values$crop_name_1,
+                 shared_parameters$crop_name_1,
                  "_",
-                 shared_values$ideotype_1,
+                 shared_parameters$ideotype_1,
                  "_", 
-                 shared_values$scenario_1,
+                 shared_parameters$scenario_1,
                  "_drainage.csv"),
           overwrite = TRUE)
         
@@ -583,11 +653,11 @@ bslib_screen4_module_v3_Server <- function(id, shared_values, switch_screen) {
                  "_yield.csv"),
           # new innovation
           paste0("E:/repos/raise_fs/shiny/data/", 
-                 shared_values$crop_name_1,
+                 shared_parameters$crop_name_1,
                  "_",
-                 shared_values$ideotype_1,
+                 shared_parameters$ideotype_1,
                  "_", 
-                 shared_values$scenario_1,
+                 shared_parameters$scenario_1,
                  "_yield.csv"),
           overwrite = TRUE)        
         
@@ -599,17 +669,17 @@ bslib_screen4_module_v3_Server <- function(id, shared_values, switch_screen) {
       
       if (shared_values$inn_type_1 == "new" && is.null(shared_values$crop_name_0))  {
         message(paste("S4. ZZ3 observeEvent newscreen: existing inn", shared_values$crop_name_0,"-", shared_values$ideotype_0,"-", shared_values$scenario_0))
-        message(paste("S4. ZZ3 observeEvent newscreen: new inn", shared_values$crop_name_1,"-", shared_values$ideotype_1,"-", shared_values$scenario_1))
+        message(paste("S4. ZZ3 observeEvent newscreen: new inn", shared_parameters$crop_name_1,"-", shared_parameters$ideotype_1,"-", shared_parameters$scenario_1))
         file.copy(
           # generic requirements
           "E:/repos/raise_fs/shiny/data/generic-generic-generic.csv", 
           # new innovation
           paste0("E:/repos/raise_fs/shiny/data/", 
-                 shared_values$crop_name_1,
+                 shared_parameters$crop_name_1,
                  "_",
-                 shared_values$ideotype_1,
+                 shared_parameters$ideotype_1,
                  "_", 
-                 shared_values$scenario_1,
+                 shared_parameters$scenario_1,
                  ".csv"),
           overwrite = TRUE)
         
@@ -619,11 +689,11 @@ bslib_screen4_module_v3_Server <- function(id, shared_values, switch_screen) {
           "E:/repos/raise_fs/shiny/data/generic_generic_generic_requirements.csv",
           # new innovation
           paste0("E:/repos/raise_fs/shiny/data/", 
-                 shared_values$crop_name_1,
+                 shared_parameters$crop_name_1,
                  "_",
-                 shared_values$ideotype_1,
+                 shared_parameters$ideotype_1,
                  "_", 
-                 shared_values$scenario_1,
+                 shared_parameters$scenario_1,
                  "_requirements.csv"),
           overwrite = TRUE)
         
@@ -632,11 +702,11 @@ bslib_screen4_module_v3_Server <- function(id, shared_values, switch_screen) {
           "E:/repos/raise_fs/shiny/data/generic_generic_generic_links.csv",
           # new innovation
           paste0("E:/repos/raise_fs/shiny/data/", 
-                 shared_values$crop_name_1,
+                 shared_parameters$crop_name_1,
                  "_",
-                 shared_values$ideotype_1,
+                 shared_parameters$ideotype_1,
                  "_", 
-                 shared_values$scenario_1,
+                 shared_parameters$scenario_1,
                  "_links.csv"),
           overwrite = TRUE)
         
@@ -645,11 +715,11 @@ bslib_screen4_module_v3_Server <- function(id, shared_values, switch_screen) {
           "E:/repos/raise_fs/shiny/data/generic_generic_generic_gs.csv",
           # new innovation
           paste0("E:/repos/raise_fs/shiny/data/", 
-                 shared_values$crop_name_1,
+                 shared_parameters$crop_name_1,
                  "_",
-                 shared_values$ideotype_1,
+                 shared_parameters$ideotype_1,
                  "_", 
-                 shared_values$scenario_1,
+                 shared_parameters$scenario_1,
                  "_gs.csv"),
           overwrite = TRUE)
         
@@ -658,11 +728,11 @@ bslib_screen4_module_v3_Server <- function(id, shared_values, switch_screen) {
           "E:/repos/raise_fs/shiny/data/generic_generic_generic_texture.csv",
           # new innovation
           paste0("E:/repos/raise_fs/shiny/data/", 
-                 shared_values$crop_name_1,
+                 shared_parameters$crop_name_1,
                  "_",
-                 shared_values$ideotype_1,
+                 shared_parameters$ideotype_1,
                  "_", 
-                 shared_values$scenario_1,
+                 shared_parameters$scenario_1,
                  "_texture.csv"),
           overwrite = TRUE)
         
@@ -671,11 +741,11 @@ bslib_screen4_module_v3_Server <- function(id, shared_values, switch_screen) {
           "E:/repos/raise_fs/shiny/data/generic_generic_generic_drainage.csv",
           # new innovation
           paste0("E:/repos/raise_fs/shiny/data/", 
-                 shared_values$crop_name_1,
+                 shared_parameters$crop_name_1,
                  "_",
-                 shared_values$ideotype_1,
+                 shared_parameters$ideotype_1,
                  "_", 
-                 shared_values$scenario_1,
+                 shared_parameters$scenario_1,
                  "_drainage.csv"),
           overwrite = TRUE)
         
@@ -684,11 +754,11 @@ bslib_screen4_module_v3_Server <- function(id, shared_values, switch_screen) {
           "E:/repos/raise_fs/shiny/data/generic_generic_generic_yield.csv",
           # new innovation
           paste0("E:/repos/raise_fs/shiny/data/", 
-                 shared_values$crop_name_1,
+                 shared_parameters$crop_name_1,
                  "_",
-                 shared_values$ideotype_1,
+                 shared_parameters$ideotype_1,
                  "_", 
-                 shared_values$scenario_1,
+                 shared_parameters$scenario_1,
                  "_yield.csv"),
           overwrite = TRUE)
         
