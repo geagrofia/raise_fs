@@ -3,6 +3,7 @@
 bslib_screen2_module_v3_SidebarUI <- function(id, shared_values, shared_parameters) {
   
   ns <- NS(id)
+  
   tagList(
     # wellPanel(
     #   style = "padding: 10px; margin-bottom: 5px;",
@@ -21,7 +22,22 @@ bslib_screen2_module_v3_SidebarUI <- function(id, shared_values, shared_paramete
     # ), 
     wellPanel(
       style = "padding: 10px; margin-bottom: 5px;",
-      h4("Screen 2: IRM Spatial Resolution"),
+      div(
+        style = "display:inline-block;vertical-align:middle;margin-bottom: 5px;",
+        actionButton(
+          ns("show_help_02_01"),
+          title = "Help for Step 2",
+          label = tagList(
+            icon("circle-question")  # icon second)
+          ),
+          style = "background: rgba(23, 162, 184, 0.5);"
+        )
+        
+      ),
+      div(
+        style = "display: inline-block; vertical-align: middle; margin-left: 10px;",
+        h4("Step 2: Define IRM Spatial Resolution")
+      ),
       # UI numericInput for entering value for spatial resolution of the mask----
       numericInput(ns("resolution"), "Resolution (m)",
                ifelse(!is.null(shared_parameters$resolution),
@@ -44,7 +60,7 @@ bslib_screen2_module_v3_MainUI <- function(id) {
       h4("Navigate", style = "color: var(--bs-secondary);"),
       style = "padding: 10px; margin-bottom: 5px;",
       actionButton(ns("back_to_screen1"), 
-                   title = "Go back to Step 1",
+                   title = "Go back to Step 1: Select Geography",
                    label = tagList(
                      icon("circle-left"),  # icon first 
                      #"Go to Introduction"
@@ -59,7 +75,7 @@ bslib_screen2_module_v3_MainUI <- function(id) {
       ),
       # <button type="button" class="btn btn-secondary" data-bs-toggle="tooltip" data-bs-placement="left" data-bs-original-title="Tooltip on left">Left</button>
       actionButton(ns("to_screen3"), 
-                   title = "Go to Step 3",
+                   title = "Go to Step 3: Number of Innovations",
                    label = tagList(
                      #"Go to Screen 2",
                      "Next",
@@ -150,9 +166,20 @@ bslib_screen2_module_v3_Server <- function(id, shared_values, shared_parameters,
     
     #2 observeEvent to_screen3 ----
     observeEvent(input$to_screen3, {
+      shared_values$step <- 3
       save_progress(shared_values, shared_parameters)
       showNotification("Progress saved!", type = "message")
       switch_screen("screen3")
+    })
+    
+    # help button 02_01----
+    observeEvent(input$show_help_02_01, {
+      showModal(modalDialog(
+        title = "Step 2: Define IRM Spatial Resolution",
+        includeMarkdown("docs/step_02_01.md"),
+        easyClose = TRUE,
+        footer = modalButton("Close")
+      ))
     })
     
   })
