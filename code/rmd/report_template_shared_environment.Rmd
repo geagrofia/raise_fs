@@ -6208,7 +6208,7 @@ if (params$TRIANGULATION ==1) {
   gtriangulation_dec_farmers_i1
 }
 
-if (!is.na(params$TRIDEC1)) {
+if (params$TRIANGULATION ==1) {
   expr <- paste0("vect_triangulation_agents_i1$", params$TRIDEC1)
   # vect_triangulation_agents_i1$tri_label_dec <-
   #   paste(vect_triangulation_agents_i1$id, "=", eval(parse(text = (expr))))
