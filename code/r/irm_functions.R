@@ -169,7 +169,7 @@ dekad <- function(x, type = c("month", "year"), ...) {
   type <- match.arg(type)
   x <- as.Date(x, ...)
   res <- ifelse(day(x) > 20,  3, ifelse(day(x) > 10, 2, 1))
-  if(type == "year") res <- month(x)*3 + res - 3
+  if(type == "year") res <- lubridate::month(x)*3 + res - 3
   return(res)
 }
 
