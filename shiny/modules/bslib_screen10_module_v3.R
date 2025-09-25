@@ -3,69 +3,148 @@
 library(DT)
 
 
-bslib_screen10_module_v3_SidebarUI <- function(id, shared_values) {
+bslib_screen10_module_v3_SidebarUI <- function(id, shared_values, shared_parameters) {
   ns <- NS(id)
   
   tagList(
-    h3("Soil Texture and Drainage:"),
-    # UI actionButtons screen navigation ----
-    actionButton(ns("back_to_screen9"), "Back to Screen 9"),
-    actionButton(ns("to_screen11"), "Go to Screen 11")
+    # wellPanel(
+    #   style = "padding: 10px; margin-bottom: 5px;",
+    #   actionButton(
+    #     ns("back_to_screen9"),
+    #     label = tagList(
+    #       icon("circle-left"),
+    #       # icon first
+    #       "Back to Screen 9"
+    #       # text second
+    #     ),
+    #     class = "btn-primary"
+    #   ),
+    #   actionButton(
+    #     ns("to_screen11"),
+    #     label = tagList(
+    #       "Go to Screen 11",
+    #       # text first
+    #       icon("circle-right")  # icon second)
+    #     ),
+    #     class = "btn-primary"
+    #   )
+    # ), 
+    wellPanel(
+      style = "padding: 10px; margin-bottom: 5px;",
+      div(
+        style = "display:inline-block;vertical-align:middle;margin-bottom: 5px;",
+        actionButton(
+          ns("show_help_10_01"),
+          title = "Help for Step 10",
+          label = tagList(
+            icon("circle-question")  # icon second)
+          ),
+          style = "background: rgba(23, 162, 184, 0.5);"
+        )
+        
+      ),
+      div(
+        style = "display: inline-block; vertical-align: middle; margin-left: 10px;",
+      h4("Step 10: View or Edit Soil Texture and Drainage Tables")
+      ),    
+      # soil texture table
+      h4("Soil Texture Table"),
+      scrollable_DT(ns("soil_texture_table")),
+      uiOutput(ns("dyanamic_save_reset_texture"))
+    ),
+    wellPanel(
+      style = "padding: 10px; margin-bottom: 5px;",
+      # soil drainage table
+      h4("Soil Drainage Table"),
+      scrollable_DT(ns("soil_drainage_table")),
+      uiOutput(ns("dyanamic_save_reset_drainage"))
+    )
   )
 }
 
 bslib_screen10_module_v3_MainUI <- function(id) {
   ns <- NS(id)
   tagList(
-    textOutput(ns("value_display")),
-    textOutput(ns("level_display")),
-    textOutput(ns("selection_display")),
-    textOutput(ns("spatres_display")),
-    textOutput(ns("aggregation_display")),
-    textOutput(ns("num_innovations_display")),
-    textOutput(ns("innovation_system_display")),
-    textOutput(ns("crop_1_display")),
-    textOutput(ns("ideotype_1_display")),
-    textOutput(ns("scenario_1_display")),
-    textOutput(ns("inn_type_1_display")),
-    
-    # soil texture table
-    h4("Soil Texture Table"),
-    DTOutput(ns("soil_texture_table")),
-    uiOutput(ns("dyanamic_save_reset_texture")),
-    
-    # soil drainage table
-    h4("Soil Drainage Table"),
-    DTOutput(ns("soil_drainage_table")),
-    uiOutput(ns("dyanamic_save_reset_drainage"))
+    wellPanel(
+      h4("Navigate", style = "color: var(--bs-secondary);"),
+      style = "padding: 10px; margin-bottom: 5px;",
+      actionButton(ns("back_to_screen9"), 
+                   title = "Go back to Step 9: View or Edit Crop Growth Stages",
+                   label = tagList(
+                     icon("circle-left"),  # icon first 
+                     #"Go to Introduction"
+                     "Back"
+                     # text second
+                   ),
+                   class = "btn-primary"),
+      
+      tags$span(
+        tagList("Step 10", icon("location-crosshairs")),  # text + icon
+        class = "btn btn-info disabled"
+      ),
+      # <button type="button" class="btn btn-secondary" data-bs-toggle="tooltip" data-bs-placement="left" data-bs-original-title="Tooltip on left">Left</button>
+      actionButton(ns("to_screen11"), 
+                   title = "Go to Step 11: View or Edit Yield Table",
+                   label = tagList(
+                     #"Go to Screen 2",
+                     "Next",
+                     # text first
+                     icon("circle-right")  # icon second)
+                   ),
+                   class = "btn-primary disabled")
+      #,
+      #actionButton(ns("save_progress"), "Save Progress"),
+      #actionButton(ns("resume_progress"), "Resume Progress")
+    ),
+    wellPanel(
+      style = "padding: 10px; margin-bottom: 5px; background: rgba(23, 162, 184, 0.5);",
+      h4("Summary of IRM setup"),
+      textOutput(ns("value_display")),
+      textOutput(ns("level_display")),
+      textOutput(ns("selection_display")),
+      textOutput(ns("spatres_display")),
+      textOutput(ns("aggregation_display")),
+      textOutput(ns("num_innovations_display")),
+      textOutput(ns("innovation_system_display")),
+      textOutput(ns("crop_1_display")),
+      textOutput(ns("ideotype_1_display")),
+      textOutput(ns("scenario_1_display")),
+      textOutput(ns("inn_type_1_display"))
+    )
   )
 }
 
-bslib_screen10_module_v3_Server <- function(id, shared_values, switch_screen) {
+bslib_screen10_module_v3_Server <- function(id, shared_values, shared_parameters, switch_screen) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
     
+    save_st <- reactiveVal(F)
+    save_sd <- reactiveVal(F)
+    disable("to_screen11")
+    
+    
     # Load the initial soil texture data ----
     initial_soil_texture_data <- reactive({
+      req(switch_screen() == "screen10")
       if (file.exists(
         paste0(
           "E:/repos/raise_fs/shiny/data/",
-          shared_values$crop_name_1,
+          shared_parameters$crop_name_1,
           "_",
-          shared_values$ideotype_1,
+          shared_parameters$ideotype_1,
           "_",
-          shared_values$scenario_1,
+          shared_parameters$scenario_1,
           "_texture.csv"
         )
       )) {
         df_texture <- read.csv(
           paste0(
             "E:/repos/raise_fs/shiny/data/",
-            shared_values$crop_name_1,
+            shared_parameters$crop_name_1,
             "_",
-            shared_values$ideotype_1,
+            shared_parameters$ideotype_1,
             "_",
-            shared_values$scenario_1,
+            shared_parameters$scenario_1,
             "_texture.csv"
           )
         )
@@ -83,25 +162,26 @@ bslib_screen10_module_v3_Server <- function(id, shared_values, switch_screen) {
     
     # Load the initial soil drainage data ----
     initial_soil_drainage_data <- reactive({
+      req(switch_screen() == "screen10")
       if (file.exists(
         paste0(
           "E:/repos/raise_fs/shiny/data/",
-          shared_values$crop_name_1,
+          shared_parameters$crop_name_1,
           "_",
-          shared_values$ideotype_1,
+          shared_parameters$ideotype_1,
           "_",
-          shared_values$scenario_1,
+          shared_parameters$scenario_1,
           "_drainage.csv"
         )
       )) {
         df_drainage <- read.csv(
           paste0(
             "E:/repos/raise_fs/shiny/data/",
-            shared_values$crop_name_1,
+            shared_parameters$crop_name_1,
             "_",
-            shared_values$ideotype_1,
+            shared_parameters$ideotype_1,
             "_",
-            shared_values$scenario_1,
+            shared_parameters$scenario_1,
             "_drainage.csv"
           )
         )
@@ -155,8 +235,9 @@ bslib_screen10_module_v3_Server <- function(id, shared_values, switch_screen) {
           selection = list(mode = "none"),
           editable = FALSE,
           options = list(
+            scrollX = TRUE,
             lengthMenu = c(10, 20),
-            pageLength = 20,
+            pageLength = 15,
             sDom  = '<"top">rt<"bottom">ip'
           )
         )
@@ -169,8 +250,9 @@ bslib_screen10_module_v3_Server <- function(id, shared_values, switch_screen) {
           selection = list(mode = "single"),
           editable = list(target = "cell", disable = list(columns = c(0:2))),
           options = list(
+            scrollX = TRUE,
             lengthMenu = c(10, 20),
-            pageLength = 20,
+            pageLength = 15,
             sDom  = '<"top">rt<"bottom">ip'
           )
         )
@@ -190,8 +272,9 @@ bslib_screen10_module_v3_Server <- function(id, shared_values, switch_screen) {
           selection = list(mode = "none"),
           editable = FALSE,
           options = list(
+            scrollX = TRUE,
             lengthMenu = c(10, 20),
-            pageLength = 10,
+            pageLength = 15,
             sDom  = '<"top">t<"bottom">ip'
           )
         )
@@ -204,8 +287,9 @@ bslib_screen10_module_v3_Server <- function(id, shared_values, switch_screen) {
           selection = list(mode = "single"),
           editable = list(target = "cell", disable = list(columns = c(0))),
           options = list(
+            scrollX = TRUE,
             lengthMenu = c(10, 20),
-            pageLength = 10,
+            pageLength = 15,
             sDom  = '<"top">t<"bottom">ip'
           )
         )
@@ -284,8 +368,8 @@ bslib_screen10_module_v3_Server <- function(id, shared_values, switch_screen) {
     # dynamic st save reset controls ----
     output$dyanamic_save_reset_texture <- renderUI({
       tagList(
-        actionButton(ns("save_btn_st"), "Save Soil Texture table"),
-        actionButton(ns("reset_btn_st"), "Reset Soil Texture table")
+        actionButton(ns("save_btn_st"), "Save Soil Texture table", class = "btn-primary"),
+        actionButton(ns("reset_btn_st"), "Reset Soil Texture table", class = "btn-primary")
       )
     })
     
@@ -347,14 +431,26 @@ bslib_screen10_module_v3_Server <- function(id, shared_values, switch_screen) {
           dt_st,
           file = paste0(
             "E:/repos/raise_fs/shiny/data/",
-            shared_values$crop_name_1,
+            shared_parameters$crop_name_1,
             "_",
-            shared_values$ideotype_1,
+            shared_parameters$ideotype_1,
             "_",
-            shared_values$scenario_1,
+            shared_parameters$scenario_1,
             "_texture_s10.csv"
           )
         )
+        
+        save_st(T)
+        message("S10. save_st")
+        print(save_st())
+        message("S10. save_sd")
+        print(save_sd())
+        message("S10. save_st & save_sd")
+        print((save_st() & save_sd()))
+        
+        if (save_st() & save_sd()){
+          enable("to_screen11")
+        }
         
         removeModal()
         showModal(
@@ -378,8 +474,8 @@ bslib_screen10_module_v3_Server <- function(id, shared_values, switch_screen) {
     # dynamic sd save reset controls ----
     output$dyanamic_save_reset_drainage <- renderUI({
       tagList(
-        actionButton(ns("save_btn_sd"), "Save Soil Drainage table"),
-        actionButton(ns("reset_btn_sd"), "Reset Soil Drainage table")
+        actionButton(ns("save_btn_sd"), "Save Soil Drainage table", class = "btn-primary"),
+        actionButton(ns("reset_btn_sd"), "Reset Soil Drainage table", class = "btn-primary")
       )
     })
     
@@ -442,14 +538,26 @@ bslib_screen10_module_v3_Server <- function(id, shared_values, switch_screen) {
           dt_sd,
           file = paste0(
             "E:/repos/raise_fs/shiny/data/",
-            shared_values$crop_name_1,
+            shared_parameters$crop_name_1,
             "_",
-            shared_values$ideotype_1,
+            shared_parameters$ideotype_1,
             "_",
-            shared_values$scenario_1,
+            shared_parameters$scenario_1,
             "_drainage_s10.csv"
           )
         )
+        
+        save_sd(T)
+        message("S10. save_st")
+        print(save_st())
+        message("S10. save_sd")
+        print(save_sd())
+        message("S10. save_st & save_sd")
+        print((save_st() & save_sd()))
+        
+        if (save_st() & save_sd()) {
+          enable("to_screen11")
+        }
         
         removeModal()
         showModal(
@@ -460,6 +568,9 @@ bslib_screen10_module_v3_Server <- function(id, shared_values, switch_screen) {
           )
         )
       }
+      
+
+
     })
     
     
@@ -475,87 +586,78 @@ bslib_screen10_module_v3_Server <- function(id, shared_values, switch_screen) {
     # outputs from previous screens----
     
     output$num_innovations_display <- renderText({
-      paste("Number of innovations:", shared_values$num_innovations)
+      paste("Step 3. Number of innovations =", shared_parameters$num_innovations)
     })
     
     output$innovation_system_display <- renderText({
-      if (shared_values$num_innovations == "two_inn") {
-        paste("Innovation System:",
-              shared_values$innovation_system)
-      }
-    })
+      paste("Step 3. Innovation System =", shared_parameters$innovation_system)
+    })  
     
     output$spatres_display <- renderText({
-      paste("Your spatial resolution is:", shared_values$resolution)
+      paste("Step 2. Spatial resolution =", shared_parameters$resolution)
     })
     
-    
     output$aggregation_display <- renderText({
-      paste("Your aggregation level is:", shared_values$aggregation)
+      paste("Step 2. Aggregation level =", shared_parameters$aggregation)
     })
     
     output$level_display <- renderText({
-      req(shared_values$level)
-      paste("You selected level on Screen 1:", shared_values$level)
+      req(shared_parameters$level)
+      paste("Step 1. Spatial level =", shared_parameters$level)
     })
     
     output$selection_display <- renderText({
-      req(shared_values$level)
+      req(shared_parameters$level)
       
-      if (shared_values$level == "woreda") {
+      if (shared_parameters$level == "woreda") {
         paste(
-          "You selected geography:",
-          shared_values$selected_region,
-          shared_values$selected_zone,
-          shared_values$selected_woreda
+          "Step 1. Geography =",
+          shared_parameters$selected_region,
+          "-",
+          shared_parameters$selected_zone,
+          "-",
+          shared_parameters$selected_woreda
         )
       } else {
-        if (shared_values$level == "zone") {
+        if (shared_parameters$level == "zone") {
           paste(
-            "You selected geography:",
-            shared_values$selected_region,
-            shared_values$selected_zone
+            "Step 1. Geography =",
+            shared_parameters$selected_region,
+            "-",
+            shared_parameters$selected_zone
           )
         } else {
-          if (shared_values$level == "region") {
-            paste("You selected geography:",
-                  shared_values$selected_region)
+          if (shared_parameters$level == "region") {
+            paste("Step 1. Geography =",
+                  shared_parameters$selected_region)
           } else {
-            paste("You selected geography: Ethiopia")
+            paste("Step 1. Geography = Ethiopia")
           }
         }
       }
     })
     
     output$crop_1_display <- renderText({
-      message(paste("S10. crop details:", shared_values$crop_name_1))
-      req(shared_values$crop_name_1)
-      paste("S10. You selected crop on Screen 4:",
-            shared_values$crop_name_1)
+      req(shared_parameters$crop_name_1)
+      paste("Step 4. Crop =", shared_parameters$crop_name_1)
     })
     
     
     output$ideotype_1_display <- renderText({
-      message(paste("S10. ideotype details:", shared_values$ideotype_1))
-      req(shared_values$ideotype_1)
-      paste("S10. You selected ideotype on Screen 4:",
-            shared_values$ideotype_1)
+      req(shared_parameters$ideotype_1)
+      paste("Step 4. Ideotype =", shared_parameters$ideotype_1)
     })
     
     
     output$scenario_1_display <- renderText({
-      message(paste("S10. scenario details:", shared_values$scenario_1))
-      req(shared_values$scenario_1)
-      paste("S10. You selected scenario on Screen 4:",
-            shared_values$scenario_1)
+      req(shared_parameters$scenario_1)
+      paste("Step 4. Scenario =", shared_parameters$scenario_1)
     })
     
     
     output$inn_type_1_display <- renderText({
-      message(paste("S10. Innovation type:", shared_values$inn_type_1))
       req(shared_values$inn_type_1)
-      paste("S10. You selected Innovation type on Screen 4:",
-            shared_values$inn_type_1)
+      paste("Step 4. Innovation type =", shared_values$inn_type_1)
     })
     
     # _ navigation----
@@ -567,8 +669,22 @@ bslib_screen10_module_v3_Server <- function(id, shared_values, switch_screen) {
     
     # observeEvent to_screen11 ----
     observeEvent(input$to_screen11, {
+      shared_values$step <- 11
+      save_progress(shared_values, shared_parameters)
+      showNotification("Progress saved!", type = "message")
       switch_screen("screen11")
       
+    })
+    
+    
+    # help button 10_01----
+    observeEvent(input$show_help_10_01, {
+      showModal(modalDialog(
+        title = "Step 10: View or Edit Soil Texture and Drainage Tables",
+        includeMarkdown("docs/step_10_01.md"),
+        easyClose = TRUE,
+        footer = modalButton("Close")
+      ))
     })
     
   }) # Module server
