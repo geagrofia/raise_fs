@@ -1,41 +1,114 @@
-bslib_screen8_module_v3_SidebarUI <- function(id, shared_values) {
+bslib_screen8_module_v3_SidebarUI <- function(id, shared_values, shared_parameters) {
   
   ns <- NS(id)
   
   tagList(
-    h3("Rule Base Propositions and Conclusions:"),
+    # wellPanel(
+    #   style = "padding: 10px; margin-bottom: 5px;",
+    #   actionButton(
+    #     ns("back_to_screen7"),
+    #     label = tagList(
+    #       icon("circle-left"),
+    #       # icon first
+    #       "Back to Screen 7"
+    #       # text second
+    #     ),
+    #     class = "btn-primary"
+    #   ),
+    #   actionButton(
+    #     ns("to_screen9"),
+    #     label = tagList(
+    #       "Go to Screen 9",
+    #       # text first
+    #       icon("circle-right")  # icon second)
+    #     ),
+    #     class = "btn-primary"
+    #   )
+    # ), 
+    wellPanel(
+      style = "padding: 10px; margin-bottom: 5px;",
+      div(
+        style = "display:inline-block;vertical-align:middle;margin-bottom: 5px;",
+        actionButton(
+          ns("show_help_08_01"),
+          title = "Help for Step 8",
+          label = tagList(
+            icon("circle-question")  # icon second)
+          ),
+          style = "background: rgba(23, 162, 184, 0.5);"
+        )
+        
+      ),
+      div(
+        style = "display: inline-block; vertical-align: middle; margin-left: 10px;",
+    h4("Step 8: View or Edit Rule Base Thresholds, Propositions and Conclusions")
+    ),
+    scrollable_DT(ns("prop_conc_data_table")),
+    uiOutput(ns("dyanamic_save_reset"))
     
-    # UI actionButtons screen navigation ----
-    actionButton(ns("back_to_screen7"), "Back to Screen 7"),
-    actionButton(ns("to_screen9"), "Go to Screen 9")
-    
+    )
   )
 }
 
 bslib_screen8_module_v3_MainUI <- function(id) {
   ns <- NS(id)
   tagList(
-    textOutput(ns("value_display")),
-    textOutput(ns("level_display")),
-    textOutput(ns("selection_display")),
-    textOutput(ns("spatres_display")),
-    textOutput(ns("aggregation_display")),
-    textOutput(ns("num_innovations_display")),
-    textOutput(ns("innovation_system_display")),
-    textOutput(ns("crop_1_display")),
-    textOutput(ns("ideotype_1_display")),
-    textOutput(ns("scenario_1_display")),
-    textOutput(ns("inn_type_1_display")),
-    DTOutput(ns("prop_conc_data_table")),
-    uiOutput(ns("dyanamic_save_reset"))
+    wellPanel(
+      h4("Navigate", style = "color: var(--bs-secondary);"),
+      style = "padding: 10px; margin-bottom: 5px;",
+      actionButton(ns("back_to_screen7"), 
+                   title = "Go back to Step 7: View or Edit Rule Base Weights",
+                   label = tagList(
+                     icon("circle-left"),  # icon first 
+                     #"Go to Introduction"
+                     "Back"
+                     # text second
+                   ),
+                   class = "btn-primary"),
+      
+      tags$span(
+        tagList("Step 8", icon("location-crosshairs")),  # text + icon
+        class = "btn btn-info disabled"
+      ),
+      # <button type="button" class="btn btn-secondary" data-bs-toggle="tooltip" data-bs-placement="left" data-bs-original-title="Tooltip on left">Left</button>
+      actionButton(ns("to_screen9"), 
+                   title = "Go to Step 9: View or Edit Crop Growth Stages",
+                   label = tagList(
+                     #"Go to Screen 2",
+                     "Next",
+                     # text first
+                     icon("circle-right")  # icon second)
+                   ),
+                   class = "btn-primary disabled")
+      #,
+      #actionButton(ns("save_progress"), "Save Progress"),
+      #actionButton(ns("resume_progress"), "Resume Progress")
+    ),
+    wellPanel(
+      style = "padding: 10px; margin-bottom: 5px; background: rgba(23, 162, 184, 0.5);",
+      h4("Summary of IRM setup"),
+      textOutput(ns("value_display")),
+      textOutput(ns("level_display")),
+      textOutput(ns("selection_display")),
+      textOutput(ns("spatres_display")),
+      textOutput(ns("aggregation_display")),
+      textOutput(ns("num_innovations_display")),
+      textOutput(ns("innovation_system_display")),
+      textOutput(ns("crop_1_display")),
+      textOutput(ns("ideotype_1_display")),
+      textOutput(ns("scenario_1_display")),
+      textOutput(ns("inn_type_1_display"))
+    )
   )
 }
 
-bslib_screen8_module_v3_Server <- function(id, shared_values, switch_screen) {
+bslib_screen8_module_v3_Server <- function(id, shared_values, shared_parameters, switch_screen) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
     
     NA_weights <- 0
+    
+    disable("to_screen9")
     
     # Load the initial data ----
     initial_prop_conc_data <- reactive({
@@ -44,32 +117,32 @@ bslib_screen8_module_v3_Server <- function(id, shared_values, switch_screen) {
       
       if (file.exists(paste0(
         "E:/repos/raise_fs/shiny/data/",
-        shared_values$crop_name_1,
+        shared_parameters$crop_name_1,
         "_",
-        shared_values$ideotype_1,
+        shared_parameters$ideotype_1,
         "_",
-        shared_values$scenario_1,
+        shared_parameters$scenario_1,
         "_requirements_s7.csv"
       ))) {
         
         message(
           paste(
             "S8. Initiation. inn details1:",
-            shared_values$crop_name_1,
+            shared_parameters$crop_name_1,
             "-",
-            shared_values$ideotype_1,
+            shared_parameters$ideotype_1,
             "-",
-            shared_values$scenario_1
+            shared_parameters$scenario_1
           )
         )
         df_requirements_s7 <- read.csv(
           paste0(
             "E:/repos/raise_fs/shiny/data/",
-            shared_values$crop_name_1,
+            shared_parameters$crop_name_1,
             "_",
-            shared_values$ideotype_1,
+            shared_parameters$ideotype_1,
             "_",
-            shared_values$scenario_1,
+            shared_parameters$scenario_1,
             "_requirements_s7.csv"
           )
         )
@@ -77,11 +150,11 @@ bslib_screen8_module_v3_Server <- function(id, shared_values, switch_screen) {
         df_links_s5 <- read.csv(
           paste0(
             "E:/repos/raise_fs/shiny/data/",
-            shared_values$crop_name_1,
+            shared_parameters$crop_name_1,
             "_",
-            shared_values$ideotype_1,
+            shared_parameters$ideotype_1,
             "_",
-            shared_values$scenario_1,
+            shared_parameters$scenario_1,
             "_links_s5.csv"
           )
         )
@@ -190,8 +263,9 @@ bslib_screen8_module_v3_Server <- function(id, shared_values, switch_screen) {
           rownames = F,
           filter = "bottom",
           selection = list(mode = "none"),
+          extensions = c('FixedColumns', 'FixedHeader'),
           editable = FALSE,
-          options = list(lengthMenu = c(10, 20, 50), pageLength = 20)
+          options = list(scrollX = TRUE, fixedColumns = list(leftColumns = 2), lengthMenu = c(10, 20, 50), pageLength = 10)
         )
         
         # this version tries to highlight groups
@@ -261,11 +335,14 @@ bslib_screen8_module_v3_Server <- function(id, shared_values, switch_screen) {
           rownames = F,
           filter = "bottom",
           selection = list(mode = "single"),
+          extensions = c('FixedColumns', 'FixedHeader'),
           editable = list(target = "cell", disable = list(columns = c(0:1))),
           # only edit the conclusions
           options = list(
+            scrollX = TRUE,
+            fixedColumns = list(leftColumns = 2),
             lengthMenu = c(10, 20, 50),
-            pageLength = 20,
+            pageLength = 10,
             rowCallback = JS(
               sprintf(
                 "function(row, data, index) {
@@ -323,14 +400,16 @@ bslib_screen8_module_v3_Server <- function(id, shared_values, switch_screen) {
     # table controls
     output$dyanamic_save_reset <- renderUI({
       tagList(
-        actionButton(ns("save_btn"), "Save table"),
-        actionButton(ns("reset_btn"), "Reset table")
+        actionButton(ns("save_btn_8"), "Save table",
+                     class = "btn-primary"),
+        actionButton(ns("reset_btn_8"), "Reset table",
+                     class = "btn-primary")
       )
     })
     
     
     # observeEvent save button----
-    observeEvent(input$save_btn, {
+    observeEvent(input$save_btn_8, {
       req(current_prop_conc_data())
       dt <- prop_conc_table_data()
       
@@ -484,7 +563,7 @@ bslib_screen8_module_v3_Server <- function(id, shared_values, switch_screen) {
       
       df_inn_requirements_s7 <- read.csv(
         paste0(
-          "E:/repos/raise_fs/shiny/data/", shared_values$crop_name_1, "_", shared_values$ideotype_1, "_", shared_values$scenario_1, "_requirements_s7.csv"
+          "E:/repos/raise_fs/shiny/data/", shared_parameters$crop_name_1, "_", shared_parameters$ideotype_1, "_", shared_parameters$scenario_1, "_requirements_s7.csv"
         )
       )
       
@@ -497,21 +576,23 @@ bslib_screen8_module_v3_Server <- function(id, shared_values, switch_screen) {
       
       fwrite(
         df_inn_requirements_s8, file = paste0(
-          "E:/repos/raise_fs/shiny/data/", shared_values$crop_name_1, "_", shared_values$ideotype_1, "_", shared_values$scenario_1, "_requirements_s8.csv"
+          "E:/repos/raise_fs/shiny/data/", shared_parameters$crop_name_1, "_", shared_parameters$ideotype_1, "_", shared_parameters$scenario_1, "_requirements_s8.csv"
         )
       )
+      
+      enable("to_screen9")
       
       removeModal()
       showModal(modalDialog(
         title = "Saved",
-        "Table saved successfully.",
+        "Thresholds, Propositions and Conclusions Table saved successfully.",
         easyClose = TRUE))
     }
       })
     
     
     # observeEvent reset button----
-    observeEvent(input$reset_btn, {
+    observeEvent(input$reset_btn_8, {
       #req(initial_prop_conc_data())  # only proceed if non-NULL
       prop_conc_table_data(initial_prop_conc_data())
     })
@@ -592,82 +673,78 @@ bslib_screen8_module_v3_Server <- function(id, shared_values, switch_screen) {
     # outputs from previous screens----
     
     output$num_innovations_display <- renderText({
-      paste("Number of innovations:", shared_values$num_innovations)
+      paste("Step 3. Number of innovations =", shared_parameters$num_innovations)
     })
     
     output$innovation_system_display <- renderText({
-      if (shared_values$num_innovations == "two_inn") {
-        paste("Innovation System:", shared_values$innovation_system)
-      }
-    })    
+      paste("Step 3. Innovation System =", shared_parameters$innovation_system)
+    })     
     
     output$spatres_display <- renderText({
-      paste("Your spatial resolution is:", shared_values$resolution)
+      paste("Step 2. Spatial resolution =", shared_parameters$resolution)
     })
     
-    
     output$aggregation_display <- renderText({
-      paste("Your aggregation level is:", shared_values$aggregation)
+      paste("Step 2. Aggregation level =", shared_parameters$aggregation)
     })
     
     output$level_display <- renderText({
-      req(shared_values$level)
-      paste("You selected level on Screen 1:", shared_values$level)
+      req(shared_parameters$level)
+      paste("Step 1. Spatial level =", shared_parameters$level)
     })
     
     output$selection_display <- renderText({
-      req(shared_values$level)
+      req(shared_parameters$level)
       
-      if (shared_values$level == "woreda") {
+      if (shared_parameters$level == "woreda") {
         paste(
-          "You selected geography:",
-          shared_values$selected_region,
-          shared_values$selected_zone,
-          shared_values$selected_woreda
+          "Step 1. Geography =",
+          shared_parameters$selected_region,
+          "-",
+          shared_parameters$selected_zone,
+          "-",
+          shared_parameters$selected_woreda
         )
       } else {
-        if (shared_values$level == "zone") {
+        if (shared_parameters$level == "zone") {
           paste(
-            "You selected geography:",
-            shared_values$selected_region,
-            shared_values$selected_zone
+            "Step 1. Geography =",
+            shared_parameters$selected_region,
+            "-",
+            shared_parameters$selected_zone
           )
         } else {
-          if (shared_values$level == "region") {
-            paste("You selected geography:",
-                  shared_values$selected_region)
+          if (shared_parameters$level == "region") {
+            paste("Step 1. Geography =",
+                  shared_parameters$selected_region)
           } else {
-            paste("You selected geography: Ethiopia")
+            paste("Step 1. Geography = Ethiopia")
           }
         }
       }
     }) 
     
     output$crop_1_display <- renderText({
-      message(paste("S8. crop details:", shared_values$crop_name_1))
-      req(shared_values$crop_name_1)
-      paste("S8. You selected crop on Screen 4:", shared_values$crop_name_1)
+      req(shared_parameters$crop_name_1)
+      paste("Step 4. Crop =", shared_parameters$crop_name_1)
     })
     
     
     output$ideotype_1_display <- renderText({
-      message(paste("S8. ideotype details:", shared_values$ideotype_1))
-      req(shared_values$ideotype_1)
-      paste("S8. You selected ideotype on Screen 4:", shared_values$ideotype_1)
+      req(shared_parameters$ideotype_1)
+      paste("Step 4. Ideotype =", shared_parameters$ideotype_1)
     })
     
     
     output$scenario_1_display <- renderText({
-      message(paste("S8. scenario details:", shared_values$scenario_1))
-      req(shared_values$scenario_1)
-      paste("S8. You selected scenario on Screen 4:", shared_values$scenario_1)
+      req(shared_parameters$scenario_1)
+      paste("Step 4. Scenario =", shared_parameters$scenario_1)
     })
     
     
     output$inn_type_1_display <- renderText({
-      message(paste("S8. Innovation type:", shared_values$inn_type_1))
       req(shared_values$inn_type_1)
-      paste("S8. You selected Innovation type on Screen 4:", shared_values$inn_type_1)
+      paste("Step 4. Innovation type =", shared_values$inn_type_1)
     })
     
     # _ navigation----
@@ -679,8 +756,21 @@ bslib_screen8_module_v3_Server <- function(id, shared_values, switch_screen) {
     
     #2 observeEvent to_screen9 ----
     observeEvent(input$to_screen9, {
+      shared_values$step <- 9
+      save_progress(shared_values, shared_parameters)
       switch_screen("screen9")
       
+    })
+    
+    
+    # help button 08_01----
+    observeEvent(input$show_help_08_01, {
+      showModal(modalDialog(
+        title = "Step 8: View or Edit Rule Base Thresholds, Propositions and Conclusions",
+        includeMarkdown("docs/step_08_01.md"),
+        easyClose = TRUE,
+        footer = modalButton("Close")
+      ))
     })
     
   })
