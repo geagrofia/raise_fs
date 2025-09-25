@@ -159,19 +159,41 @@ Spatial accessibility is determined by geographic location in relation to target
 
 In public planning, an important objective is the equal provision of services for all people and in all parts of a country. For example, the population of a country or region should have similar access to public services, independent from their location of residence. Poor infrastructure and consequently limited accessibility implies fewer opportunities for improving economic status, health or social standing. Ravallion (1997), for example, speaks of a “spatial poverty trap” that may prevent the poor from breaking out of local level constraints.
 
-Thus, herebelow, we demonstrate on how to compute spatial accessibility. The outputs of these will be used directly during IRM. The  script will output the following:
+This script computes spatial accessibility. The outputs of these can be used directly during IRM. The  script will output the following:
 
-1. "--_tran_intv.tif"  Access using transport to Kebele centres (FTC)
-2. "--_tran_inthv.tif" or "--_tran_zone.tif" Access using transport to Farmers union / zone center/
-3. "--_tran_intwv.tif" Access using transport to woreda centers
-4. "--_tran_market.tif" acces using transport to market centers
 
-5. "--_walk_intv.tif"  Access by walking to Kebele centres (FTC)
-6. "--_walk_inthv.tif" or "--_walk_zone.tif" Access by walking to Farmer Union /zone center/
-7. "--_walk_intwv.tif" Access by walking to woreda centers
-8. "--_walk_market.tif" access using walking to market centers
+1. rast_cost_w_FTC_--.tif Access by walking to Kebele centres (FTC) 
+2. rast_cost_w_FTC_hr_--.tif "" in hours
+3. rast_cost_v_FTC_--.tif Access using transport to Kebele centres (FTC)
+4. rast_cost_v_FTC_hr_--.tif "" in hours
 
-NB: "-- is for a two digit character for the study woreda eg. "en" for endamekhoni
+5. rast_cost_w_woredaC_--.tif Access by walking to woreda centres
+6. rast_cost_w_woredaC_hr_--.tif "" in hours
+7. rast_cost_v_woredaC_--.tif Access using transport to woreda centres
+8. rast_cost_v_woredaC_hr_--.tif "" in hours
+
+9. rast_cost_w_zoneC_--.tif  Access by walking to Farmer Union /zone centre/
+10.rast_cost_w_zoneC_hr_--.tif "" in hours
+11.rast_cost_v_zoneC_--.tif Access using transport to Farmers union / zone centre/
+12.rast_cost_v_zoneC_hr_--.tif "" in hours
+
+13.rast_cost_w_localmarket_--.tif Access by walking to local market centres
+14.rast_cost_w_localmarket_hr_--.tif "" in hours
+15.rast_cost_v_localmarket_--.tif Access using transport to local market centres
+16.rast_cost_v_localmarket_hr_--.tif "" in hours
+
+17.rast_cost_w_woredamarket_--.tif Access by walking to woreda market centres
+18.rast_cost_w_woredamarket_hr_--.tif "" in hours
+19.rast_cost_v_woredamarket_--.tif Access using transport to woreda market centres
+20.rast_cost_v_woredamarket_hr_--.tif "" in hours
+
+21.rast_cost_w_zonemarket_--.tif Access by walking to zone market centres/wholesalers
+22.rast_cost_w_zonemarket_hr_--.tif "" in hours
+23.rast_cost_v_zonemarket_--.tif  Access using transport to zone market centres/wholesalers
+24.rast_cost_v_zonemarket_hr_--.tif "" in hours
+
+
+NB: "-- is for a five digit number for the study woreda e.g. "30801" for Ziquala
 
 
 ```{r ins_figure1, echo=FALSE, fig.cap="Schematic workflow of the accessibility modelling", warning=FALSE, out.width= "100%"}
