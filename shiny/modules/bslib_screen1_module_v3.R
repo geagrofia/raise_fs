@@ -13,7 +13,22 @@ bslib_screen1_module_v3_SidebarUI <- function(id, shared_values, shared_paramete
     
     wellPanel(
       style = "padding: 10px; margin-bottom: 5px;",
-      h4("Step 1: Select Geography"),
+      div(style="display:inline-block;vertical-align:middle;margin-bottom: 5px;",
+                actionButton(ns("show_help_01_01"), 
+                   title = "Help for Step 1",
+                   label = tagList(
+                     #"Go to Screen 2",
+                     #"Help for Step 1",
+                     # text first
+                     icon("circle-question")  # icon second)
+                   ),
+                   style = "background: rgba(23, 162, 184, 0.5);")
+                   #class = "btn btn-info")
+          ),
+      div(
+        style = "display: inline-block; vertical-align: middle; margin-left: 10px;",
+          h4("Step 1: Select Geography")
+      ),
       radioButtons(
         ns("level"),
         "Select level:",
@@ -72,7 +87,7 @@ bslib_screen1_module_v3_MainUI <- function(id) {
       ),
       # <button type="button" class="btn btn-secondary" data-bs-toggle="tooltip" data-bs-placement="left" data-bs-original-title="Tooltip on left">Left</button>
       actionButton(ns("to_screen2"), 
-                   title = "Go to Step 2",
+                   title = "Go to Step 2: Define IRM Spatial Resolution",
                    label = tagList(
         #"Go to Screen 2",
         "Next",
@@ -268,6 +283,7 @@ bslib_screen1_module_v3_Server <- function(id, shared_values, shared_parameters,
         message("S1. 1 Leaflet update observe: region")
         region_id <- df_region |> dplyr::filter(ADM1_EN == input$region) |> pull(ADM1_EN)
         region_data <- vect_region |> subset(vect_region$ADM1_EN == region_id)
+        #message("Expanse R",  expanse(region_data, unit = "km"))
         region_ext <- unlist(unname(as.vector(ext(region_data)))) # Extent of selected region as unnamed vector
         map |>
           addPolygons(data = region_data, color = "green", weight = 2) |> 
@@ -278,6 +294,7 @@ bslib_screen1_module_v3_Server <- function(id, shared_values, shared_parameters,
         message("S1. 1 Leaflet update observe: zone")
         zone_id <- df_zone %>% dplyr::filter(ADM2_EN == input$zone) %>% pull(ADM2_EN)
         zone_data <- vect_zone %>% subset(vect_zone$ADM2_EN == zone_id)
+        message("Expanse Z",  expanse(zone_data, unit = "km"))
         zone_ext <- unlist(unname(as.vector(ext(zone_data)))) # Extent of selected zone as unnamed vector
         map %>%
           addPolygons(data = zone_data, color = "red", weight = 2) %>% 
@@ -288,6 +305,7 @@ bslib_screen1_module_v3_Server <- function(id, shared_values, shared_parameters,
         message("S1. 1 Leaflet update observe: woreda")
         woreda_id <- df_woreda %>% dplyr::filter(ADM3_EN == input$woreda) %>% pull(ADM3_EN)
         woreda_data <- vect_woreda %>% subset(vect_woreda$ADM3_EN == woreda_id)
+        #message("Expanse W",  expanse(woreda_data, unit = "km"))
         woreda_ext <- unlist(unname(as.vector(ext(woreda_data)))) # Extent of selected woreda as unnamed vector
         map %>%
           addPolygons(data = woreda_data, color = "black", weight = 2) %>% 
@@ -317,7 +335,8 @@ bslib_screen1_module_v3_Server <- function(id, shared_values, shared_parameters,
     #4 observeEvent input$to_screen2 ----
     observeEvent(input$to_screen2, {
       message("S1. 4 input$to_screen2 observeEvent")
-      #save_progress(shared_values, shared_parameters)
+      shared_values$step <- 2
+      save_progress(shared_values, shared_parameters)
       #showNotification("Progress saved!", type = "message")
       switch_screen("screen2")
     })
@@ -475,6 +494,16 @@ bslib_screen1_module_v3_Server <- function(id, shared_values, shared_parameters,
     observeEvent(input$resume_progress, {
       load_progress(shared_values, shared_parameters, session$token)
       showNotification("Progress resumed!", type = "message")
+    })
+    
+    # help button 01_01----
+    observeEvent(input$show_help_01_01, {
+      showModal(modalDialog(
+        title = "Step 1: Select Geography",
+        includeMarkdown("docs/step_01_01.md"),
+        easyClose = TRUE,
+        footer = modalButton("Close")
+      ))
     })
     
     
