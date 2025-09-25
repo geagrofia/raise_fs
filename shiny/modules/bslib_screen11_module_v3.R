@@ -3,64 +3,135 @@
 library(DT)
 
 
-bslib_screen11_module_v3_SidebarUI <- function(id, shared_values) {
+bslib_screen11_module_v3_SidebarUI <- function(id, shared_values, shared_parameters) {
   ns <- NS(id)
   
   tagList(
-    h3("Yield:"),
-    # UI actionButtons screen navigation ----
-    actionButton(ns("back_to_screen10"), "Back to Screen 10"),
-    actionButton(ns("to_screen12"), "Go to Screen 12")
+    # wellPanel(
+    #   style = "padding: 10px; margin-bottom: 5px;",
+    #   actionButton(
+    #     ns("back_to_screen10"),
+    #     label = tagList(
+    #       icon("circle-left"),
+    #       # icon first
+    #       "Back to Screen 10"
+    #       # text second
+    #     ),
+    #     class = "btn-primary"
+    #   ),
+    #   actionButton(
+    #     ns("to_screen12"),
+    #     label = tagList(
+    #       "Go to Screen 12",
+    #       # text first
+    #       icon("circle-right")  # icon second)
+    #     ),
+    #     class = "btn-primary"
+    #   )
+    # ), 
+    wellPanel(
+      style = "padding: 10px; margin-bottom: 5px;",
+      div(
+        style = "display:inline-block;vertical-align:middle;margin-bottom: 5px;",
+        actionButton(
+          ns("show_help_11_01"),
+          title = "Help for Step 11",
+          label = tagList(
+            icon("circle-question")  # icon second)
+          ),
+          style = "background: rgba(23, 162, 184, 0.5);"
+        )
+        
+      ),
+      div(
+        style = "display: inline-block; vertical-align: middle; margin-left: 10px;",
+      h4("Step 11: View or Edit Yield Table")
+      ),
+      
+      scrollable_DT(ns("yield_table")),
+      uiOutput(ns("dyanamic_save_reset_yield"))
+    )
   )
 }
 
 bslib_screen11_module_v3_MainUI <- function(id) {
   ns <- NS(id)
   tagList(
-    textOutput(ns("value_display")),
-    textOutput(ns("level_display")),
-    textOutput(ns("selection_display")),
-    textOutput(ns("spatres_display")),
-    textOutput(ns("aggregation_display")),
-    textOutput(ns("num_innovations_display")),
-    textOutput(ns("innovation_system_display")),
-    textOutput(ns("crop_1_display")),
-    textOutput(ns("ideotype_1_display")),
-    textOutput(ns("scenario_1_display")),
-    textOutput(ns("inn_type_1_display")),
-    
-    # yield table
-    h4("Yield Table"),
-    DTOutput(ns("yield_table")),
-    uiOutput(ns("dyanamic_save_reset_yield"))
+    wellPanel(
+      h4("Navigate", style = "color: var(--bs-secondary);"),
+      style = "padding: 10px; margin-bottom: 5px;",
+      actionButton(ns("back_to_screen10"), 
+                   title = "Go back to Step 10: View or Edit Soil Texture and Drainage Tables",
+                   label = tagList(
+                     icon("circle-left"),  # icon first 
+                     #"Go to Introduction"
+                     "Back"
+                     # text second
+                   ),
+                   class = "btn-primary"),
+      
+      tags$span(
+        tagList("Step 11", icon("location-crosshairs")),  # text + icon
+        class = "btn btn-info disabled"
+      ),
+      # <button type="button" class="btn btn-secondary" data-bs-toggle="tooltip" data-bs-placement="left" data-bs-original-title="Tooltip on left">Left</button>
+      actionButton(ns("to_screen12"), 
+                   title = "Go to Step 12: View or Edit Spatial Data",
+                   label = tagList(
+                     #"Go to Screen 2",
+                     "Next",
+                     # text first
+                     icon("circle-right")  # icon second)
+                   ),
+                   class = "btn-primary disabled")
+      #,
+      #actionButton(ns("save_progress"), "Save Progress"),
+      #actionButton(ns("resume_progress"), "Resume Progress")
+    ),
+    wellPanel(
+      style = "padding: 10px; margin-bottom: 5px; background: rgba(23, 162, 184, 0.5);",
+      h4("Summary of IRM setup"),
+      textOutput(ns("value_display")),
+      textOutput(ns("level_display")),
+      textOutput(ns("selection_display")),
+      textOutput(ns("spatres_display")),
+      textOutput(ns("aggregation_display")),
+      textOutput(ns("num_innovations_display")),
+      textOutput(ns("innovation_system_display")),
+      textOutput(ns("crop_1_display")),
+      textOutput(ns("ideotype_1_display")),
+      textOutput(ns("scenario_1_display")),
+      textOutput(ns("inn_type_1_display"))
+    )
   )
 }
 
-bslib_screen11_module_v3_Server <- function(id, shared_values, switch_screen) {
+bslib_screen11_module_v3_Server <- function(id, shared_values, shared_parameters, switch_screen) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
     
     # Load the initial yield data ----
     initial_yield_data <- reactive({
+      req(switch_screen() == "screen11")
       if (file.exists(
         paste0(
           "E:/repos/raise_fs/shiny/data/",
-          shared_values$crop_name_1,
+          shared_parameters$crop_name_1,
           "_",
-          shared_values$ideotype_1,
+          shared_parameters$ideotype_1,
           "_",
-          shared_values$scenario_1,
+          shared_parameters$scenario_1,
           "_yield.csv"
         )
       )) {
         df_yield <- read.csv(
           paste0(
             "E:/repos/raise_fs/shiny/data/",
-            shared_values$crop_name_1,
+            shared_parameters$crop_name_1,
             "_",
-            shared_values$ideotype_1,
+            shared_parameters$ideotype_1,
             "_",
-            shared_values$scenario_1,
+            shared_parameters$scenario_1,
             "_yield.csv"
           )
         )
@@ -104,6 +175,7 @@ bslib_screen11_module_v3_Server <- function(id, shared_values, switch_screen) {
           selection = list(mode = "none"),
           editable = FALSE,
           options = list(
+            scrollX = TRUE,
             lengthMenu = c(10, 20),
             pageLength = 10,
             sDom  = '<"top">t'
@@ -118,6 +190,7 @@ bslib_screen11_module_v3_Server <- function(id, shared_values, switch_screen) {
           selection = list(mode = "single"),
           editable = list(target = "cell", disable = list(columns = c(0))),
           options = list(
+            scrollX = TRUE,
             lengthMenu = c(10, 20),
             pageLength = 10,
             sDom  = '<"top">t'
@@ -159,8 +232,11 @@ bslib_screen11_module_v3_Server <- function(id, shared_values, switch_screen) {
     
     # dynamic yd save reset controls ----
     output$dyanamic_save_reset_yield <- renderUI({
-      tagList(actionButton(ns("save_btn_yd"), "Save Yield table"),
-              actionButton(ns("reset_btn_yd"), "Reset Yield table"))
+      tagList(actionButton(ns("save_btn_yd"), "Save Yield table",
+                           class = "btn-primary"),
+              actionButton(ns("reset_btn_yd"), "Reset Yield table",
+                           class = "btn-primary")
+              )
     })
     
     # observeEvent yd save button----
@@ -217,14 +293,16 @@ bslib_screen11_module_v3_Server <- function(id, shared_values, switch_screen) {
           dt_yd,
           file = paste0(
             "E:/repos/raise_fs/shiny/data/",
-            shared_values$crop_name_1,
+            shared_parameters$crop_name_1,
             "_",
-            shared_values$ideotype_1,
+            shared_parameters$ideotype_1,
             "_",
-            shared_values$scenario_1,
+            shared_parameters$scenario_1,
             "_yield_s11.csv"
           )
         )
+        
+        enable("to_screen12")
         
         removeModal()
         showModal(
@@ -249,87 +327,78 @@ bslib_screen11_module_v3_Server <- function(id, shared_values, switch_screen) {
     # outputs from previous screens----
     
     output$num_innovations_display <- renderText({
-      paste("Number of innovations:", shared_values$num_innovations)
+      paste("Step 3. Number of innovations =", shared_parameters$num_innovations)
     })
     
     output$innovation_system_display <- renderText({
-      if (shared_values$num_innovations == "two_inn") {
-        paste("Innovation System:",
-              shared_values$innovation_system)
-      }
-    })
+      paste("Step 3. Innovation System =", shared_parameters$innovation_system)
+    })  
     
     output$spatres_display <- renderText({
-      paste("Your spatial resolution is:", shared_values$resolution)
+      paste("Step 2. Spatial resolution =", shared_parameters$resolution)
     })
     
-    
     output$aggregation_display <- renderText({
-      paste("Your aggregation level is:", shared_values$aggregation)
+      paste("Step 2. Aggregation level =", shared_parameters$aggregation)
     })
     
     output$level_display <- renderText({
-      req(shared_values$level)
-      paste("You selected level on Screen 1:", shared_values$level)
+      req(shared_parameters$level)
+      paste("Step 1. Spatial level =", shared_parameters$level)
     })
     
     output$selection_display <- renderText({
-      req(shared_values$level)
+      req(shared_parameters$level)
       
-      if (shared_values$level == "woreda") {
+      if (shared_parameters$level == "woreda") {
         paste(
-          "You selected geography:",
-          shared_values$selected_region,
-          shared_values$selected_zone,
-          shared_values$selected_woreda
+          "Step 1. Geography =",
+          shared_parameters$selected_region,
+          "-",
+          shared_parameters$selected_zone,
+          "-",
+          shared_parameters$selected_woreda
         )
       } else {
-        if (shared_values$level == "zone") {
+        if (shared_parameters$level == "zone") {
           paste(
-            "You selected geography:",
-            shared_values$selected_region,
-            shared_values$selected_zone
+            "Step 1. Geography =",
+            shared_parameters$selected_region,
+            "-",
+            shared_parameters$selected_zone
           )
         } else {
-          if (shared_values$level == "region") {
-            paste("You selected geography:",
-                  shared_values$selected_region)
+          if (shared_parameters$level == "region") {
+            paste("Step 1. Geography =",
+                  shared_parameters$selected_region)
           } else {
-            paste("You selected geography: Ethiopia")
+            paste("Step 1. Geography = Ethiopia")
           }
         }
       }
     })
     
     output$crop_1_display <- renderText({
-      message(paste("S11. crop details:", shared_values$crop_name_1))
-      req(shared_values$crop_name_1)
-      paste("S11. You selected crop on Screen 4:",
-            shared_values$crop_name_1)
+      req(shared_parameters$crop_name_1)
+      paste("Step 4. Crop =", shared_parameters$crop_name_1)
     })
     
     
     output$ideotype_1_display <- renderText({
-      message(paste("S11. ideotype details:", shared_values$ideotype_1))
-      req(shared_values$ideotype_1)
-      paste("S11. You selected ideotype on Screen 4:",
-            shared_values$ideotype_1)
+      req(shared_parameters$ideotype_1)
+      paste("Step 4. Ideotype =", shared_parameters$ideotype_1)
     })
     
     
     output$scenario_1_display <- renderText({
-      message(paste("S11. scenario details:", shared_values$scenario_1))
-      req(shared_values$scenario_1)
-      paste("S11. You selected scenario on Screen 4:",
-            shared_values$scenario_1)
+      req(shared_parameters$scenario_1)
+      paste("Step 4. Scenario =", shared_parameters$scenario_1)
     })
     
     
     output$inn_type_1_display <- renderText({
-      message(paste("S11. Innovation type:", shared_values$inn_type_1))
       req(shared_values$inn_type_1)
-      paste("S11. You selected Innovation type on Screen 4:",
-            shared_values$inn_type_1)
+      paste("Step 4. Innovation type =", shared_values$inn_type_1)
     })
     
     # _ navigation----
@@ -341,8 +410,21 @@ bslib_screen11_module_v3_Server <- function(id, shared_values, switch_screen) {
     
     # observeEvent to_screen12 ----
     observeEvent(input$to_screen12, {
+      shared_values$step <- 12
+      save_progress(shared_values, shared_parameters)
+      showNotification("Progress saved!", type = "message")
       switch_screen("screen12")
       
+    })
+    
+    # help button 11_01----
+    observeEvent(input$show_help_11_01, {
+      showModal(modalDialog(
+        title = "Step 11: View or Edit Yield Table",
+        includeMarkdown("docs/step_11_01.md"),
+        easyClose = TRUE,
+        footer = modalButton("Close")
+      ))
     })
     
   }) # Module server
