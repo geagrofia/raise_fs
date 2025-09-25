@@ -1,26 +1,68 @@
-bslib_screen12_module_v3_SidebarUI <- function(id, shared_values) {
+bslib_screen12_module_v3_SidebarUI <- function(id, shared_values, shared_parameters) {
   
   ns <- NS(id)
   
   tagList(
-    h3("Spatial Data:"),
-    
-    checkboxInput(ns("services_local"), "Access to local services (e.g. FTCs)", value = FALSE),
-    checkboxInput(ns("services_woreda"), "Access to woreda services (e.g. SMS)", value = FALSE),
-    checkboxInput(ns("services_zone"), "Access to zonal services (e.g. Union)", value = FALSE),
-
-    checkboxInput(ns("markets_local"), "Access to local markets", value = FALSE),
-    checkboxInput(ns("markets_woreda"), "Access to woreda markets", value = FALSE),
-    checkboxInput(ns("markets_zone"), "Access to regional markets (e.g. wholesalers)", value = FALSE),
-    
-    downloadButton(ns("run_Acc_btn"), "Run Accessibility Analysis"),
+    # wellPanel(
+    #   style = "padding: 10px; margin-bottom: 5px;",
+    #   actionButton(
+    #     ns("back_to_screen11"),
+    #     label = tagList(
+    #       icon("circle-left"),
+    #       # icon first
+    #       "Back to Screen 11"
+    #       # text second
+    #     ),
+    #     class = "btn-primary"
+    #   ),
+    #   actionButton(
+    #     ns("to_screen13"),
+    #     label = tagList(
+    #       "Go to Screen 13",
+    #       # text first
+    #       icon("circle-right")  # icon second)
+    #     ),
+    #     class = "btn-primary"
+    #   )
+    # ), 
+    wellPanel(
+      style = "padding: 10px; margin-bottom: 5px;",
+      div(
+        style = "display:inline-block;vertical-align:middle;margin-bottom: 5px;",
+        actionButton(
+          ns("show_help_12_01"),
+          title = "Help for Step 12",
+          label = tagList(
+            icon("circle-question")  # icon second)
+          ),
+          style = "background: rgba(23, 162, 184, 0.5);"
+        )
+        
+      ),
+      div(
+        style = "display: inline-block; vertical-align: middle; margin-left: 10px;",
+      h4("Step 12: View or Edit Spatial Data")
+      )
+    ),
+    wellPanel(
+      style = "padding: 10px; margin-bottom: 5px;",
+      h5("Accessibility Analysis:"),
+      checkboxInput(ns("services_local"), "Access to local services (e.g. FTCs)", value = FALSE),
+      checkboxInput(ns("services_woreda"), "Access to woreda services (e.g. SMS)", value = FALSE),
+      checkboxInput(ns("services_zone"), "Access to zonal services (e.g. Union)", value = FALSE),
+      checkboxInput(ns("markets_local"), "Access to local markets", value = FALSE),
+      checkboxInput(ns("markets_woreda"), "Access to woreda markets", value = FALSE),
+      checkboxInput(ns("markets_zone"), "Access to regional markets (e.g. wholesalers)", value = FALSE),
+      downloadButton(ns("run_Acc_btn"), "Run Accessibility Analysis"),
     #downloadButton(ns("run_Accfewpar_btn"), "Run Accessibility Analysis with fewer params"),
-
-    uiOutput(ns("extra_ui")),
-    # UI actionButtons screen navigation ----
-    actionButton(ns("back_to_screen11"), "Back to Screen 11"),
-    actionButton(ns("to_screen13"), "Go to Screen 13")
-    
+      uiOutput(ns("extra_ui"))
+    ),
+    wellPanel(
+      style = "padding: 10px; margin-bottom: 5px;",
+      h5("Spatial Data:"),    
+      scrollable_DT(ns("spatial_data_table")),
+      uiOutput(ns("dyanamic_save_reset"))
+    )
   )
 }
 
@@ -29,34 +71,67 @@ bslib_screen12_module_v3_SidebarUI <- function(id, shared_values) {
 bslib_screen12_module_v3_MainUI <- function(id) {
   ns <- NS(id)
   tagList(
-    textOutput(ns("value_display")),
-    textOutput(ns("level_display")),
-    textOutput(ns("selection_display")),
-    textOutput(ns("spatres_display")),
-    textOutput(ns("aggregation_display")),
-    textOutput(ns("num_innovations_display")),
-    textOutput(ns("innovation_system_display")),
-    textOutput(ns("crop_1_display")),
-    textOutput(ns("ideotype_1_display")),
-    textOutput(ns("scenario_1_display")),
-    textOutput(ns("inn_type_1_display")),
-    DTOutput(ns("spatial_data_table")),
-    uiOutput(ns("dyanamic_save_reset"))
+    wellPanel(
+      h4("Navigate", style = "color: var(--bs-secondary);"),
+      style = "padding: 10px; margin-bottom: 5px;",
+      actionButton(ns("back_to_screen11"), 
+                   title = "Go back to Step 11: View or Edit Yield Table",
+                   label = tagList(
+                     icon("circle-left"),  # icon first 
+                     #"Go to Introduction"
+                     "Back"
+                     # text second
+                   ),
+                   class = "btn-primary"),
+      
+      tags$span(
+        tagList("Step 12", icon("location-crosshairs")),  # text + icon
+        class = "btn btn-info disabled"
+      ),
+      # <button type="button" class="btn btn-secondary" data-bs-toggle="tooltip" data-bs-placement="left" data-bs-original-title="Tooltip on left">Left</button>
+      actionButton(ns("to_screen13"), 
+                   title = "Go to Step 13: Run IRM or start Innovation 2",
+                   label = tagList(
+                     #"Go to Screen 2",
+                     "Next",
+                     # text first
+                     icon("circle-right")  # icon second)
+                   ),
+                   class = "btn-primary disabled")
+      #,
+      #actionButton(ns("save_progress"), "Save Progress"),
+      #actionButton(ns("resume_progress"), "Resume Progress")
+    ),
+    wellPanel(
+      style = "padding: 10px; margin-bottom: 5px; background: rgba(23, 162, 184, 0.5);",
+      h4("Summary of IRM setup"),
+      textOutput(ns("value_display")),
+      textOutput(ns("level_display")),
+      textOutput(ns("selection_display")),
+      textOutput(ns("spatres_display")),
+      textOutput(ns("aggregation_display")),
+      textOutput(ns("num_innovations_display")),
+      textOutput(ns("innovation_system_display")),
+      textOutput(ns("crop_1_display")),
+      textOutput(ns("ideotype_1_display")),
+      textOutput(ns("scenario_1_display")),
+      textOutput(ns("inn_type_1_display"))
+    )
   )
 }
 
-bslib_screen12_module_v3_Server <- function(id, shared_values, switch_screen) {
+bslib_screen12_module_v3_Server <- function(id, shared_values, shared_parameters, switch_screen) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
     
     NA_weights <- 0
     
-    shared_values$services_local <- 0
-    shared_values$services_woreda <- 0
-    shared_values$services_zone <- 0
-    shared_values$markets_local <- 0
-    shared_values$markets_woreda <- 0
-    shared_values$markets_zone <- 0
+    shared_parameters$services_local <- 0
+    shared_parameters$services_woreda <- 0
+    shared_parameters$services_zone <- 0
+    shared_parameters$markets_local <- 0
+    shared_parameters$markets_woreda <- 0
+    shared_parameters$markets_zone <- 0
     
     # Load the initial data ----
     initial_spatial_data <- reactive({
@@ -65,32 +140,32 @@ bslib_screen12_module_v3_Server <- function(id, shared_values, switch_screen) {
       
       if (file.exists(paste0(
         "E:/repos/raise_fs/shiny/data/",
-        shared_values$crop_name_1,
+        shared_parameters$crop_name_1,
         "_",
-        shared_values$ideotype_1,
+        shared_parameters$ideotype_1,
         "_",
-        shared_values$scenario_1,
+        shared_parameters$scenario_1,
         "_requirements_s8.csv"
       ))) {
         
         message(
           paste(
             "S12. Initiation. inn details1:",
-            shared_values$crop_name_1,
+            shared_parameters$crop_name_1,
             "-",
-            shared_values$ideotype_1,
+            shared_parameters$ideotype_1,
             "-",
-            shared_values$scenario_1
+            shared_parameters$scenario_1
           )
         )
         df_requirements_s8 <- read.csv(
           paste0(
             "E:/repos/raise_fs/shiny/data/",
-            shared_values$crop_name_1,
+            shared_parameters$crop_name_1,
             "_",
-            shared_values$ideotype_1,
+            shared_parameters$ideotype_1,
             "_",
-            shared_values$scenario_1,
+            shared_parameters$scenario_1,
             "_requirements_s8.csv"
           )
         )
@@ -98,11 +173,11 @@ bslib_screen12_module_v3_Server <- function(id, shared_values, switch_screen) {
         df_links_s5 <- read.csv(
           paste0(
             "E:/repos/raise_fs/shiny/data/",
-            shared_values$crop_name_1,
+            shared_parameters$crop_name_1,
             "_",
-            shared_values$ideotype_1,
+            shared_parameters$ideotype_1,
             "_",
-            shared_values$scenario_1,
+            shared_parameters$scenario_1,
             "_links_s5.csv"
           )
         )
@@ -209,8 +284,9 @@ bslib_screen12_module_v3_Server <- function(id, shared_values, switch_screen) {
           rownames = F,
           filter = "bottom",
           selection = list(mode = "none"),
+          extensions = c('FixedColumns', 'FixedHeader'),
           editable = FALSE,
-          options = list(lengthMenu = c(10, 20, 50), pageLength = 20)
+          options = list(scrollX = TRUE, fixedColumns = list(leftColumns = 2), lengthMenu = c(10, 20, 50), pageLength = 10)
         )
         
         # this version tries to highlight groups
@@ -280,11 +356,14 @@ bslib_screen12_module_v3_Server <- function(id, shared_values, switch_screen) {
           rownames = F,
           filter = "bottom",
           selection = list(mode = "single"),
+          extensions = c('FixedColumns', 'FixedHeader'),
           editable = list(target = "cell", disable = list(columns = c(0:1))),
           # only edit the conclusions
           options = list(
+            scrollX = TRUE,
+            fixedColumns = list(leftColumns = 2),
             lengthMenu = c(10, 20, 50),
-            pageLength = 20,
+            pageLength = 10,
             rowCallback = JS(
               sprintf(
                 "function(row, data, index) {
@@ -342,15 +421,19 @@ bslib_screen12_module_v3_Server <- function(id, shared_values, switch_screen) {
     # dynamic save reset controls ----
     output$dyanamic_save_reset <- renderUI({
       tagList(
-        actionButton(ns("save_btn"), "Save table"),
-        actionButton(ns("reset_btn"), "Reset table")
+        actionButton(ns("save_btn_spatial"), "Save Spatial Data table",
+                     class = "btn-primary"),
+        actionButton(ns("reset_btn"), "Reset Spatial Data table",
+                     class = "btn-primary")
       )
     })
     
     
     # observeEvent save button----
-    observeEvent(input$save_btn, {
+    observeEvent(input$save_btn_spatial, {
+      
       req(current_spatial_data())
+      
       dt <- spatial_data_table_data()
       
       message("S12. 2 str(dt)")
@@ -463,32 +546,32 @@ bslib_screen12_module_v3_Server <- function(id, shared_values, switch_screen) {
         
         if (file.exists(paste0(
           "E:/repos/raise_fs/shiny/data/",
-          shared_values$crop_name_1,
+          shared_parameters$crop_name_1,
           "_",
-          shared_values$ideotype_1,
+          shared_parameters$ideotype_1,
           "_",
-          shared_values$scenario_1,
+          shared_parameters$scenario_1,
           "_gs_s9.csv"
         ))) {
           
           df_gs_s9 <- read.csv(
             paste0(
               "E:/repos/raise_fs/shiny/data/",
-              shared_values$crop_name_1,
+              shared_parameters$crop_name_1,
               "_",
-              shared_values$ideotype_1,
+              shared_parameters$ideotype_1,
               "_",
-              shared_values$scenario_1,
+              shared_parameters$scenario_1,
               "_gs_s9.csv"
             )
           ) } else {          df_gs_s9 <- read.csv(
             paste0(
               "E:/repos/raise_fs/shiny/data/",
-              shared_values$crop_name_1,
+              shared_parameters$crop_name_1,
               "_",
-              shared_values$ideotype_1,
+              shared_parameters$ideotype_1,
               "_",
-              shared_values$scenario_1,
+              shared_parameters$scenario_1,
               "_gs.csv"
             ))}
           
@@ -575,7 +658,7 @@ bslib_screen12_module_v3_Server <- function(id, shared_values, switch_screen) {
       # save growth stages table
       fwrite(
         df_gs_s12, file = paste0(
-          "E:/repos/raise_fs/shiny/data/", shared_values$crop_name_1, "_", shared_values$ideotype_1, "_", shared_values$scenario_1, "_gs_s12.csv"
+          "E:/repos/raise_fs/shiny/data/", shared_parameters$crop_name_1, "_", shared_parameters$ideotype_1, "_", shared_parameters$scenario_1, "_gs_s12.csv"
         )
       )
       
@@ -642,7 +725,7 @@ bslib_screen12_module_v3_Server <- function(id, shared_values, switch_screen) {
       
       df_inn_requirements_s8 <- read.csv(
         paste0(
-          "E:/repos/raise_fs/shiny/data/", shared_values$crop_name_1, "_", shared_values$ideotype_1, "_", shared_values$scenario_1, "_requirements_s8.csv"
+          "E:/repos/raise_fs/shiny/data/", shared_parameters$crop_name_1, "_", shared_parameters$ideotype_1, "_", shared_parameters$scenario_1, "_requirements_s8.csv"
         )
       )
       
@@ -654,15 +737,19 @@ bslib_screen12_module_v3_Server <- function(id, shared_values, switch_screen) {
       
       fwrite(
         df_inn_requirements_s12, file = paste0(
-          "E:/repos/raise_fs/shiny/data/", shared_values$crop_name_1, "_", shared_values$ideotype_1, "_", shared_values$scenario_1, "_requirements_s12.csv"
+          "E:/repos/raise_fs/shiny/data/", shared_parameters$crop_name_1, "_", shared_parameters$ideotype_1, "_", shared_parameters$scenario_1, "_requirements_s12.csv"
         )
       )
       
+      enable("to_screen13")
+      
       removeModal()
+      
       showModal(modalDialog(
         title = "Saved",
-        "Table saved successfully.",
+        "Spatial Data Table saved successfully.",
         easyClose = TRUE))
+      
     }
       })
     
@@ -745,62 +832,93 @@ bslib_screen12_module_v3_Server <- function(id, shared_values, switch_screen) {
     
     # observe parameters ----
     observe({
+     req(input$services_local)
       message("S12. observe parameters")
-      shared_values$services_local <- ifelse(input$services_local, 1, 0)
-      shared_values$services_woreda <- ifelse(input$services_woreda, 1, 0)
-      shared_values$services_zone <- ifelse(input$services_zone, 1, 0)
-      shared_values$markets_local <- ifelse(input$markets_local, 1, 0)
-      shared_values$markets_woreda <- ifelse(input$markets_woreda, 1, 0)
-      shared_values$markets_zone <- ifelse(input$markets_zone, 1, 0)
-      message("S12. shared_values$services_local")
-      print(shared_values$services_local)
-      message("S12. shared_values$services_woreda")
-      print(shared_values$services_woreda)
-      message("S12. shared_values$services_zone")
-      print(shared_values$services_zone)
-      message("S12. shared_values$markets_local")
-      print(shared_values$markets_local)
-      message("S12. shared_values$markets_woreda")
-      print(shared_values$markets_woreda)
-      message("S12. shared_values$markets_zone")
-      print(shared_values$markets_zone)
+      shared_parameters$services_local <- ifelse(input$services_local, 1, 0)
+      message("S12. shared_parameters$services_local")
+      print(shared_parameters$services_local)
+    })
+    
+    # observe parameters ----
+    observe({
+      req(input$services_woreda)
+      message("S12. observe parameters")
+      shared_parameters$services_woreda <- ifelse(input$services_woreda, 1, 0)
+      message("S12. shared_parameters$services_woreda")
+      print(shared_parameters$services_woreda)
+    })
+    
+    # observe parameters ----
+    observe({
+      req(input$services_zone)
+      message("S12. observe parameters")
+      shared_parameters$services_zone <- ifelse(input$services_zone, 1, 0)
+      message("S12. shared_parameters$services_zone")
+      print(shared_parameters$services_zone)
+    })
+    
+    # observe parameters ----
+    observe({
+      req(input$markets_local)
+      message("S12. observe parameters")
+      shared_parameters$markets_local <- ifelse(input$markets_local, 1, 0)
+      message("S12. shared_parameters$markets_local")
+      print(shared_parameters$markets_local)
+    })
+    
+    # observe parameters ----
+    observe({
+      req(input$markets_woreda)
+      message("S12. observe parameters")
+      shared_parameters$markets_woreda <- ifelse(input$markets_woreda, 1, 0)
+      message("S12. shared_parameters$markets_woreda")
+      print(shared_parameters$markets_woreda)
+    })
+    
+    # observe parameters ----
+    observe({
+      req(input$markets_zone)
+      message("S12. observe parameters")
+      shared_parameters$markets_zone <- ifelse(input$markets_zone, 1, 0)
+      message("S12. shared_parameters$markets_zone")
+      print(shared_parameters$markets_zone)
     })
     
     
     # downloadHandler run_Acc_btn ----
     output$run_Acc_btn  <- downloadHandler(
       filename = paste0(
-        shared_values$crop_name_1,
+        shared_parameters$crop_name_1,
         "_",
-        shared_values$ideotype_1,
+        shared_parameters$ideotype_1,
         "_",
-        shared_values$scenario_1,
+        shared_parameters$scenario_1,
         "_accessibility_",
-        shared_values$DIVCODEVAL,
+        shared_parameters$DIVCODEVAL,
         ".html"
       ),
       content = function(file) {
         withProgress(value = 0, message = 'Starting, this may take some time', {
           params_acc <- list(
             EXT = "Ethiopia",
-            ZONCODEVAR =  shared_values$ZONCODEVAR,
-            ZONCODEVAL =  shared_values$ZONCODEVAL,
-            DIVCODEVAR =  shared_values$DIVCODEVAR,
-            DIVCODEVAL =  shared_values$DIVCODEVAL,
-            DIVNAMEVAR =  shared_values$DIVNAMEVAR,
-            LEVEL = shared_values$level,
-            ACC_S_L = shared_values$services_local,
-            ACC_S_W = shared_values$services_woreda,
-            ACC_S_Z = shared_values$services_zone,
-            ACC_M_L = shared_values$markets_local,
-            ACC_M_W = shared_values$markets_woreda,
-            ACC_M_Z = shared_values$markets_zone,
+            ZONCODEVAR =  shared_parameters$ZONCODEVAR,
+            ZONCODEVAL =  shared_parameters$ZONCODEVAL,
+            DIVCODEVAR =  shared_parameters$DIVCODEVAR,
+            DIVCODEVAL =  shared_parameters$DIVCODEVAL,
+            DIVNAMEVAR =  shared_parameters$DIVNAMEVAR,
+            LEVEL = shared_parameters$level,
+            ACC_S_L = shared_parameters$services_local,
+            ACC_S_W = shared_parameters$services_woreda,
+            ACC_S_Z = shared_parameters$services_zone,
+            ACC_M_L = shared_parameters$markets_local,
+            ACC_M_W = shared_parameters$markets_woreda,
+            ACC_M_Z = shared_parameters$markets_zone,
             INN1 =  paste0(
-              shared_values$crop_name_1,
+              shared_parameters$crop_name_1,
               "_",
-              shared_values$ideotype_1,
+              shared_parameters$ideotype_1,
               "_",
-              shared_values$scenario_1
+              shared_parameters$scenario_1
             )
           )
           
@@ -843,26 +961,26 @@ bslib_screen12_module_v3_Server <- function(id, shared_values, switch_screen) {
           tags$br(),
           "(seconds):",
           tags$span(style = "color:blue;", paste(
-            "rast_cost_w_FTC_", shared_values$DIVCODEVAL
+            "rast_cost_w_FTC_", shared_parameters$DIVCODEVAL
           )),
           tags$br(),
           "(hours):",
           tags$span(
             style = "color:blue;",
-            paste("rast_cost_w_FTC_hr_", shared_values$DIVCODEVAL)
+            paste("rast_cost_w_FTC_hr_", shared_parameters$DIVCODEVAL)
           ),
           tags$br(),
           "✔ Walking and vehicle to Local Services",
           tags$br(),
           "(seconds):",
           tags$span(style = "color:blue;", paste(
-            "rast_cost_v_FTC_", shared_values$DIVCODEVAL
+            "rast_cost_v_FTC_", shared_parameters$DIVCODEVAL
           )),
           tags$br(),
           "(hours):",
           tags$span(
             style = "color:blue;",
-            paste("rast_cost_v_FTC_hr_", shared_values$DIVCODEVAL)
+            paste("rast_cost_v_FTC_hr_", shared_parameters$DIVCODEVAL)
           ),
           tags$br(),
           tags$br()
@@ -875,13 +993,13 @@ bslib_screen12_module_v3_Server <- function(id, shared_values, switch_screen) {
           "(seconds):",
           tags$span(
             style = "color:blue;",
-            paste("rast_cost_w_woredaC_", shared_values$DIVCODEVAL)
+            paste("rast_cost_w_woredaC_", shared_parameters$DIVCODEVAL)
           ),
           tags$br(),
           "(hours):",
           tags$span(
             style = "color:blue;",
-            paste("rast_cost_w_woredaC_hr_", shared_values$DIVCODEVAL)
+            paste("rast_cost_w_woredaC_hr_", shared_parameters$DIVCODEVAL)
           ),
           tags$br(),
           "✔ Walking and vehicle to Woreda Services",
@@ -889,13 +1007,13 @@ bslib_screen12_module_v3_Server <- function(id, shared_values, switch_screen) {
           "(seconds):",
           tags$span(
             style = "color:blue;",
-            paste("rast_cost_v_woredaC_", shared_values$DIVCODEVAL)
+            paste("rast_cost_v_woredaC_", shared_parameters$DIVCODEVAL)
           ),
           tags$br(),
           "(hours):",
           tags$span(
             style = "color:blue;",
-            paste("rast_cost_v_woredaC_hr_", shared_values$DIVCODEVAL)
+            paste("rast_cost_v_woredaC_hr_", shared_parameters$DIVCODEVAL)
           ),
           tags$br(),
           tags$br()
@@ -908,13 +1026,13 @@ bslib_screen12_module_v3_Server <- function(id, shared_values, switch_screen) {
           "(seconds):",
           tags$span(
             style = "color:blue;",
-            paste("rast_cost_w_zoneC_", shared_values$DIVCODEVAL)
+            paste("rast_cost_w_zoneC_", shared_parameters$DIVCODEVAL)
           ),
           tags$br(),
           "(hours):",
           tags$span(
             style = "color:blue;",
-            paste("rast_cost_w_zoneC_hr_", shared_values$DIVCODEVAL)
+            paste("rast_cost_w_zoneC_hr_", shared_parameters$DIVCODEVAL)
           ),
           tags$br(),
           "✔ Walking and vehicle to Zonal Services",
@@ -922,13 +1040,13 @@ bslib_screen12_module_v3_Server <- function(id, shared_values, switch_screen) {
           "(seconds):",
           tags$span(
             style = "color:blue;",
-            paste("rast_cost_v_zoneC_", shared_values$DIVCODEVAL)
+            paste("rast_cost_v_zoneC_", shared_parameters$DIVCODEVAL)
           ),
           tags$br(),
           "(hours):",
           tags$span(
             style = "color:blue;",
-            paste("rast_cost_v_zoneC_hr_", shared_values$DIVCODEVAL)
+            paste("rast_cost_v_zoneC_hr_", shared_parameters$DIVCODEVAL)
           ),
           tags$br(),
           tags$br()
@@ -941,13 +1059,13 @@ bslib_screen12_module_v3_Server <- function(id, shared_values, switch_screen) {
           "(seconds):",
           tags$span(
             style = "color:blue;",
-            paste("rast_cost_w_localmarket_", shared_values$DIVCODEVAL)
+            paste("rast_cost_w_localmarket_", shared_parameters$DIVCODEVAL)
           ),
           tags$br(),
           "(hours):",
           tags$span(
             style = "color:blue;",
-            paste("rast_cost_w_localmarket_hr_", shared_values$DIVCODEVAL)
+            paste("rast_cost_w_localmarket_hr_", shared_parameters$DIVCODEVAL)
           ),
           tags$br(),
           "✔ Walking and vehicle to Local Markets",
@@ -955,13 +1073,13 @@ bslib_screen12_module_v3_Server <- function(id, shared_values, switch_screen) {
           "(seconds):",
           tags$span(
             style = "color:blue;",
-            paste("rast_cost_v_localmarket_", shared_values$DIVCODEVAL)
+            paste("rast_cost_v_localmarket_", shared_parameters$DIVCODEVAL)
           ),
           tags$br(),
           "(hours):",
           tags$span(
             style = "color:blue;",
-            paste("rast_cost_v_localmarket_hr_", shared_values$DIVCODEVAL)
+            paste("rast_cost_v_localmarket_hr_", shared_parameters$DIVCODEVAL)
           ),
           tags$br(),
           tags$br()
@@ -974,13 +1092,13 @@ bslib_screen12_module_v3_Server <- function(id, shared_values, switch_screen) {
           "(seconds):",
           tags$span(
             style = "color:blue;",
-            paste("rast_cost_w_woredamarket_", shared_values$DIVCODEVAL)
+            paste("rast_cost_w_woredamarket_", shared_parameters$DIVCODEVAL)
           ),
           tags$br(),
           "(hours):",
           tags$span(
             style = "color:blue;",
-            paste("rast_cost_w_woredamarket_hr_", shared_values$DIVCODEVAL)
+            paste("rast_cost_w_woredamarket_hr_", shared_parameters$DIVCODEVAL)
           ),
           tags$br(),
           "✔ Walking and vehicle to Woreda Market",
@@ -988,13 +1106,13 @@ bslib_screen12_module_v3_Server <- function(id, shared_values, switch_screen) {
           "(seconds):",
           tags$span(
             style = "color:blue;",
-            paste("rast_cost_v_woredamarket_", shared_values$DIVCODEVAL)
+            paste("rast_cost_v_woredamarket_", shared_parameters$DIVCODEVAL)
           ),
           tags$br(),
           "(hours):",
           tags$span(
             style = "color:blue;",
-            paste("rast_cost_v_woredamarket_hr_", shared_values$DIVCODEVAL)
+            paste("rast_cost_v_woredamarket_hr_", shared_parameters$DIVCODEVAL)
           ),
           tags$br(),
           tags$br()
@@ -1007,13 +1125,13 @@ bslib_screen12_module_v3_Server <- function(id, shared_values, switch_screen) {
           "(seconds):",
           tags$span(
             style = "color:blue;",
-            paste("rast_cost_w_zonemarket_", shared_values$DIVCODEVAL)
+            paste("rast_cost_w_zonemarket_", shared_parameters$DIVCODEVAL)
           ),
           tags$br(),
           "(hours):",
           tags$span(
             style = "color:blue;",
-            paste("rast_cost_w_zonemarket_hr_", shared_values$DIVCODEVAL)
+            paste("rast_cost_w_zonemarket_hr_", shared_parameters$DIVCODEVAL)
           ),
           tags$br(),
           "✔ Walking and vehicle to Zonal Market",
@@ -1021,13 +1139,13 @@ bslib_screen12_module_v3_Server <- function(id, shared_values, switch_screen) {
           "(seconds):",
           tags$span(
             style = "color:blue;",
-            paste("rast_cost_v_zonemarket_", shared_values$DIVCODEVAL)
+            paste("rast_cost_v_zonemarket_", shared_parameters$DIVCODEVAL)
           ),
           tags$br(),
           "(hours):",
           tags$span(
             style = "color:blue;",
-            paste("rast_cost_v_zonemarket_hr_", shared_values$DIVCODEVAL)
+            paste("rast_cost_v_zonemarket_hr_", shared_parameters$DIVCODEVAL)
           ),
           tags$br(),
           tags$br()
@@ -1102,82 +1220,78 @@ bslib_screen12_module_v3_Server <- function(id, shared_values, switch_screen) {
     # outputs from previous screens----
     
     output$num_innovations_display <- renderText({
-      paste("Number of innovations:", shared_values$num_innovations)
+      paste("Step 3. Number of innovations =", shared_parameters$num_innovations)
     })
     
     output$innovation_system_display <- renderText({
-      if (shared_values$num_innovations == "two_inn") {
-        paste("Innovation System:", shared_values$innovation_system)
-      }
-    })    
+      paste("Step 3. Innovation System =", shared_parameters$innovation_system)
+    })     
     
     output$spatres_display <- renderText({
-      paste("Your spatial resolution is:", shared_values$resolution)
+      paste("Step 2. Spatial resolution =", shared_parameters$resolution)
     })
     
-    
     output$aggregation_display <- renderText({
-      paste("Your aggregation level is:", shared_values$aggregation)
+      paste("Step 2. Aggregation level =", shared_parameters$aggregation)
     })
     
     output$level_display <- renderText({
-      req(shared_values$level)
-      paste("You selected level on Screen 1:", shared_values$level)
+      req(shared_parameters$level)
+      paste("Step 1. Spatial level =", shared_parameters$level)
     })
     
     output$selection_display <- renderText({
-      req(shared_values$level)
+      req(shared_parameters$level)
       
-      if (shared_values$level == "woreda") {
+      if (shared_parameters$level == "woreda") {
         paste(
-          "You selected geography:",
-          shared_values$selected_region,
-          shared_values$selected_zone,
-          shared_values$selected_woreda
+          "Step 1. Geography =",
+          shared_parameters$selected_region,
+          "-",
+          shared_parameters$selected_zone,
+          "-",
+          shared_parameters$selected_woreda
         )
       } else {
-        if (shared_values$level == "zone") {
+        if (shared_parameters$level == "zone") {
           paste(
-            "You selected geography:",
-            shared_values$selected_region,
-            shared_values$selected_zone
+            "Step 1. Geography =",
+            shared_parameters$selected_region,
+            "-",
+            shared_parameters$selected_zone
           )
         } else {
-          if (shared_values$level == "region") {
-            paste("You selected geography:",
-                  shared_values$selected_region)
+          if (shared_parameters$level == "region") {
+            paste("Step 1. Geography =",
+                  shared_parameters$selected_region)
           } else {
-            paste("You selected geography: Ethiopia")
+            paste("Step 1. Geography = Ethiopia")
           }
         }
       }
-    }) 
+    })
     
     output$crop_1_display <- renderText({
-      message(paste("S12. crop details:", shared_values$crop_name_1))
-      req(shared_values$crop_name_1)
-      paste("S12. You selected crop on Screen 4:", shared_values$crop_name_1)
+      req(shared_parameters$crop_name_1)
+      paste("Step 4. Crop =", shared_parameters$crop_name_1)
     })
     
     
     output$ideotype_1_display <- renderText({
-      message(paste("S12. ideotype details:", shared_values$ideotype_1))
-      req(shared_values$ideotype_1)
-      paste("S12. You selected ideotype on Screen 4:", shared_values$ideotype_1)
+      req(shared_parameters$ideotype_1)
+      paste("Step 4. Ideotype =", shared_parameters$ideotype_1)
     })
     
     
     output$scenario_1_display <- renderText({
-      message(paste("S12. scenario details:", shared_values$scenario_1))
-      req(shared_values$scenario_1)
-      paste("S12. You selected scenario on Screen 4:", shared_values$scenario_1)
+      req(shared_parameters$scenario_1)
+      paste("Step 4. Scenario =", shared_parameters$scenario_1)
     })
     
     
     output$inn_type_1_display <- renderText({
-      message(paste("S12. Innovation type:", shared_values$inn_type_1))
       req(shared_values$inn_type_1)
-      paste("S12. You selected Innovation type on Screen 4:", shared_values$inn_type_1)
+      paste("Step 4. Innovation type =", shared_values$inn_type_1)
     })
     
     # _ navigation----
@@ -1189,8 +1303,21 @@ bslib_screen12_module_v3_Server <- function(id, shared_values, switch_screen) {
     
     #2 observeEvent to_screen13 ----
     observeEvent(input$to_screen13, {
+      shared_values$step <- 13
+      save_progress(shared_values, shared_parameters)
+      showNotification("Progress saved!", type = "message")
       switch_screen("screen13")
       
+    })
+    
+    # help button 12_01----
+    observeEvent(input$show_help_12_01, {
+      showModal(modalDialog(
+        title = "Step 12: View or Edit Spatial Data",
+        includeMarkdown("docs/step_12_01.md"),
+        easyClose = TRUE,
+        footer = modalButton("Close")
+      ))
     })
     
   })
