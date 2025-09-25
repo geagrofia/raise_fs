@@ -7,28 +7,28 @@ bslib_screen9_module_v3_SidebarUI <- function(id, shared_values, shared_paramete
   ns <- NS(id)
   
   tagList(
-    wellPanel(
-      style = "padding: 10px; margin-bottom: 5px;",
-      actionButton(
-        ns("back_to_screen8"),
-        label = tagList(
-          icon("circle-left"),
-          # icon first
-          "Back to Screen 8"
-          # text second
-        ),
-        class = "btn-primary"
-      ),
-      actionButton(
-        ns("to_screen10"),
-        label = tagList(
-          "Go to Screen 10",
-          # text first
-          icon("circle-right")  # icon second)
-        ),
-        class = "btn-primary"
-      )
-    ), 
+    # wellPanel(
+    #   style = "padding: 10px; margin-bottom: 5px;",
+    #   actionButton(
+    #     ns("back_to_screen8"),
+    #     label = tagList(
+    #       icon("circle-left"),
+    #       # icon first
+    #       "Back to Screen 8"
+    #       # text second
+    #     ),
+    #     class = "btn-primary"
+    #   ),
+    #   actionButton(
+    #     ns("to_screen10"),
+    #     label = tagList(
+    #       "Go to Screen 10",
+    #       # text first
+    #       icon("circle-right")  # icon second)
+    #     ),
+    #     class = "btn-primary"
+    #   )
+    # ), 
     # wellPanel(
     #   style = "padding: 10px; margin-bottom: 5px;",
     # h4("Screen 9: Crop Growth Stages"),
@@ -37,7 +37,22 @@ bslib_screen9_module_v3_SidebarUI <- function(id, shared_values, shared_paramete
     # )
     wellPanel(
       style = "padding: 10px; margin-bottom: 5px;",
-      h4("Step 3: Crop Growth Stages"),
+      div(
+        style = "display:inline-block;vertical-align:middle;margin-bottom: 5px;",
+        actionButton(
+          ns("show_help_09_01"),
+          title = "Help for Step 9",
+          label = tagList(
+            icon("circle-question")  # icon second)
+          ),
+          style = "background: rgba(23, 162, 184, 0.5);"
+        )
+        
+      ),
+      div(
+        style = "display: inline-block; vertical-align: middle; margin-left: 10px;",
+      h4("Step 9: View or Edit Crop Growth Stages")
+      ),
       
       # First set of radio buttons----
       radioButtons(
@@ -49,6 +64,21 @@ bslib_screen9_module_v3_SidebarUI <- function(id, shared_values, shared_paramete
       
       # Second radio button (conditionally shown)----
       uiOutput(ns("sowdate1_ui"))
+    ),
+    wellPanel(
+      style = "padding: 10px; margin-bottom: 5px;",    
+      # growth stages table
+      h4("Growth Stages Table"),
+      scrollable_DT(ns("growth_stages_table")),
+      actionButton(ns("add_btn"), "Add Growth Stage",
+                   class = "btn-primary"),
+      actionButton(ns("delete_btn"), "Delete Growth Stage",
+                   class = "btn-primary"),
+      actionButton(ns("move_up_btn"), "Move Up Growth Stage",
+                   class = "btn-primary"),
+      actionButton(ns("move_down_btn"), "Move Down Growth Stage",
+                   class = "btn-primary"),
+      uiOutput(ns("dyanamic_save_reset_gs"))
     )
   )
 }
@@ -56,33 +86,61 @@ bslib_screen9_module_v3_SidebarUI <- function(id, shared_values, shared_paramete
 bslib_screen9_module_v3_MainUI <- function(id) {
   ns <- NS(id)
   tagList(
-    textOutput(ns("value_display")),
-    textOutput(ns("level_display")),
-    textOutput(ns("selection_display")),
-    textOutput(ns("spatres_display")),
-    textOutput(ns("aggregation_display")),
-    textOutput(ns("num_innovations_display")),
-    textOutput(ns("innovation_system_display")),
-    textOutput(ns("crop_1_display")),
-    textOutput(ns("ideotype_1_display")),
-    textOutput(ns("scenario_1_display")),
-    textOutput(ns("inn_type_1_display")),
-    textOutput(ns("sowdate_1_display")),
-    
-    # growth stages table
-    h4("Growth Stages Table"),
-    DTOutput(ns("growth_stages_table")),
-    actionButton(ns("add_btn"), "Add Growth Stage"),
-    actionButton(ns("delete_btn"), "Delete Growth Stage"),
-    actionButton(ns("move_up_btn"), "Move Up Growth Stage"),
-    actionButton(ns("move_down_btn"), "Move Down Growth Stage"),
-    uiOutput(ns("dyanamic_save_reset_gs"))
+    wellPanel(
+      h4("Navigate", style = "color: var(--bs-secondary);"),
+      style = "padding: 10px; margin-bottom: 5px;",
+      actionButton(ns("back_to_screen8"), 
+                   title = "Go back to Step 8: View or Edit Rule Base Propositions and Conclusions",
+                   label = tagList(
+                     icon("circle-left"),  # icon first 
+                     #"Go to Introduction"
+                     "Back"
+                     # text second
+                   ),
+                   class = "btn-primary"),
+      
+      tags$span(
+        tagList("Step 9", icon("location-crosshairs")),  # text + icon
+        class = "btn btn-info disabled"
+      ),
+      # <button type="button" class="btn btn-secondary" data-bs-toggle="tooltip" data-bs-placement="left" data-bs-original-title="Tooltip on left">Left</button>
+      actionButton(ns("to_screen10"), 
+                   title = "Go to Step 10: View or Edit Soil Texture and Drainage Tables",
+                   label = tagList(
+                     #"Go to Screen 2",
+                     "Next",
+                     # text first
+                     icon("circle-right")  # icon second)
+                   ),
+                   class = "btn-primary disabled")
+      #,
+      #actionButton(ns("save_progress"), "Save Progress"),
+      #actionButton(ns("resume_progress"), "Resume Progress")
+    ),
+    wellPanel(
+      style = "padding: 10px; margin-bottom: 5px; background: rgba(23, 162, 184, 0.5);",
+      h4("Summary of IRM setup"),
+      textOutput(ns("value_display")),
+      textOutput(ns("level_display")),
+      textOutput(ns("selection_display")),
+      textOutput(ns("spatres_display")),
+      textOutput(ns("aggregation_display")),
+      textOutput(ns("num_innovations_display")),
+      textOutput(ns("innovation_system_display")),
+      textOutput(ns("crop_1_display")),
+      textOutput(ns("ideotype_1_display")),
+      textOutput(ns("scenario_1_display")),
+      textOutput(ns("inn_type_1_display")),
+      textOutput(ns("sowdate_1_display"))
+    )
   )
 }
 
 bslib_screen9_module_v3_Server <- function(id, shared_values, shared_parameters, switch_screen) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
+    
+    disable("to_screen10")
     
     output$sowdate1_ui <- renderUI({
       if (input$sos1 == "fixed") {
@@ -92,6 +150,7 @@ bslib_screen9_module_v3_Server <- function(id, shared_values, shared_parameters,
     
     # Load the initial growth stages data ----
     initial_growth_stages_data <- reactive({
+      req(switch_screen() == "screen9")
       if (file.exists(
         paste0(
           "E:/repos/raise_fs/shiny/data/",
@@ -156,6 +215,7 @@ bslib_screen9_module_v3_Server <- function(id, shared_values, shared_parameters,
           selection = list(mode = "none"),
           editable = FALSE,
           options = list(
+            scrollX = TRUE,
             lengthMenu = c(10, 20),
             pageLength = 10,
             sDom  = '<"top">lrt<"bottom">ip'
@@ -170,6 +230,7 @@ bslib_screen9_module_v3_Server <- function(id, shared_values, shared_parameters,
           selection = list(mode = "single"),
           editable = list(target = "cell"),
           options = list(
+            scrollX = TRUE,
             lengthMenu = c(10, 20),
             pageLength = 10,
             sDom  = '<"top">lrt<"bottom">ip'
@@ -329,8 +390,10 @@ bslib_screen9_module_v3_Server <- function(id, shared_values, shared_parameters,
     # dynamic gs save reset controls ----
     output$dyanamic_save_reset_gs <- renderUI({
       tagList(
-        actionButton(ns("save_btn_gs"), "Save Growth Stages table"),
-        actionButton(ns("reset_btn_gs"), "Reset Growth Stages table")
+        actionButton(ns("save_btn_gs"), "Save Growth Stages table",
+                     class = "btn-primary"),
+        actionButton(ns("reset_btn_gs"), "Reset Growth Stages table",
+                     class = "btn-primary")
       )
     })
     
@@ -427,10 +490,12 @@ bslib_screen9_module_v3_Server <- function(id, shared_values, shared_parameters,
           )
         )
         
+        enable("to_screen10")
+        
         removeModal()
         showModal(modalDialog(
           title = "Saved",
-          "Table saved successfully.",
+          "Growth Stages Table saved successfully.",
           easyClose = TRUE
         ))
       }
@@ -549,11 +614,24 @@ bslib_screen9_module_v3_Server <- function(id, shared_values, shared_parameters,
     
     # observeEvent to_screen10 ----
     observeEvent(input$to_screen10, {
+      shared_values$step <- 10
       save_progress(shared_values, shared_parameters)
       showNotification("Progress saved!", type = "message")
       switch_screen("screen10")
       
     })
+    
+    
+    # help button 09_01----
+    observeEvent(input$show_help_09_01, {
+      showModal(modalDialog(
+        title = "Step 9: View or Edit Crop Growth Stages",
+        includeMarkdown("docs/step_09_01.md"),
+        easyClose = TRUE,
+        footer = modalButton("Close")
+      ))
+    })
+    
     
   }) # Module server
 } # Server
