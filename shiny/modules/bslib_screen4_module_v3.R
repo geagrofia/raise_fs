@@ -32,10 +32,26 @@ bslib_screen4_module_v3_SidebarUI <- function(id, shared_values, shared_paramete
     # ), 
     wellPanel(
       style = "padding: 10px; margin-bottom: 5px;",
-      h4("Screen 4: Select Innovation"),
+      div(
+        style = "display:inline-block;vertical-align:middle;margin-bottom: 5px;",
+        actionButton(
+          ns("show_help_04_01"),
+          title = "Help for Step 4",
+          label = tagList(
+            icon("circle-question")  # icon second)
+          ),
+          style = "background: rgba(23, 162, 184, 0.5);"
+        )
+        
+      ),
+      div(
+        style = "display: inline-block; vertical-align: middle; margin-left: 10px;",
+      h4("Step 4: Select Innovation")
+      ),
       
       # UI datatable ----
-      DTOutput(ns("data_table")),
+      scrollable_DT(ns("data_table")),
+      #DTOutput(ns("data_table")),
       
       # UI actionbuttons row selections----
       actionButton(ns("select_row"), "Select an Existing Innovation", class = "btn-primary"),
@@ -59,7 +75,7 @@ bslib_screen4_module_v3_MainUI <- function(id) {
       h4("Navigate", style = "color: var(--bs-secondary);"),
       style = "padding: 10px; margin-bottom: 5px;",
       actionButton(ns("back_to_screen3"), 
-                   title = "Go back to Step 3",
+                   title = "Go back to Step 3: Select number of Innovations",
                    label = tagList(
                      icon("circle-left"),  # icon first 
                      #"Go to Introduction"
@@ -74,7 +90,7 @@ bslib_screen4_module_v3_MainUI <- function(id) {
       ),
       # <button type="button" class="btn btn-secondary" data-bs-toggle="tooltip" data-bs-placement="left" data-bs-original-title="Tooltip on left">Left</button>
       actionButton(ns("to_screen5"), 
-                   title = "Go to Step 5",
+                   title = "Go to Step 5: Rule Base Hierarchy",
                    label = tagList(
                      #"Go to Screen 2",
                      "Next",
@@ -142,6 +158,7 @@ bslib_screen4_module_v3_Server <- function(id, shared_values, shared_parameters,
         selection = list(mode = "single", selected = selected_row()),
         editable = FALSE,
         options = list(
+          scrollX = TRUE,
           dom = '<t><"bottom"lip>',
           columnDefs = list(list(
             visible = FALSE, targets = c(0) # hide the inn_ID
@@ -166,7 +183,7 @@ bslib_screen4_module_v3_Server <- function(id, shared_values, shared_parameters,
       if (length(selected_row) > 0) {
         enable("select_row")
         enable("duplicate_row")
-        enable("to_screen5")
+        #enable("to_screen5")
         cat("\n\ndisable r\n\n")
       } else {
         disable("select_row")
@@ -193,6 +210,7 @@ bslib_screen4_module_v3_Server <- function(id, shared_values, shared_parameters,
       
       editing_mode("view")  # Set to "view" mode
       shared_values$inn_type_1 <- "existing"#  Set to "existing" innovation mode
+      enable("to_screen5")
     })
     
     # observeEvent duplicate row (Option 2: Edit after duplication)----
@@ -400,6 +418,7 @@ bslib_screen4_module_v3_Server <- function(id, shared_values, shared_parameters,
           df_inn(all_df_inn)
           editing_mode("view")  # Reset editing mode
           selected_row(df_inn()[nrow(all_df_inn), ])# select the newly added innovation in the datatable
+          enable("to_screen5")
 
         }
       }
@@ -527,6 +546,7 @@ bslib_screen4_module_v3_Server <- function(id, shared_values, shared_parameters,
     observeEvent(input$to_screen5, {
       req(selected_row())
       
+      shared_values$step <- 5
       save_progress(shared_values, shared_parameters)
       showNotification("Progress saved!", type = "message")
       
@@ -770,6 +790,18 @@ bslib_screen4_module_v3_Server <- function(id, shared_values, shared_parameters,
       # shared_values$scenario_1 <-  selected_row()$scenario
       switch_screen("screen5")
       
+    })
+    
+    
+    
+    # help button 04_01----
+    observeEvent(input$show_help_04_01, {
+      showModal(modalDialog(
+        title = "Step 4: Select Innovation",
+        includeMarkdown("docs/step_04_01.md"),
+        easyClose = TRUE,
+        footer = modalButton("Close")
+      ))
     })
     
   })
