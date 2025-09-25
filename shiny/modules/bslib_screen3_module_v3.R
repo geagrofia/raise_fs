@@ -21,7 +21,22 @@ bslib_screen3_module_v3_SidebarUI <- function(id, shared_values, shared_paramete
     # ), 
     wellPanel(
       style = "padding: 10px; margin-bottom: 5px;",
-      h4("Screen 3: Number of Innovations"),
+      div(
+        style = "display:inline-block;vertical-align:middle;margin-bottom: 5px;",
+        actionButton(
+          ns("show_help_03_01"),
+          title = "Help for Step 3",
+          label = tagList(
+            icon("circle-question")  # icon second)
+          ),
+          style = "background: rgba(23, 162, 184, 0.5);"
+        )
+        
+      ),
+      div(
+        style = "display: inline-block; vertical-align: middle; margin-left: 10px;",
+      h4("Step 3: Select number of Innovations")
+      ),
       
       # First set of radio buttons----
       radioButtons(
@@ -44,7 +59,7 @@ bslib_screen3_module_v3_MainUI <- function(id) {
       h4("Navigate", style = "color: var(--bs-secondary);"),
       style = "padding: 10px; margin-bottom: 5px;",
       actionButton(ns("back_to_screen2"), 
-                   title = "Go back to Step 2",
+                   title = "Go back to Step 2: Define IRM Spatial Resolution",
                    label = tagList(
                      icon("circle-left"),  # icon first 
                      #"Go to Introduction"
@@ -59,7 +74,7 @@ bslib_screen3_module_v3_MainUI <- function(id) {
       ),
       # <button type="button" class="btn btn-secondary" data-bs-toggle="tooltip" data-bs-placement="left" data-bs-original-title="Tooltip on left">Left</button>
       actionButton(ns("to_screen4"), 
-                   title = "Go to Step 4",
+                   title = "Go to Step 4: Select Innovation",
                    label = tagList(
                      #"Go to Screen 2",
                      "Next",
@@ -93,7 +108,7 @@ bslib_screen3_module_v3_Server <- function(id, shared_values, shared_parameters,
     output$innovation_system_ui <- renderUI({
       if (input$num_innovations == "two_inn") {
         radioButtons(ns("innovation_system"), "System:",
-                     choices = list("Intercrop / Rotation" = "intercrop", "Compare" = "compare"),
+                     choices = list("Intercrop" = "intercrop", "Compare" = "compare"),
                      selected = shared_parameters$innovation_system)
       } else {
         radioButtons(ns("innovation_system"), "System:",
@@ -186,6 +201,17 @@ bslib_screen3_module_v3_Server <- function(id, shared_values, shared_parameters,
       showNotification("Progress saved!", type = "message")
       switch_screen("screen4")
       message(paste("S3. To screen 4. forget:", shared_values$forget))
+    })
+    
+    
+    # help button 03_01----
+    observeEvent(input$show_help_03_01, {
+      showModal(modalDialog(
+        title = "Step 3: Select number of Innovations",
+        includeMarkdown("docs/step_03_01.md"),
+        easyClose = TRUE,
+        footer = modalButton("Close")
+      ))
     })
     
   })
