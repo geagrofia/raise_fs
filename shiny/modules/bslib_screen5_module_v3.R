@@ -30,7 +30,22 @@ bslib_screen5_module_v3_SidebarUI <- function(id, shared_values, shared_paramete
     # ),
     wellPanel(
       style = "padding: 10px; margin-bottom: 5px;",
-      h4("Screen 5: Rule Base Hierarchy"),
+      div(
+        style = "display:inline-block;vertical-align:middle;margin-bottom: 5px;",
+        actionButton(
+          ns("show_help_05_01"),
+          title = "Help for Step 5",
+          label = tagList(
+            icon("circle-question")  # icon second)
+          ),
+          style = "background: rgba(23, 162, 184, 0.5);"
+        )
+        
+      ),
+      div(
+        style = "display: inline-block; vertical-align: middle; margin-left: 10px;",
+      h4("Step 5: View or Edit Rule Base Hierarchy")
+      ),
       #DTOutput(ns("inn_req_data_table")),
       htmlOutput(ns("inn_type_edit_mode_1_display")),
       
@@ -58,7 +73,7 @@ bslib_screen5_module_v3_MainUI <- function(id) {
       h4("Navigate", style = "color: var(--bs-secondary);"),
       style = "padding: 10px; margin-bottom: 5px;",
       actionButton(ns("back_to_screen4"), 
-                   title = "Go back to Step 4",
+                   title = "Go back to Step 4: Select Innovation",
                    label = tagList(
                      icon("circle-left"),  # icon first 
                      #"Go to Introduction"
@@ -73,14 +88,14 @@ bslib_screen5_module_v3_MainUI <- function(id) {
       ),
       # <button type="button" class="btn btn-secondary" data-bs-toggle="tooltip" data-bs-placement="left" data-bs-original-title="Tooltip on left">Left</button>
       actionButton(ns("to_screen6"), 
-                   title = "Go to Step 6",
+                   title = "Go to Step 6: View or Edit Rule Base Conclusions",
                    label = tagList(
                      #"Go to Screen 2",
                      "Next",
                      # text first
                      icon("circle-right")  # icon second)
                    ),
-                   class = "btn-primary")
+                   class = "btn-primary disabled")
       #,
       #actionButton(ns("save_progress"), "Save Progress"),
       #actionButton(ns("resume_progress"), "Resume Progress")
@@ -109,6 +124,8 @@ bslib_screen5_module_v3_Server <- function(id, shared_values, shared_parameters,
   moduleServer(id, function(input, output, session) {
     
     ns <- session$ns
+    
+    disable("to_screen6")
     
     # --- STEP 1: Recursive cleaner to convert 0 to list() and remove attrs ----
     clean_tree <- function(tree) {
@@ -412,10 +429,14 @@ bslib_screen5_module_v3_Server <- function(id, shared_values, shared_parameters,
     output$dyanamic_save_reset <- renderUI({
       if (shared_values$inn_type_1 == "existing") {
         # observe the inn_type to determine button visibility----
+        tagList(
+          actionButton(ns("save_dyn_button"), "Save Hierarchy", class = "btn-primary") # Button to save changes
+        ) 
       } else {
         tagList(
-        actionButton(ns("save_dyn_button"), "Save Changes / Re-load"), # Button to save changes
-        actionButton(ns("reset_dyn_button"), "Reset to Original")) # Button to reset to original
+        actionButton(ns("save_dyn_button"), "Save Hierarchy", class = "btn-primary"), # Button to save changes
+        actionButton(ns("reset_dyn_button"), "Reset Hierarchy", class = "btn-primary") # Button to reset to original
+        ) 
       }
     })
   # }
@@ -593,7 +614,7 @@ bslib_screen5_module_v3_Server <- function(id, shared_values, shared_parameters,
           row.names = F
         )
           
-        
+        enable("to_screen6")
       }
     })
     
@@ -705,11 +726,23 @@ bslib_screen5_module_v3_Server <- function(id, shared_values, shared_parameters,
     
     #2 observeEvent to_screen6 ----
     observeEvent(input$to_screen6, {
+      shared_values$step <- 6
       save_progress(shared_values, shared_parameters)
       showNotification("Progress saved!", type = "message")
       switch_screen("screen6")
-      
     })
+    
+    
+    # help button 05_01----
+    observeEvent(input$show_help_05_01, {
+      showModal(modalDialog(
+        title = "Step 5: View or Edit Rule Base Hierarchy",
+        includeMarkdown("docs/step_05_01.md"),
+        easyClose = TRUE,
+        footer = modalButton("Close")
+      ))
+    })
+    
     
   })
 }
